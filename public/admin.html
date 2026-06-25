@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>預約系統後台</title>
+  <style>
+    :root {
+      --blue: #1a73e8;
+      --green: #188038;
+      --red: #d93025;
+      --yellow: #f9ab00;
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #dadce0;
+      --soft: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f5f7fb;
+      color: var(--ink);
+      font-family: Arial, "Noto Sans TC", sans-serif;
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    h1, h2, h3 { margin: 0 0 14px; line-height: 1.25; }
+    h1 { color: var(--blue); font-size: 22px; margin: 0; }
+    h2 { color: var(--blue); font-size: 21px; }
+    p { color: var(--muted); line-height: 1.6; }
+    main { max-width: 1180px; margin: 24px auto; padding: 0 16px; }
+    .panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      margin-bottom: 18px;
+      box-shadow: 0 8px 28px rgba(60,64,67,.07);
+    }
+    .login-wrap {
+      max-width: 460px;
+      margin: 56px auto;
+      padding: 0 16px;
+    }
+    label { display: block; font-weight: 700; margin-bottom: 7px; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    .row {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 12px;
+      align-items: end;
+    }
+    .col-2 { grid-column: span 2; }
+    .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; }
+    .col-5 { grid-column: span 5; }
+    .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.secondary { background: #fff; color: var(--blue); border: 1px solid var(--blue); }
+    button.danger { background: var(--red); }
+    button.green { background: var(--green); }
+    button.yellow { background: var(--yellow); color: #202124; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .tab {
+      width: auto;
+      background: #fff;
+      color: var(--muted);
+      border: 1px solid var(--line);
+    }
+    .tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .list { display: grid; gap: 12px; }
+    .item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: var(--soft);
+    }
+    .muted { color: var(--muted); }
+    .ok { color: var(--green); font-weight: 700; }
+    .bad { color: var(--red); font-weight: 700; }
+    .hidden { display: none !important; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .stat { background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+    .stat strong { display: block; color: var(--blue); font-size: 28px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; }
+    th { background: var(--soft); color: var(--muted); }
+    @media (max-width: 780px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .row { grid-template-columns: 1fr; }
+      .row > * { grid-column: auto !important; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header id="appHeader" class="hidden">
+    <div>
+      <h1>預約系統後台</h1>
+      <div class="muted" id="tenantLabel"></div>
+    </div>
+    <div>
+      <span id="userLabel" class="muted"></span>
+      <button class="secondary" onclick="logout()">登出</button>
+    </div>
+  </header>
+
+  <section class="login-wrap" id="loginWrap">
+    <div class="panel">
+      <h2>登入後台</h2>
+      <p>這裡登入的是中央系統帳號，不需要再進客戶的 GAS 或 Systeme 後台。</p>
+      <label>Email</label>
+      <input id="loginEmail" type="email" autocomplete="email">
+      <label style="margin-top:12px;">密碼</label>
+      <input id="loginPassword" type="password" autocomplete="current-password">
+      <button style="width:100%; margin-top:16px;" onclick="login()">登入</button>
+      <p id="loginMsg" class="bad"></p>
+    </div>
+
+    <div class="panel">
+      <h2>第一次建立客戶</h2>
+      <p>每個客戶建立一個租戶代碼，例如 `nicolle-demo`。這個動作只要做一次。</p>
+      <label>租戶代碼</label>
+      <input id="setupTenant" placeholder="client-name">
+      <label style="margin-top:12px;">客戶/系統名稱</label>
+      <input id="setupName" placeholder="某某顧問團隊">
+      <label style="margin-top:12px;">管理員姓名</label>
+      <input id="setupAdminName" placeholder="Nicolle">
+      <label style="margin-top:12px;">管理員 Email</label>
+      <input id="setupAdminEmail" type="email">
+      <label style="margin-top:12px;">管理員密碼</label>
+      <input id="setupPassword" type="password">
+      <label style="margin-top:12px;">安裝密鑰 INSTALLER_SECRET</label>
+      <input id="setupSecret" type="password">
+      <button class="green" style="width:100%; margin-top:16px;" onclick="setupTenant()">建立租戶</button>
+      <p id="setupMsg"></p>
+    </div>
+  </section>
+
+  <main id="app" class="hidden">
+    <div class="tabs">
+      <button class="tab active" data-view="appointments" onclick="showView('appointments')">預約</button>
+      <button class="tab" data-view="projects" onclick="showView('projects')">專案</button>
+      <button class="tab" data-view="consultants" onclick="showView('consultants')">顧問與 OAuth</button>
+      <button class="tab" data-view="schedule" onclick="showView('schedule')">開放時段</button>
+      <button class="tab" data-view="questions" onclick="showView('questions')">問卷</button>
+      <button class="tab" data-view="analytics" onclick="showView('analytics')">統計</button>
+    </div>
+    <section id="view"></section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    let tenant = (params.get('tenant') || params.get('t') || '').toLowerCase();
+    function tokenKey() { return 'dm_saas_' + tenant + '_token'; }
+    let token = tenant ? localStorage.getItem(tokenKey()) : '';
+    let currentUser = null;
+    let consultantsCache = [];
+    let projectsCache = [];
+
+    if (tenant) document.getElementById('setupTenant').value = tenant;
+
+    function api(action, payload) {
+      if (!tenant) tenant = (document.getElementById('setupTenant').value || '').toLowerCase();
+      return fetch('/api?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+          'Authorization': token ? 'Bearer ' + token : ''
+        },
+        body: JSON.stringify(payload || {})
+      }).then(function (res) { return res.json(); }).then(function (data) {
+        if (data && data.success === false) throw new Error(data.message || '操作失敗');
+        return data;
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    function field(id) { return document.getElementById(id).value.trim(); }
+
+    function login() {
+      tenant = tenant || field('setupTenant');
+      api('verifyLogin', {
+        email: field('loginEmail'),
+        password: field('loginPassword')
+      }).then(function (res) {
+        token = res.authToken;
+        localStorage.setItem(tokenKey(), token);
+        currentUser = res;
+        bootApp();
+      }).catch(function (err) {
+        document.getElementById('loginMsg').textContent = err.message;
+      });
+    }
+
+    function setupTenant() {
+      tenant = field('setupTenant').toLowerCase();
+      api('initializeTenant', {
+        tenant: tenant,
+        tenantName: field('setupName'),
+        projectName: field('setupName') || '預約諮詢',
+        adminName: field('setupAdminName'),
+        adminEmail: field('setupAdminEmail'),
+        adminPwd: field('setupPassword'),
+        installerSecret: field('setupSecret')
+      }).then(function (res) {
+        document.getElementById('setupMsg').innerHTML = '<span class="ok">建立完成。</span><br>後台：<a href="' + res.adminUrl + '">' + res.adminUrl + '</a><br>預約頁：<a href="' + res.bookingUrl + '">' + res.bookingUrl + '</a>';
+      }).catch(function (err) {
+        document.getElementById('setupMsg').innerHTML = '<span class="bad">' + escapeHtml(err.message) + '</span>';
+      });
+    }
+
+    function logout() {
+      localStorage.removeItem(tokenKey());
+      location.reload();
+    }
+
+    function bootApp() {
+      document.getElementById('loginWrap').classList.add('hidden');
+      document.getElementById('appHeader').classList.remove('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('tenantLabel').textContent = '租戶：' + tenant;
+      document.getElementById('userLabel').textContent = currentUser ? currentUser.name : '';
+      showView('appointments');
+    }
+
+    function showView(name) {
+      document.querySelectorAll('.tab').forEach(function (tab) {
+        tab.classList.toggle('active', tab.dataset.view === name);
+      });
+      const map = {
+        appointments: loadAppointments,
+        projects: loadProjects,
+        consultants: loadConsultants,
+        schedule: loadSchedule,
+        questions: loadQuestions,
+        analytics: loadAnalytics
+      };
+      map[name]();
+    }
+
+    function loadAppointments() {
+      document.getElementById('view').innerHTML = '<div class="panel"><h2>預約</h2><p>讀取中...</p></div>';
+      api('getConsultantAppointments', {}).then(function (res) {
+        const rows = (res.data || []).map(function (a) {
+          return '<tr><td>' + escapeHtml(a.meetTime) + '</td><td>' + escapeHtml(a.clientName) + '<br><span class="muted">' + escapeHtml(a.clientEmail) + '</span></td><td>' + escapeHtml(a.projectName) + '</td><td>' + escapeHtml(a.consultant) + '</td><td>' + escapeHtml(a.status) + '</td><td>' + (a.meetLink ? '<a href="' + escapeHtml(a.meetLink) + '" target="_blank">會議連結</a>' : '') + '</td><td><button class="danger" onclick="cancelAppointment(' + a.rowId + ')">取消</button></td></tr>';
+        }).join('');
+        document.getElementById('view').innerHTML = '<div class="panel"><h2>預約</h2><table><thead><tr><th>時間</th><th>客戶</th><th>專案</th><th>顧問</th><th>狀態</th><th>連結</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      });
+    }
+
+    function cancelAppointment(rowId) {
+      if (!confirm('確定取消這筆預約？')) return;
+      api('handleAppointmentAction', { actionType: 'cancel', rowId: rowId }).then(function (res) {
+        alert(res.message || '已取消');
+        loadAppointments();
+      }).catch(function (err) { alert(err.message); });
+    }
+
+    function loadProjects() {
+      api('getAdminProjectData', {}).then(function (res) {
+        projectsCache = res.projects || [];
+        let html = '<div class="panel"><h2>專案</h2><p>每個專案會形成一個預約網址，客戶安裝碼只需要填租戶與專案代碼。</p><div class="list">';
+        projectsCache.forEach(function (p) {
+          html += '<div class="item row" data-project="' + p.rowId + '">' +
+            '<div class="col-2"><label>代碼</label><input class="p-code" value="' + escapeHtml(p.code) + '"></div>' +
+            '<div class="col-3"><label>名稱</label><input class="p-name" value="' + escapeHtml(p.name) + '"></div>' +
+            '<div class="col-2"><label>狀態</label><select class="p-status"><option ' + (p.status === '啟用' ? 'selected' : '') + '>啟用</option><option ' + (p.status === '停用' ? 'selected' : '') + '>停用</option></select></div>' +
+            '<div class="col-5"><label>預約網址</label><input readonly value="' + escapeHtml(p.bookingUrl) + '"></div>' +
+            '<div class="col-6"><label>優先跳轉網址</label><input class="p-main" value="' + escapeHtml(p.mainUrl) + '"></div>' +
+            '<div class="col-6"><label>備用跳轉網址</label><input class="p-fallback" value="' + escapeHtml(p.fallbackUrl) + '"></div>' +
+            '<div class="col-8"><label>預約注意事項</label><textarea class="p-notice">' + escapeHtml(p.bookingNotice) + '</textarea></div>' +
+            '<div class="col-2"><label>婉拒動作</label><select class="p-reject-type"><option value="text" ' + (p.rejectType === 'text' ? 'selected' : '') + '>文字</option><option value="url" ' + (p.rejectType === 'url' ? 'selected' : '') + '>跳轉網址</option></select></div>' +
+            '<div class="col-2"><label>內容/網址</label><input class="p-reject-value" value="' + escapeHtml(p.rejectValue) + '"></div>' +
+            '<div class="col-12"><button onclick="saveProject(' + p.rowId + ')">儲存專案</button></div>' +
+          '</div>';
+        });
+        html += '</div></div><div class="panel"><h2>新增專案</h2><div class="row"><div class="col-2"><label>代碼</label><input id="newProjectCode" value="P02"></div><div class="col-4"><label>名稱</label><input id="newProjectName"></div><div class="col-6"><button class="green" onclick="addProject()">新增</button></div></div></div>';
+        document.getElementById('view').innerHTML = html;
+      });
+    }
+
+    function saveProject(rowId) {
+      const card = document.querySelector('[data-project="' + rowId + '"]');
+      api('saveProjectData', {
+        rowId: rowId,
+        code: card.querySelector('.p-code').value,
+        name: card.querySelector('.p-name').value,
+        status: card.querySelector('.p-status').value,
+        mainUrl: card.querySelector('.p-main').value,
+        fallbackUrl: card.querySelector('.p-fallback').value,
+        bookingNotice: card.querySelector('.p-notice').value,
+        rejectType: card.querySelector('.p-reject-type').value,
+        rejectValue: card.querySelector('.p-reject-value').value
+      }).then(function () { alert('已儲存'); loadProjects(); });
+    }
+
+    function addProject() {
+      api('saveProjectData', { code: field('newProjectCode'), name: field('newProjectName'), status: '啟用' }).then(loadProjects);
+    }
+
+    function loadConsultants() {
+      api('getAdminConsultantData', {}).then(function (res) {
+        consultantsCache = res.consultants || [];
+        projectsCache = res.projects || [];
+        let html = '<div class="panel"><h2>顧問與 Google OAuth</h2><p>每位會被派單的顧問，都要按一次「連接 Google」。系統會把 refresh token 加密存在中央資料庫。</p><div class="list">';
+        consultantsCache.forEach(function (c) {
+          html += '<div class="item row" data-consultant="' + c.rowId + '">' +
+            '<div class="col-2"><label>姓名</label><input class="c-name" value="' + escapeHtml(c.name) + '"></div>' +
+            '<div class="col-3"><label>登入 Email</label><input class="c-email" value="' + escapeHtml(c.loginEmail) + '"></div>' +
+            '<div class="col-2"><label>新密碼</label><input class="c-password" placeholder="不改留空"></div>' +
+            '<div class="col-2"><label>接單</label><select class="c-accept"><option value="是" ' + (c.isAccepting === '是' ? 'selected' : '') + '>是</option><option value="否" ' + (c.isAccepting === '否' ? 'selected' : '') + '>否</option></select></div>' +
+            '<div class="col-1"><label>權重</label><input class="c-weight" type="number" value="' + escapeHtml(c.weight) + '"></div>' +
+            '<div class="col-2"><label>時區</label><input class="c-tz" value="' + escapeHtml(c.shiftTZ || 'Asia/Taipei') + '"></div>' +
+            '<div class="col-3"><label>可看專案</label><input class="c-projects" value="' + escapeHtml(c.projects || 'ALL') + '"></div>' +
+            '<div class="col-3"><label>權限</label><input class="c-role" value="' + escapeHtml(c.sysRole || '') + '" placeholder="ALL 或顧問管理"></div>' +
+            '<div class="col-3"><label>Google 狀態</label><div>' + (c.googleConnected ? '<span class="ok">已連接 ' + escapeHtml(c.googleEmail) + '</span>' : '<span class="bad">尚未連接</span>') + '</div></div>' +
+            '<div class="col-3"><button onclick="saveConsultant(' + c.rowId + ')">儲存</button> <button class="green" onclick="connectGoogle(' + c.rowId + ')">連接 Google</button></div>' +
+          '</div>';
+        });
+        html += '</div></div><div class="panel"><h2>新增顧問</h2><div class="row"><div class="col-2"><label>姓名</label><input id="newCName"></div><div class="col-3"><label>Email</label><input id="newCEmail"></div><div class="col-2"><label>密碼</label><input id="newCPwd"></div><div class="col-2"><label>專案</label><input id="newCProjects" value="ALL"></div><div class="col-3"><button class="green" onclick="addConsultant()">新增顧問</button></div></div></div>';
+        document.getElementById('view').innerHTML = html;
+      });
+    }
+
+    function saveConsultant(id) {
+      const card = document.querySelector('[data-consultant="' + id + '"]');
+      api('saveConsultantData', {
+        rowId: id,
+        name: card.querySelector('.c-name').value,
+        loginEmail: card.querySelector('.c-email').value,
+        password: card.querySelector('.c-password').value,
+        isAccepting: card.querySelector('.c-accept').value,
+        weight: card.querySelector('.c-weight').value,
+        projects: card.querySelector('.c-projects').value,
+        sysRole: card.querySelector('.c-role').value,
+        shiftTZ: card.querySelector('.c-tz').value
+      }).then(function () { alert('已儲存'); loadConsultants(); });
+    }
+
+    function addConsultant() {
+      api('saveConsultantData', {
+        name: field('newCName'),
+        loginEmail: field('newCEmail'),
+        password: field('newCPwd'),
+        projects: field('newCProjects'),
+        isAccepting: '是'
+      }).then(loadConsultants);
+    }
+
+    function connectGoogle(id) {
+      api('getGoogleConnectUrl', { consultantId: id, returnTo: location.origin + location.pathname + '?tenant=' + tenant }).then(function (res) {
+        location.href = res.url;
+      }).catch(function (err) { alert(err.message); });
+    }
+
+    function loadSchedule() {
+      api('getAdminConsultantData', {}).then(function (res) {
+        consultantsCache = res.consultants || [];
+        const options = consultantsCache.map(function (c) { return '<option value="' + c.rowId + '">' + escapeHtml(c.name) + '</option>'; }).join('');
+        document.getElementById('view').innerHTML = '<div class="panel"><h2>開放時段</h2><label>選擇顧問</label><select id="scheduleConsultant" onchange="loadScheduleEditor()">' + options + '</select><div id="scheduleEditor" style="margin-top:16px;"></div></div>';
+        loadScheduleEditor();
+      });
+    }
+
+    function loadScheduleEditor() {
+      const id = document.getElementById('scheduleConsultant').value;
+      if (!id) return;
+      api('getConsultantScheduleData', { consultantId: id }).then(function (res) {
+        const weeklyMap = {};
+        (res.weekly || []).forEach(function (r) { weeklyMap[r.dayOfWeek] = r; });
+        const days = ['日', '一', '二', '三', '四', '五', '六'];
+        let html = '<div class="row"><div class="col-2"><label>時區</label><input id="shiftTZ" value="' + escapeHtml(res.shiftTZ) + '"></div><div class="col-2"><label>間隔分鐘</label><input id="interval" type="number" value="' + res.settings.interval + '"></div><div class="col-2"><label>前緩衝</label><input id="bufferBefore" type="number" value="' + res.settings.bufferBefore + '"></div><div class="col-2"><label>後緩衝</label><input id="bufferAfter" type="number" value="' + res.settings.bufferAfter + '"></div><div class="col-2"><label>最早天數</label><input id="minDays" type="number" value="' + res.settings.minDays + '"></div><div class="col-2"><label>最晚天數</label><input id="maxDays" type="number" value="' + res.settings.maxDays + '"></div></div>';
+        html += '<div class="list" style="margin-top:16px;">';
+        for (let i = 0; i < 7; i += 1) {
+          const r = weeklyMap[i] || {};
+          html += '<div class="item row weekly-row" data-day="' + i + '"><div class="col-2"><strong>星期' + days[i] + '</strong></div><div class="col-2"><label>開始</label><input class="w-start" value="' + escapeHtml(r.start || '') + '" placeholder="09:00"></div><div class="col-2"><label>結束</label><input class="w-end" value="' + escapeHtml(r.end || '') + '" placeholder="18:00"></div><div class="col-2"><label>第二段開始</label><input class="w-start2" value="' + escapeHtml(r.start2 || '') + '"></div><div class="col-2"><label>第二段結束</label><input class="w-end2" value="' + escapeHtml(r.end2 || '') + '"></div></div>';
+        }
+        html += '</div><button class="green" style="margin-top:16px;" onclick="saveSchedule()">儲存時段</button>';
+        document.getElementById('scheduleEditor').innerHTML = html;
+      });
+    }
+
+    function saveSchedule() {
+      const weeklyRules = Array.from(document.querySelectorAll('.weekly-row')).map(function (row) {
+        return {
+          dayOfWeek: Number(row.dataset.day),
+          start: row.querySelector('.w-start').value,
+          end: row.querySelector('.w-end').value,
+          start2: row.querySelector('.w-start2').value,
+          end2: row.querySelector('.w-end2').value
+        };
+      }).filter(function (r) { return r.start && r.end; });
+      api('saveConsultantWeeklyAndSettings', {
+        consultantId: document.getElementById('scheduleConsultant').value,
+        shiftTZ: field('shiftTZ'),
+        settings: {
+          interval: field('interval'),
+          bufferBefore: field('bufferBefore'),
+          bufferAfter: field('bufferAfter'),
+          minDays: field('minDays'),
+          maxDays: field('maxDays')
+        },
+        weeklyRules: weeklyRules
+      }).then(function () { alert('已儲存'); });
+    }
+
+    function loadQuestions() {
+      api('getAdminProjectData', {}).then(function (res) {
+        projectsCache = res.projects || [];
+        const options = projectsCache.map(function (p) { return '<option value="' + p.code + '">' + escapeHtml(p.code + ' ' + p.name) + '</option>'; }).join('');
+        document.getElementById('view').innerHTML = '<div class="panel"><h2>問卷</h2><label>專案</label><select id="questionProject" onchange="loadQuestionEditor()">' + options + '</select><div id="questionEditor" style="margin-top:16px;"></div></div>';
+        loadQuestionEditor();
+      });
+    }
+
+    function loadQuestionEditor() {
+      const projectCode = document.getElementById('questionProject').value;
+      api('getAdminQuestions', { projectCode }).then(function (questions) {
+        let html = '<p>一行一個選項；題型請填「簡答」、「單選」或「複選」。婉拒字填了之後，客戶答案包含該字就會進婉拒流程。</p><div class="list" id="questionRows">';
+        (questions || []).forEach(function (q, index) {
+          html += questionRow(q, index);
+        });
+        html += '</div><button class="secondary" onclick="addQuestionRow()">新增題目</button> <button class="green" onclick="saveQuestions()">儲存問卷</button>';
+        document.getElementById('questionEditor').innerHTML = html;
+      });
+    }
+
+    function questionRow(q, index) {
+      return '<div class="item row q-row"><div class="col-4"><label>題目</label><input class="q-title" value="' + escapeHtml(q.title || '') + '"></div><div class="col-2"><label>題型</label><select class="q-type"><option ' + (q.type === '簡答' ? 'selected' : '') + '>簡答</option><option ' + (q.type === '單選' ? 'selected' : '') + '>單選</option><option ' + (q.type === '複選' ? 'selected' : '') + '>複選</option></select></div><div class="col-3"><label>選項</label><textarea class="q-options">' + escapeHtml(q.options || '') + '</textarea></div><div class="col-2"><label>婉拒字</label><input class="q-reject" value="' + escapeHtml(q.rejectWord || '') + '"></div><div class="col-1"><label>必填</label><select class="q-required"><option value="是" ' + (q.isRequired !== '否' ? 'selected' : '') + '>是</option><option value="否" ' + (q.isRequired === '否' ? 'selected' : '') + '>否</option></select></div></div>';
+    }
+
+    function addQuestionRow() {
+      document.getElementById('questionRows').insertAdjacentHTML('beforeend', questionRow({ type: '簡答', isRequired: '是' }, 0));
+    }
+
+    function saveQuestions() {
+      const projectCode = document.getElementById('questionProject').value;
+      const questions = Array.from(document.querySelectorAll('.q-row')).map(function (row) {
+        return {
+          title: row.querySelector('.q-title').value,
+          type: row.querySelector('.q-type').value,
+          options: row.querySelector('.q-options').value,
+          rejectWord: row.querySelector('.q-reject').value,
+          isRequired: row.querySelector('.q-required').value
+        };
+      }).filter(function (q) { return q.title; });
+      api('saveAdminQuestions', { projectCode, questions }).then(function () { alert('已儲存'); });
+    }
+
+    function loadAnalytics() {
+      api('getAnalyticsData', { projectCode: 'ALL' }).then(function (res) {
+        const s = res.stats;
+        document.getElementById('view').innerHTML = '<div class="panel"><h2>統計</h2><div class="stat-grid"><div class="stat"><span>瀏覽</span><strong>' + s.views + '</strong></div><div class="stat"><span>預約</span><strong>' + s.bookings + '</strong></div><div class="stat"><span>婉拒</span><strong>' + s.rejected + '</strong></div><div class="stat"><span>等候</span><strong>' + s.waitlist + '</strong></div></div><p>狀態：' + escapeHtml(res.sysHealth.apiStatus) + '</p></div>';
+      });
+    }
+
+    if (token) {
+      api('me', {}).then(function (res) {
+        currentUser = { name: res.user.name };
+        bootApp();
+      }).catch(function () {
+        localStorage.removeItem(tokenKey());
+      });
+    }
+
+    if (params.get('googleConnected')) {
+      setTimeout(function () { alert('Google Calendar 已連接完成。'); }, 300);
+    }
+  </script>
+</body>
+</html>
