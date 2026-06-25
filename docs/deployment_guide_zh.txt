@@ -1,0 +1,287 @@
+GitHub + Vercel 手把手部署教學
+
+更新日期：2026-06-20
+
+官方參考：
+- GitHub 建立 repository：https://docs.github.com/en/repositories/creating-and-managing-repositories/quickstart-for-repositories
+- GitHub 網頁上傳檔案：https://docs.github.com/en/repositories/working-with-files/managing-files/adding-a-file-to-a-repository
+- Vercel Git 部署：https://vercel.com/docs/git
+- Vercel 環境變數：https://vercel.com/docs/environment-variables
+- Vercel Postgres 現況：https://vercel.com/docs/postgres
+- Google OAuth Web Server：https://developers.google.com/identity/protocols/oauth2/web-server
+- Google Calendar 建立 Meet 事件：https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
+
+一、你現在手上有什麼
+
+這個資料夾就是要上傳到 GitHub 的專案。
+
+請保留這些資料夾與檔案：
+- api
+- lib
+- public
+- sql
+- snippets
+- docs
+- package.json
+- vercel.json
+- .env.example
+- .gitignore
+- README.txt
+
+不要上傳真正的 .env 檔。
+
+二、建立 GitHub 帳號與專案
+
+1. 到 https://github.com 註冊或登入。
+2. 右上角按「+」。
+3. 選「New repository」。
+4. Repository name 輸入：
+   dm-booking-saas
+5. Visibility 建議先選 Private。
+6. 不要勾 Add README，因為這個資料夾已經有 README.txt。
+7. 按 Create repository。
+
+三、把檔案上傳到 GitHub
+
+方式 A：用 GitHub 網頁上傳，最適合第一次不會用 Git 的情況。
+
+1. 進入剛建立好的 repository。
+2. 點 Add file。
+3. 點 Upload files。
+4. 從你的電腦拖曳這個資料夾內的檔案與資料夾上去。
+5. Commit message 填：
+   Initial SaaS booking system
+6. 按 Commit changes。
+
+注意：
+- GitHub 官方文件說，瀏覽器一次最多可上傳 100 個檔案。
+- 這份專案目前檔案數不多，可以直接上傳。
+- 不要上傳 .env 或任何真正密鑰。
+
+四、建立 Vercel 帳號並匯入 GitHub 專案
+
+1. 到 https://vercel.com 註冊或登入。
+2. 建議用 GitHub 帳號登入，之後比較順。
+3. Dashboard 右上角按 New Project。
+4. 選剛剛的 GitHub repository：dm-booking-saas。
+5. Framework Preset 可選 Other。
+6. Build Command 留空或保持預設。
+7. Output Directory 留空。
+8. 先不要急著 Deploy，下一步要補環境變數。
+
+Vercel 官方文件說，GitHub repository 匯入 Vercel 後，之後 main branch 有更新，Vercel 會自動部署新版。
+
+五、建立 Postgres 資料庫
+
+這個 SaaS 版不能只靠 Vercel 檔案，因為所有客戶、顧問、預約紀錄都要存資料庫。
+
+Vercel 目前新的 Postgres 是透過 Marketplace 連接外部供應商，例如 Neon。Vercel 官方文件也說舊的 Vercel Postgres 已不再提供給新專案，新的專案要用 Marketplace 的 Postgres integration。
+
+建議流程：
+
+1. 在 Vercel 專案 Dashboard 找 Marketplace 或 Storage / Integrations。
+2. 選 Postgres 類型的 integration，最常見是 Neon。
+3. 建立一個資料庫。
+4. 讓它連接到你的 Vercel project。
+5. 確認 Vercel Environment Variables 裡出現 DATABASE_URL。
+
+如果沒有自動出現 DATABASE_URL：
+1. 進入資料庫供應商後台。
+2. 複製 Postgres connection string。
+3. 回 Vercel Project Settings -> Environment Variables。
+4. 新增 DATABASE_URL。
+
+六、執行資料表 SQL
+
+1. 打開資料庫供應商的 SQL Editor。
+2. 打開本專案的 sql/schema.sql。
+3. 全部複製。
+4. 貼到 SQL Editor。
+5. 執行。
+
+執行成功後，資料庫會有 tenants、projects、consultants、appointments 等資料表。
+
+七、建立 Google OAuth 憑證
+
+這一步是讓客戶顧問可以授權你的系統讀取 Calendar 忙碌時間、建立 Calendar 事件與 Google Meet。
+
+1. 到 https://console.cloud.google.com
+2. 建立一個新 Project，例如 DM Booking SaaS。
+3. 到 APIs & Services。
+4. Enable APIs and Services。
+5. 搜尋 Google Calendar API 並啟用。
+6. 到 OAuth consent screen。
+7. App name 填你的系統名稱。
+8. User support email 填你的信箱。
+9. Scopes 加入：
+   - openid
+   - email
+   - profile
+   - https://www.googleapis.com/auth/calendar.readonly
+   - https://www.googleapis.com/auth/calendar.events
+10. 測試階段先把你自己和測試客戶信箱加入 Test users。
+11. 到 Credentials。
+12. Create Credentials -> OAuth client ID。
+13. Application type 選 Web application。
+14. Authorized redirect URIs 加：
+    https://你的-vercel-網址.vercel.app/api/oauth-callback
+15. 建立後複製 Client ID 和 Client Secret。
+
+重要：
+- Google 官方 OAuth 文件建議 web server app 使用 access_type=offline，這樣才會拿到 refresh token，系統才可以在顧問不在線時建立 Calendar/Meet。
+- Calendar scope 屬於敏感權限。若你要正式大量商用，之後很可能需要做 Google OAuth app verification。
+
+八、設定 Vercel Environment Variables
+
+到 Vercel Project Settings -> Environment Variables，新增：
+
+APP_URL
+填你的 Vercel 網址，例如：
+https://dm-booking-saas.vercel.app
+
+DATABASE_URL
+填 Postgres connection string。如果 Vercel Marketplace 已自動建立，就不用重複新增。
+
+JWT_SECRET
+填一段很長的隨機文字，例如 40 字以上。
+
+TOKEN_ENCRYPTION_KEY
+填另一段很長的隨機文字，用來加密 Google refresh token。
+
+INSTALLER_SECRET
+你自己設定的安裝密鑰。之後建立新客戶租戶時會用到。
+
+OWNER_NAME
+你的名字，例如 Nicolle。這只當預設值，不再硬寫在核心程式裡。
+
+OWNER_EMAIL
+你的管理信箱。
+
+GOOGLE_CLIENT_ID
+剛剛 Google Cloud 的 OAuth Client ID。
+
+GOOGLE_CLIENT_SECRET
+剛剛 Google Cloud 的 OAuth Client Secret。
+
+設定好後，回到 Deployments，重新部署一次。
+
+九、建立第一個客戶租戶
+
+1. 打開：
+   https://你的-vercel-網址.vercel.app/admin?tenant=client-slug
+
+   client-slug 換成客戶代碼，例如：
+   nicolle-demo
+
+2. 在「第一次建立客戶」區塊填：
+   - 租戶代碼：nicolle-demo
+   - 客戶/系統名稱：客戶的團隊名稱
+   - 管理員姓名
+   - 管理員 Email
+   - 管理員密碼
+   - INSTALLER_SECRET
+
+3. 按建立租戶。
+4. 建立成功後，用管理員 Email 和密碼登入。
+
+十、連接顧問 Google Calendar
+
+1. 進入後台。
+2. 到「顧問與 OAuth」。
+3. 每位顧問按「連接 Google」。
+4. 登入該顧問 Google 帳號。
+5. 同意 Calendar 權限。
+6. 回到後台後看到「已連接」。
+
+注意：
+- 要建立在顧問自己的 Calendar 上，就要用顧問自己的 Google 帳號授權。
+- 如果只用你的帳號授權，所有預約都會進你的 Calendar，不適合多顧問客戶。
+
+十一、設定開放時段
+
+1. 到「開放時段」。
+2. 選顧問。
+3. 設定時區，例如 Asia/Taipei。
+4. 設定間隔、前後緩衝、最早/最晚可預約天數。
+5. 填每週可預約時間，例如星期一 09:00 到 18:00。
+6. 儲存。
+
+十二、設定專案與問卷
+
+專案：
+1. 到「專案」。
+2. P01 是預設專案。
+3. 可以改名稱、注意事項、婉拒動作。
+4. 新增其他專案可用 P02、P03。
+
+問卷：
+1. 到「問卷」。
+2. 選專案。
+3. 新增題目。
+4. 題型可填簡答、單選、複選。
+5. 單選/複選的選項一行一個。
+6. 婉拒字可填「否」之類，客戶答案包含該字會進婉拒流程。
+
+十三、把預約頁裝到 Systeme
+
+1. 打開 snippets/systeme_booking_install.txt。
+2. 把 appUrl 換成你的 Vercel 網址。
+3. 把 tenant 換成客戶代碼。
+4. 把 project 換成專案代碼，例如 P01。
+5. 複製整段。
+6. 到 Systeme 預約頁，新增 HTML/Custom Code 區塊。
+7. 貼上。
+8. 發布頁面。
+
+十四、把後台入口裝到 Systeme
+
+1. 打開 snippets/systeme_admin_install.txt。
+2. 把 href 裡的 Vercel 網址換成你的。
+3. 把 tenant 換成客戶代碼。
+4. 複製整段。
+5. 到 Systeme 後台入口頁，新增 HTML/Custom Code 區塊。
+6. 貼上。
+7. 發布頁面。
+
+也可以不裝到 Systeme，直接給客戶：
+https://你的-vercel-網址.vercel.app/admin?tenant=client-slug
+
+注意：
+- Google OAuth 登入頁不適合放在 iframe 裡，所以後台入口用「開新分頁」會比嵌入式 iframe 穩定。
+- 一般客人看的 booking 頁可以用 iframe 嵌入，因為客人不需要跑 Google OAuth。
+
+十五、以後怎麼更新維護
+
+以後你只需要改 GitHub 裡的中央代碼。
+
+網頁方式：
+1. 到 GitHub repository。
+2. 找到要改的檔案。
+3. 按鉛筆編輯。
+4. 改完按 Commit changes。
+5. Vercel 會自動重新部署。
+
+重點：
+- 不需要登入客戶 GAS。
+- 不需要把完整代碼交給客戶。
+- 客戶 Systeme 裡只留嵌入碼。
+- 如果只是改功能，所有客戶會共用新版。
+- 如果只是改某客戶設定，進該租戶後台改，不用動代碼。
+
+十六、正式商用前必做
+
+1. Google OAuth app verification
+   Calendar 權限通常需要驗證，尤其不是只給內部測試帳號用時。
+
+2. 付費資料庫備份
+   預約資料是正式營運資料，請開資料庫備份。
+
+3. 寄信服務
+   初版先建立 Google Calendar invitation。
+   若要完整取代 GAS GmailApp 的信件範本與提醒，建議下一階段接 Resend、SendGrid 或 Gmail API。
+
+4. 自訂網域
+   例如 booking.yourdomain.com，看起來會比 vercel.app 更像正式 SaaS。
+
+5. 權限分層
+   現在已有 ALL 和基本登入，之後可把顧問、管理員、只讀角色拆得更細。
