@@ -1,0 +1,17 @@
+<!--
+Systeme 後台頁安裝碼
+
+Google OAuth 不建議放在 iframe 裡執行，所以後台建議用新分頁開啟。
+請改：
+1. href 裡的 Vercel 網址
+2. tenant= 後面的客戶租戶代碼
+-->
+
+<div style="font-family:Arial,'Noto Sans TC',sans-serif; text-align:center; padding:32px;">
+  <a
+    href="https://你的-vercel-網址.vercel.app/admin?tenant=client-slug"
+    target="_blank"
+    rel="noopener"
+    style="display:inline-block; padding:14px 22px; border-radius:8px; background:#1a73e8; color:#fff; text-decoration:none; font-weight:700;"
+  >開啟預約系統後台</a>
+</div>
