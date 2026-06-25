@@ -1,0 +1,21 @@
+<!--
+Systeme 預約頁安裝碼
+
+你只要改下面 3 個值：
+1. appUrl：你的 Vercel 網址，例如 https://dm-booking-saas.vercel.app
+2. tenant：客戶租戶代碼，例如 nicolle-demo
+3. project：專案代碼，例如 P01
+-->
+
+<div id="dm-booking"></div>
+
+<script>
+  window.DM_BOOKING_CONFIG = {
+    appUrl: "https://你的-vercel-網址.vercel.app",
+    tenant: "client-slug",
+    project: "P01",
+    containerId: "dm-booking",
+    minHeight: "850px"
+  };
+</script>
+<script src="https://你的-vercel-網址.vercel.app/embed.js"></script>
