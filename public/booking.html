@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>預約諮詢</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --blue: #1a73e8;
+      --green: #188038;
+      --red: #d93025;
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #dadce0;
+      --soft: #f8fafc;
+      --notice: #fff8e1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #f5f7fb;
+      color: var(--ink);
+      font-family: Arial, "Noto Sans TC", sans-serif;
+    }
+    .wrap {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr);
+      gap: 20px;
+      max-width: 1060px;
+      margin: 0 auto;
+      align-items: start;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 8px 30px rgba(60, 64, 67, 0.08);
+    }
+    .notice { background: var(--notice); border-color: #f9d56e; display: none; }
+    h1, h2, h3 { margin: 0 0 16px; line-height: 1.25; }
+    h1 { font-size: 26px; color: var(--blue); }
+    h2 { font-size: 22px; }
+    p { color: var(--muted); line-height: 1.6; }
+    label { display: block; font-weight: 700; margin: 0 0 8px; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    .field { margin-bottom: 18px; }
+    .choice {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 8px 0;
+      font-weight: 400;
+      color: var(--ink);
+    }
+    .choice input { width: 18px; margin-top: 2px; }
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 6px;
+      padding: 13px 16px;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button.secondary { background: #fff; color: var(--blue); border: 1px solid var(--blue); }
+    button:disabled { opacity: 0.58; cursor: wait; }
+    .slots {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .slot {
+      border: 1px solid var(--blue);
+      color: var(--blue);
+      background: #fff;
+      border-radius: 6px;
+      padding: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      text-align: center;
+    }
+    .slot.selected { background: var(--blue); color: #fff; }
+    .hidden { display: none !important; }
+    .status { margin-top: 14px; color: var(--muted); }
+    .error { color: var(--red); }
+    .success { color: var(--green); }
+    .complete {
+      text-align: center;
+      padding: 28px;
+    }
+    .complete a { color: var(--blue); font-weight: 700; }
+    @media (max-width: 760px) {
+      body { padding: 12px; }
+      .wrap { grid-template-columns: 1fr; }
+      .panel { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <aside class="panel notice" id="noticePanel">
+      <h3>預約注意事項</h3>
+      <div id="noticeText"></div>
+    </aside>
+
+    <section class="panel" id="formPanel">
+      <h1 id="title">預約諮詢</h1>
+      <p id="loading">正在載入預約設定...</p>
+      <form id="bookingForm" class="hidden">
+        <div class="field">
+          <label for="clientName">姓名 *</label>
+          <input id="clientName" autocomplete="name" required>
+        </div>
+        <div class="field">
+          <label for="clientEmail">Email *</label>
+          <input id="clientEmail" type="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="clientPhone">電話 *</label>
+          <input id="clientPhone" autocomplete="tel" required>
+        </div>
+        <div id="questions"></div>
+        <button type="submit">下一步：選擇時間</button>
+      </form>
+
+      <section id="slotsPanel" class="hidden">
+        <h2>選擇可預約時間</h2>
+        <p>以下時段會即時避開顧問 Google Calendar 裡已忙碌的行程。</p>
+        <div id="slotStatus" class="status">正在讀取可預約時間...</div>
+        <div id="slots" class="slots"></div>
+        <button id="confirmBtn" disabled>確認預約</button>
+        <button class="secondary" id="backBtn" type="button" style="margin-top:10px;">返回修改資料</button>
+      </section>
+
+      <section id="donePanel" class="complete hidden"></section>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const tenant = (params.get('tenant') || params.get('t') || '').toLowerCase();
+    const projectCode = (params.get('p') || 'P01').toUpperCase();
+    const skipForm = params.get('skipForm') === 'true';
+    const apiBase = '/api';
+
+    let questions = [];
+    let projectName = '';
+    let rejectType = 'text';
+    let rejectValue = '';
+    let pendingBooking = null;
+    let selectedSlot = null;
+
+    function api(action, payload) {
+      return fetch(apiBase + '?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ projectCode }, payload || {}))
+      }).then(function (res) { return res.json(); });
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function renderQuestions() {
+      const box = document.getElementById('questions');
+      if (skipForm) {
+        box.innerHTML = '';
+        return;
+      }
+
+      box.innerHTML = questions.map(function (q, index) {
+        const required = q.isRequired !== '否';
+        let html = '<div class="field" data-q="' + index + '">';
+        html += '<label>' + escapeHtml(q.title) + (required ? ' *' : '') + '</label>';
+        if (q.type === '單選' || q.type === '複選') {
+          const type = q.type === '單選' ? 'radio' : 'checkbox';
+          (q.options || []).forEach(function (opt, optIndex) {
+            html += '<label class="choice"><input type="' + type + '" name="q_' + index + '" value="' + escapeHtml(opt) + '"><span>' + escapeHtml(opt) + '</span></label>';
+          });
+        } else {
+          html += '<textarea name="q_' + index + '" ' + (required ? 'required' : '') + '></textarea>';
+        }
+        html += '</div>';
+        return html;
+      }).join('');
+    }
+
+    function collectAnswers() {
+      const answers = [];
+      for (let i = 0; i < questions.length; i += 1) {
+        const q = questions[i];
+        const required = q.isRequired !== '否';
+        let value = '';
+
+        if (q.type === '單選') {
+          const selected = document.querySelector('input[name="q_' + i + '"]:checked');
+          value = selected ? selected.value : '';
+        } else if (q.type === '複選') {
+          value = Array.from(document.querySelectorAll('input[name="q_' + i + '"]:checked')).map(function (el) { return el.value; }).join(', ');
+        } else {
+          value = (document.querySelector('[name="q_' + i + '"]') || {}).value || '';
+        }
+
+        if (required && !value.trim()) {
+          throw new Error('請填寫：「' + q.title + '」。');
+        }
+        answers.push('Q: ' + q.title + '\nA: ' + (value || '未填寫'));
+
+        if (q.rejectWord && value.indexOf(q.rejectWord) !== -1) {
+          const err = new Error('reject');
+          err.reject = true;
+          throw err;
+        }
+      }
+      return answers.join('\n\n');
+    }
+
+    function showReject(payload) {
+      api('logRejected', payload).finally(function () {
+        if (rejectType === 'url' && rejectValue) {
+          location.href = rejectValue;
+          return;
+        }
+        document.getElementById('formPanel').innerHTML = '<div class="complete"><h2>目前不適合預約</h2><p>' + escapeHtml(rejectValue || '謝謝你的填寫，目前暫時無法安排預約。') + '</p></div>';
+      });
+    }
+
+    function loadSlots() {
+      document.getElementById('bookingForm').classList.add('hidden');
+      document.getElementById('slotsPanel').classList.remove('hidden');
+      document.getElementById('slotStatus').textContent = '正在讀取可預約時間...';
+      document.getElementById('slots').innerHTML = '';
+      selectedSlot = null;
+      document.getElementById('confirmBtn').disabled = true;
+
+      api('getAvailableTimes', { projectCode }).then(function (slots) {
+        if (!Array.isArray(slots) || !slots.length) {
+          document.getElementById('slotStatus').textContent = '目前沒有可預約時間，已幫你加入等候名單。';
+          api('logMissed', pendingBooking);
+          return;
+        }
+        document.getElementById('slotStatus').textContent = '請選擇一個時段。';
+        document.getElementById('slots').innerHTML = slots.map(function (slot, index) {
+          return '<button class="slot" data-index="' + index + '" data-ts="' + slot.timestamp + '">' + escapeHtml(slot.displayText) + '</button>';
+        }).join('');
+        document.querySelectorAll('.slot').forEach(function (button) {
+          button.addEventListener('click', function () {
+            document.querySelectorAll('.slot').forEach(function (b) { b.classList.remove('selected'); });
+            button.classList.add('selected');
+            selectedSlot = Number(button.dataset.ts);
+            document.getElementById('confirmBtn').disabled = false;
+          });
+        });
+      });
+    }
+
+    document.getElementById('bookingForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      const payload = {
+        projectCode,
+        name: document.getElementById('clientName').value.trim(),
+        email: document.getElementById('clientEmail').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim()
+      };
+
+      try {
+        payload.answers = collectAnswers();
+      } catch (error) {
+        if (error.reject) {
+          showReject(payload);
+          return;
+        }
+        alert(error.message);
+        return;
+      }
+
+      pendingBooking = payload;
+      loadSlots();
+    });
+
+    document.getElementById('backBtn').addEventListener('click', function () {
+      document.getElementById('slotsPanel').classList.add('hidden');
+      document.getElementById('bookingForm').classList.remove('hidden');
+    });
+
+    document.getElementById('confirmBtn').addEventListener('click', function () {
+      if (!selectedSlot || !pendingBooking) return;
+      const btn = this;
+      btn.disabled = true;
+      btn.textContent = '正在建立 Google Meet...';
+      api('submitBooking', Object.assign({}, pendingBooking, { timestamp: selectedSlot })).then(function (res) {
+        if (!res.success) {
+          alert(res.message || '預約失敗，請重新選擇時段。');
+          btn.disabled = false;
+          btn.textContent = '確認預約';
+          loadSlots();
+          return;
+        }
+        document.getElementById('slotsPanel').classList.add('hidden');
+        document.getElementById('donePanel').classList.remove('hidden');
+        document.getElementById('donePanel').innerHTML =
+          '<h2 class="success">預約成功</h2>' +
+          '<p>已建立 Google Calendar 與 Google Meet，會議資訊也會寄給你。</p>' +
+          (res.meetLink ? '<p><a href="' + escapeHtml(res.meetLink) + '" target="_blank" rel="noopener">開啟會議連結</a></p>' : '');
+      });
+    });
+
+    function boot() {
+      if (!tenant) {
+        document.getElementById('loading').innerHTML = '<span class="error">安裝碼缺少 tenant。</span>';
+        return;
+      }
+      api('getQuestions', { projectCode }).then(function (res) {
+        if (res.error) {
+          document.getElementById('loading').innerHTML = '<span class="error">' + escapeHtml(res.error) + '</span>';
+          return;
+        }
+        projectName = res.projectName || '預約諮詢';
+        rejectType = res.rejectType || 'text';
+        rejectValue = res.rejectValue || '';
+        questions = res.questions || [];
+        document.getElementById('title').textContent = projectName + '｜預約諮詢';
+        if (res.bookingNotice) {
+          document.getElementById('noticeText').innerHTML = escapeHtml(res.bookingNotice).replace(/\n/g, '<br>');
+          document.getElementById('noticePanel').style.display = 'block';
+        }
+        renderQuestions();
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('bookingForm').classList.remove('hidden');
+        api('logPageView', { projectCode }).catch(function () {});
+      });
+    }
+
+    boot();
+  </script>
+</body>
+</html>
