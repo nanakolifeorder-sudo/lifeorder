@@ -1,0 +1,21 @@
+{
+  "name": "dm-booking-saas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Centralized multi-tenant booking system for Vercel.",
+  "scripts": {
+    "check": "node --check api/index.js && node --check api/oauth-callback.js && node --check lib/service.js && node --check lib/google.js",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "vercel": "^34.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
