@@ -3,3 +3,5 @@ node_modules
 .env.local
 .vercel
 *.log
+*.xlsx
+legacy_import_payload.json
