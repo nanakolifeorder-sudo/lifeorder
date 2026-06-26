@@ -973,20 +973,28 @@
         { label: '清空舊資料', body: { stage: 'reset', tenantName: payload.tenantName, ownerName: payload.ownerName, ownerEmail: payload.ownerEmail } },
         { label: '專案', key: 'projects', body: { stage: 'projects', items: payload.projects || [] } },
         { label: '顧問', key: 'consultants', body: { stage: 'consultants', items: payload.consultants || [] } },
-        { label: '題庫', key: 'questions', body: { stage: 'questions', items: payload.questions || [] } },
-        { label: '排班', key: 'availability', body: { stage: 'availability', items: payload.availability || [] } },
         { label: '婉拒', key: 'rejected', body: { stage: 'rejected', items: payload.rejected || [] } },
         { label: '等候', key: 'waitlist', body: { stage: 'waitlist', items: payload.waitlist || [] } },
         { label: '信件範本', key: 'emailTemplates', body: { stage: 'emailTemplates', tenantName: payload.tenantName, items: payload.emailTemplates || [] } },
         { label: '測驗名單', key: 'leads', body: { stage: 'leads', items: payload.leads || [] } }
       ];
-      chunks(payload.appointments || [], 35).forEach(function (items, index) {
-        stages.splice(5 + index, 0, { label: '預約 ' + (index + 1), key: 'appointments', body: { stage: 'appointments', items: items } });
+      chunks(payload.questions || [], 20).forEach(function (items, index) {
+        stages.splice(3 + index, 0, { label: '題庫 ' + (index + 1), key: 'questions', body: { stage: 'questions', items: items } });
+      });
+      const afterQuestions = 3 + chunks(payload.questions || [], 20).length;
+      chunks(payload.availability || [], 20).forEach(function (items, index) {
+        stages.splice(afterQuestions + index, 0, { label: '排班 ' + (index + 1), key: 'availability', body: { stage: 'availability', items: items } });
+      });
+      const afterAvailability = afterQuestions + chunks(payload.availability || [], 20).length;
+      chunks(payload.appointments || [], 20).forEach(function (items, index) {
+        stages.splice(afterAvailability + index, 0, { label: '預約 ' + (index + 1), key: 'appointments', body: { stage: 'appointments', items: items } });
       });
 
+      let currentStageLabel = '';
       try {
         for (let i = 0; i < stages.length; i += 1) {
           const stage = stages[i];
+          currentStageLabel = stage.label;
           msg.innerHTML = '<span class="ok">匯入中</span> ' + escapeHtml(stage.label) + '（' + (i + 1) + '/' + stages.length + '）';
           const res = await api('importLegacyData', stage.body);
           if (stage.key) counts[stage.key] += Number(res.count || 0);
@@ -1002,7 +1010,7 @@
         Object.keys(cache).forEach(function (key) { delete cache[key]; });
         bootApp();
       } catch (err) {
-        msg.innerHTML = '<span class="bad">' + escapeHtml(err.message) + '</span>';
+        msg.innerHTML = '<span class="bad">' + escapeHtml(currentStageLabel + '：' + err.message) + '</span>';
       }
     }
 
