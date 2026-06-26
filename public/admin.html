@@ -159,11 +159,11 @@
       <label style="margin-top:12px;">客戶/系統名稱</label>
       <input id="setupName" placeholder="某某顧問團隊">
       <label style="margin-top:12px;">管理員姓名</label>
-      <input id="setupAdminName" placeholder="Nicolle">
+      <input id="setupAdminName" placeholder="DMtest" value="DMtest">
       <label style="margin-top:12px;">管理員 Email</label>
-      <input id="setupAdminEmail" type="email">
+      <input id="setupAdminEmail" type="email" value="ncs1491311@gmail.com">
       <label style="margin-top:12px;">管理員密碼</label>
-      <input id="setupPassword" type="password">
+      <input id="setupPassword" type="password" value="1111">
       <label style="margin-top:12px;">安裝密鑰 INSTALLER_SECRET</label>
       <input id="setupSecret" type="password">
       <button class="green" style="width:100%; margin-top:16px;" onclick="setupTenant()">建立租戶</button>
@@ -179,6 +179,7 @@
       <button class="tab" data-view="schedule" onclick="showView('schedule')">開放時段</button>
       <button class="tab" data-view="questions" onclick="showView('questions')">問卷</button>
       <button class="tab" data-view="analytics" onclick="showView('analytics')">統計</button>
+      <button class="tab" data-view="emails" onclick="showView('emails')">信件</button>
     </div>
     <section id="view"></section>
   </main>
@@ -271,7 +272,8 @@
         consultants: loadConsultants,
         schedule: loadSchedule,
         questions: loadQuestions,
-        analytics: loadAnalytics
+        analytics: loadAnalytics,
+        emails: loadEmails
       };
       map[name]();
     }
@@ -490,6 +492,108 @@
         const s = res.stats;
         document.getElementById('view').innerHTML = '<div class="panel"><h2>統計</h2><div class="stat-grid"><div class="stat"><span>瀏覽</span><strong>' + s.views + '</strong></div><div class="stat"><span>預約</span><strong>' + s.bookings + '</strong></div><div class="stat"><span>婉拒</span><strong>' + s.rejected + '</strong></div><div class="stat"><span>等候</span><strong>' + s.waitlist + '</strong></div></div><p>狀態：' + escapeHtml(res.sysHealth.apiStatus) + '</p></div>';
       });
+    }
+
+    function fmtDate(value) {
+      if (!value) return '';
+      return new Date(value).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+    }
+
+    function triggerLabel(value) {
+      const map = {
+        lead_created: '填表未預約',
+        booking_created: '成功預約',
+        waitlist_created: '無時段/候補',
+        rejected_created: '資格不符合'
+      };
+      return map[value] || value;
+    }
+
+    function loadEmails(projectCode) {
+      api('getEmailAutomationData', { projectCode: projectCode || 'ALL' }).then(function (res) {
+        projectsCache = res.projects || [];
+        const projectOptions = ['<option value="ALL">全部專案</option>'].concat(projectsCache.map(function (p) {
+          return '<option value="' + escapeHtml(p.code) + '">' + escapeHtml(p.code + ' ' + p.name) + '</option>';
+        })).join('');
+        const templateRows = (res.templates || []).map(emailTemplateRow).join('') || '<p class="muted">還沒有信件模板。</p>';
+        const leadRows = (res.leads || []).map(function (lead) {
+          return '<tr><td>' + escapeHtml(lead.project_code) + '</td><td>' + escapeHtml(lead.client_name) + '<br><span class="muted">' + escapeHtml(lead.client_email) + '</span></td><td>' + escapeHtml(lead.status) + '</td><td>' + fmtDate(lead.updated_at) + '</td></tr>';
+        }).join('');
+        const queueRows = (res.queue || []).map(function (mail) {
+          return '<tr><td>' + escapeHtml(mail.project_code) + '</td><td>' + escapeHtml(triggerLabel(mail.trigger_name)) + '</td><td>' + escapeHtml(mail.client_email) + '</td><td>' + escapeHtml(mail.subject) + '</td><td>' + fmtDate(mail.scheduled_at) + '</td><td>' + escapeHtml(mail.status) + (mail.error_message ? '<br><span class="bad">' + escapeHtml(mail.error_message) + '</span>' : '') + '</td></tr>';
+        }).join('');
+        document.getElementById('view').innerHTML =
+          '<div class="panel"><h2>信件自動化</h2><p>填表未預約會先進 lead；成功預約、候補或資格不符合時，未預約跟進信會停止。</p>' +
+          '<label>篩選專案</label><select id="emailProject" onchange="loadEmails(this.value)">' + projectOptions + '</select>' +
+          '<button class="yellow" style="margin-top:12px;" onclick="runEmailQueue()">手動執行到期寄信</button></div>' +
+          '<div class="panel"><h2>信件模板</h2><div class="list" id="emailTemplateRows">' + templateRows + '</div>' +
+          '<button class="secondary" onclick="addEmailTemplate()">新增模板</button></div>' +
+          '<div class="panel"><h2>近期 Lead</h2><table><thead><tr><th>專案</th><th>客戶</th><th>狀態</th><th>更新時間</th></tr></thead><tbody>' + leadRows + '</tbody></table></div>' +
+          '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>專案</th><th>觸發</th><th>Email</th><th>主旨</th><th>排程</th><th>狀態</th></tr></thead><tbody>' + queueRows + '</tbody></table></div>';
+        document.getElementById('emailProject').value = projectCode || 'ALL';
+      });
+    }
+
+    function emailTemplateRow(t) {
+      t = t || {};
+      const rowId = t.rowId || '';
+      return '<div class="item row email-template" data-template="' + rowId + '">' +
+        '<div class="col-2"><label>專案</label><input class="e-project" value="' + escapeHtml(t.projectCode || (projectsCache[0] || {}).code || 'P01') + '"></div>' +
+        '<div class="col-2"><label>觸發</label><select class="e-trigger">' +
+          '<option value="lead_created" ' + (t.triggerName === 'lead_created' ? 'selected' : '') + '>填表未預約</option>' +
+          '<option value="booking_created" ' + (t.triggerName === 'booking_created' ? 'selected' : '') + '>成功預約</option>' +
+          '<option value="waitlist_created" ' + (t.triggerName === 'waitlist_created' ? 'selected' : '') + '>無時段/候補</option>' +
+          '<option value="rejected_created" ' + (t.triggerName === 'rejected_created' ? 'selected' : '') + '>資格不符合</option>' +
+        '</select></div>' +
+        '<div class="col-2"><label>延遲小時</label><input class="e-delay" type="number" value="' + escapeHtml(t.timeParam || 0) + '"></div>' +
+        '<div class="col-2"><label>狀態</label><select class="e-status"><option value="active" ' + (t.status !== 'inactive' ? 'selected' : '') + '>啟用</option><option value="inactive" ' + (t.status === 'inactive' ? 'selected' : '') + '>停用</option></select></div>' +
+        '<div class="col-2"><label>已預約停止</label><select class="e-stop"><option value="true" ' + (t.stopWhenBooked !== false ? 'selected' : '') + '>是</option><option value="false" ' + (t.stopWhenBooked === false ? 'selected' : '') + '>否</option></select></div>' +
+        '<div class="col-2"><label>寄件名稱</label><input class="e-sender" value="' + escapeHtml(t.senderName || '') + '"></div>' +
+        '<div class="col-4"><label>模板名稱</label><input class="e-name" value="' + escapeHtml(t.name || '') + '"></div>' +
+        '<div class="col-8"><label>主旨</label><input class="e-subject" value="' + escapeHtml(t.subject || '') + '"></div>' +
+        '<div class="col-12"><label>內容</label><textarea class="e-body" placeholder="可用變數：{{name}} {{email}} {{phone}} {{project}} {{time}} {{meetLink}} {{consultant}}">' + escapeHtml(t.body || '') + '</textarea></div>' +
+        '<div class="col-12"><button onclick="saveEmailTemplate(this)">儲存模板</button></div>' +
+      '</div>';
+    }
+
+    function addEmailTemplate() {
+      document.getElementById('emailTemplateRows').insertAdjacentHTML('beforeend', emailTemplateRow({
+        triggerName: 'lead_created',
+        status: 'active',
+        timeParam: 24,
+        stopWhenBooked: true,
+        name: '未預約提醒',
+        subject: '{{name}}，提醒你完成 {{project}} 預約',
+        body: '{{name}} 你好，\\n\\n你剛剛填寫了 {{project}}，但目前還沒有完成預約。\\n如果你已經預約，這封信會自動停止。'
+      }));
+    }
+
+    function saveEmailTemplate(button) {
+      const card = button.closest('.email-template');
+      const id = card.dataset.template || '';
+      api('saveEmailTemplate', {
+        rowId: id,
+        projectCode: card.querySelector('.e-project').value,
+        name: card.querySelector('.e-name').value,
+        triggerName: card.querySelector('.e-trigger').value,
+        timeParam: card.querySelector('.e-delay').value,
+        status: card.querySelector('.e-status').value,
+        senderName: card.querySelector('.e-sender').value,
+        stopWhenBooked: card.querySelector('.e-stop').value === 'true',
+        subject: card.querySelector('.e-subject').value,
+        body: card.querySelector('.e-body').value
+      }).then(function () {
+        alert('信件模板已儲存。');
+        loadEmails(document.getElementById('emailProject') ? document.getElementById('emailProject').value : 'ALL');
+      });
+    }
+
+    function runEmailQueue() {
+      api('runEmailQueue', { limit: 50 }).then(function (res) {
+        const s = res.summary || {};
+        alert('已執行：送出 ' + (s.sent || 0) + '、取消 ' + (s.cancelled || 0) + '、失敗 ' + (s.failed || 0));
+        loadEmails(document.getElementById('emailProject') ? document.getElementById('emailProject').value : 'ALL');
+      }).catch(function (err) { alert(err.message); });
     }
 
     if (token) {
