@@ -1,65 +1,98 @@
-仿 Calendly 系統 SaaS 化狀態
+DM Booking SaaS 遷移狀態
+更新日：2026-06-26
 
-這次已完成的核心改造
+一、目前已完成
 
-1. 中央化部署
-   - 原本 Systeme 直接打 GAS Web App。
-   - 現在改為 Systeme 只貼安裝碼，核心邏輯在 Vercel。
+1. SaaS 地基
+- GitHub private repo：dm-booking-saas
+- Vercel 正式站：https://dm-booking-saas.vercel.app
+- Supabase 專案與主要資料表已建立
+- 所有客戶資料都以 tenant_slug 分租戶隔離
 
-2. 多客戶租戶模式
-   - 用 tenant 區分客戶。
-   - 不再把 Nicolle 或任何客戶專屬資訊硬寫在核心代碼中。
-   - 可調整資訊集中在資料庫與後台，不用改程式碼。
+2. 三層權限
+- 最高權限系統管理員：SYSTEM_OWNER
+- 租戶管理員：TENANT_ADMIN
+- 顧問：CONSULTANT
 
-3. Google OAuth
-   - 每位顧問可以從後台按「連接 Google」。
-   - refresh token 會加密後存進資料庫。
-   - 預約時會用該顧問自己的 Google Calendar 建立行程與 Google Meet。
+3. 固定測試帳號
+- 最高權限：ncs1491311@gmail.com / 1111
+- 租戶管理員：tenant-admin@dmtest.test / 1111
+- 顧問：consultant@dmtest.test / 1111
 
-4. 預約核心流程
-   - 讀取專案設定。
-   - 讀取問卷題目。
-   - 根據顧問開放時段與 Google Calendar 忙碌行程計算可約時間。
-   - 客戶送出預約後建立 Google Calendar 事件與 Google Meet。
-   - 記錄預約、婉拒、等候名單、頁面瀏覽。
+注意：租戶管理員與顧問測試帳號是系統登入用，不一定是真實 Google 帳號。
+如果要測 Google OAuth，請改成可登入的 Google 帳號或新增真實顧問。
 
-5. 後台核心功能
-   - 租戶初始化。
-   - 登入。
-   - 專案管理。
-   - 顧問管理。
-   - Google OAuth 連接。
-   - 每週開放時段。
-   - 問卷管理。
-   - 預約列表與取消。
-   - 基本統計。
+4. OAuth 規則
+- 顧問可以自己授權 Google Calendar / Meet / Gmail scope
+- 預約排程使用該顧問的 Google Calendar 與 Google Meet
+- 自動化信件固定使用租戶管理員授權的 Gmail
+- 不再優先使用預約顧問的 Gmail 寄自動化信件
 
-還沒有完整搬完的舊 GAS 功能
+5. 後台介面
+- 預設進入客戶總覽 CRM
+- CRM 內可切換：
+  - 即將到來
+  - 已過期 / 完成
+  - 取消與婉拒
+  - 等候名單
+- 已加入深色畫面、淺色畫面、重新整理
+- 依權限顯示分頁：
+  - 客戶總覽 CRM
+  - 我的排班
+  - 顧問管理
+  - 專案管理
+  - 表單管理
+  - 信件管理
+  - 戰情數據
 
-1. Zoom Server-to-Server OAuth
-   - 舊版有 Zoom 金鑰欄位與建立 Zoom 會議。
-   - SaaS 初版先以 Google Meet 為主。
+二、權限規則
 
-2. 信件範本、排程提醒、會後跟進
-   - 資料表已預留 email_templates。
-   - 寄信服務建議改接 Resend、SendGrid 或 Gmail API，不建議繼續靠 GAS 的 GmailApp 額度。
+1. 最高權限系統管理員
+- 可登入任一 tenant URL 查看資料
+- 可建立測試帳號
+- 可掌握租戶、顧問、CRM、表單、信件與數據
 
-3. 改期、補填資料、直接邀請
-   - 舊版 URL token 和補填流程很完整。
-   - SaaS 初版已保留架構方向，但目前只完成取消預約。
+2. 租戶管理員
+- 只能查看自己的 tenant
+- 可新增與管理該租戶底下的顧問
+- 可設定顧問權限
+- 可管理專案、表單、信件、戰情資料
+- 可授權租戶 Gmail，作為自動化信件寄件帳號
 
-4. 進階 CRM UI
-   - SaaS 初版保留基本預約列表與 CRM 欄位更新 API。
-   - 舊版 Notion 式側欄、成交狀態、方案追蹤等細節可在下一階段搬。
+3. 顧問
+- 只能看到自己的預約與自己的排班
+- 可自己授權 Google Calendar / Meet
+- 顧問是否能看全部 CRM、專案、表單、信件、戰情，由租戶管理員設定
 
-5. 舊 Google Sheets 資料搬移
-   - 目前是新資料庫 schema。
-   - 若要把既有客戶資料搬進 SaaS，需要另外做一次 Sheets to Postgres 匯入工具。
+三、下一階段待補
 
-建議下一階段順序
+1. 預約操作完整版
+- 改期
+- 轉派
+- 發送自選改期
+- 補填資料 / 補件信
 
-1. 先上線內部測試租戶，確認 Google OAuth、可約時段、建立 Meet 都正常。
-2. 補上寄信服務與信件範本。
-3. 補上改期、補填、直接邀請。
-4. 做舊資料匯入工具。
-5. 再開始大量安裝客戶。
+2. CRM 完整版
+- 客戶完整歷史紀錄
+- CRM 狀態欄位可編輯
+- 備註、成交狀態、出席狀態、方案欄位
+- 客戶側邊詳情視窗
+
+3. 信件管理完整版
+- 會議前提醒
+- 會議後跟進
+- 未預約多段跟進
+- 測試寄信
+- 變數按鈕
+- 信件 HTML 編輯
+- 排程寄信器改用 Google Cloud Scheduler 或其他外部排程
+
+4. Systeme 串接
+- 預約成功後停止 Systeme 後續信
+- 可評估用標籤、Webhook、Make/Zapier 或由本系統接管跟進信
+
+5. 正式商用前
+- Google OAuth 驗證
+- 錯誤紀錄與備份
+- 租戶安裝流程
+- 使用者授權與稽核紀錄
