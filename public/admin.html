@@ -89,6 +89,22 @@
     .bad { color: var(--red); font-weight: 700; }
     .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .toolbar select { width: auto; min-width: 132px; }
+    .owner-scope {
+      max-width: 1120px;
+      margin: 0 auto 14px;
+      padding: 14px 22px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      display: flex;
+      gap: 12px;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+    .owner-scope .scope-title { min-width: 120px; }
+    .owner-scope label { font-size: 13px; margin-bottom: 5px; color: var(--muted); }
+    .owner-scope select { min-width: 220px; }
     .login-wrap {
       max-width: 480px;
       margin: 80px auto;
@@ -199,6 +215,7 @@
     .mini { font-size: 13px; color: var(--muted); }
     @media (max-width: 780px) {
       header { margin: 10px; align-items: flex-start; flex-direction: column; }
+      .owner-scope { margin: 0 10px 14px; }
       main { padding: 0 10px; }
       .row { grid-template-columns: 1fr; }
       .row > * { grid-column: auto !important; }
@@ -223,6 +240,8 @@
       <button class="danger" onclick="logout()">登出</button>
     </div>
   </header>
+
+  <section class="owner-scope hidden" id="ownerScopeBar"></section>
 
   <section class="login-wrap" id="loginWrap">
     <div class="panel">
@@ -251,6 +270,8 @@
     let currentView = 'crm';
     let crmMode = 'upcoming';
     let crmProject = 'ALL';
+    let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
+    let ownerScope = { tenants: [], projects: [] };
     let scheduleConsultants = [];
     const cache = {};
 
@@ -309,6 +330,20 @@
       return clean ? tenantDisplayName + '團隊顧問 ' + clean : '';
     }
 
+    function clearViewCache() {
+      Object.keys(cache).forEach(function (key) { delete cache[key]; });
+    }
+
+    function scopedProjectCode() {
+      return isSystemOwner() ? ownerProject : crmProject;
+    }
+
+    function projectMatchesScope(row) {
+      if (!isSystemOwner() || ownerProject === 'ALL') return true;
+      const text = String(row.projects || row.projectCodes || '').toUpperCase();
+      return text.split(',').map(function (item) { return item.trim(); }).includes('ALL') || text.split(',').map(function (item) { return item.trim(); }).includes(ownerProject);
+    }
+
     function setTheme(theme) {
       document.body.dataset.theme = theme;
       localStorage.setItem('dm_saas_theme', theme);
@@ -338,13 +373,54 @@
 
     function bootApp() {
       tenantDisplayName = currentUser.tenantName || tenantDisplayName || 'DM Chen';
+      if (isSystemOwner()) crmProject = ownerProject;
       document.getElementById('loginWrap').classList.add('hidden');
       document.getElementById('appHeader').classList.remove('hidden');
       document.getElementById('app').classList.remove('hidden');
       document.getElementById('userName').textContent = currentUser.name || 'DMtest';
       document.getElementById('tenantLabel').textContent = '使用者：' + tenantDisplayName + '｜權限：' + roleLabel(currentUser.role);
       renderTabs();
+      loadOwnerScopeBar();
       showView('crm');
+    }
+
+    function loadOwnerScopeBar() {
+      const bar = document.getElementById('ownerScopeBar');
+      if (!isSystemOwner()) {
+        bar.classList.add('hidden');
+        return;
+      }
+      api('getOwnerScopeData', {}).then(function (res) {
+        ownerScope = res;
+        if (!ownerScope.projects.some(function (p) { return p.code === ownerProject; })) ownerProject = 'ALL';
+        const tenantOptions = (res.tenants || []).map(function (item) {
+          return '<option value="' + escapeHtml(item.slug) + '"' + (item.slug === tenant ? ' selected' : '') + '>' + escapeHtml(item.name || item.slug) + '</option>';
+        }).join('');
+        const projectOptions = '<option value="ALL">全部專案</option>' + (res.projects || []).map(function (item) {
+          return '<option value="' + escapeHtml(item.code) + '"' + (item.code === ownerProject ? ' selected' : '') + '>' + escapeHtml(item.name || item.code) + '</option>';
+        }).join('');
+        bar.innerHTML =
+          '<div class="scope-title"><strong>組織視角</strong><div class="mini">最高權限</div></div>' +
+          '<div><label>使用者 / 團隊</label><select id="ownerTenantSelect" onchange="switchOwnerTenant(this.value)">' + tenantOptions + '</select></div>' +
+          '<div><label>專案範圍</label><select id="ownerProjectSelect" onchange="switchOwnerProject(this.value)">' + projectOptions + '</select></div>';
+        bar.classList.remove('hidden');
+      }).catch(function () {
+        bar.classList.add('hidden');
+      });
+    }
+
+    function switchOwnerTenant(slug) {
+      if (!slug || slug === tenant) return;
+      localStorage.setItem('dm_saas_' + slug + '_token', token);
+      location.href = '/admin?tenant=' + encodeURIComponent(slug);
+    }
+
+    function switchOwnerProject(code) {
+      ownerProject = code || 'ALL';
+      crmProject = ownerProject;
+      localStorage.setItem('dm_saas_' + tenant + '_project', ownerProject);
+      clearViewCache();
+      showView(currentView);
     }
 
     function availableTabs() {
@@ -429,6 +505,12 @@
 
     function loadCrmByProject(value) {
       crmProject = value || 'ALL';
+      if (isSystemOwner()) {
+        ownerProject = crmProject;
+        localStorage.setItem('dm_saas_' + tenant + '_project', ownerProject);
+        const scopeSelect = document.getElementById('ownerProjectSelect');
+        if (scopeSelect) scopeSelect.value = ownerProject;
+      }
       delete cache.crm;
       loadCrm();
     }
@@ -517,10 +599,14 @@
       loading('我的排班');
       if (isAdmin()) {
         api('getAdminConsultantData', {}).then(function (res) {
-          scheduleConsultants = res.consultants || [];
+          scheduleConsultants = (res.consultants || []).filter(projectMatchesScope);
           const options = scheduleConsultants.map(function (c) {
             return '<option value="' + c.rowId + '">' + escapeHtml(teamConsultantName(c.name)) + '</option>';
           }).join('');
+          if (!options) {
+            document.getElementById('view').innerHTML = '<div class="panel"><h2>我的排班</h2><p>這個專案範圍目前沒有可顯示的團隊顧問。</p></div>';
+            return;
+          }
           document.getElementById('view').innerHTML =
             '<div class="panel"><h2>我的排班</h2><label>' + escapeHtml(tenantDisplayName) + '團隊顧問</label>' +
             '<select id="scheduleConsultant" onchange="loadScheduleEditor()">' + options + '</select>' +
@@ -678,9 +764,10 @@
     }
 
     function renderConsultants(res) {
+      const consultants = (res.consultants || []).filter(projectMatchesScope);
       const html = '<div class="panel"><div class="row"><div class="col-8"><h2>' + escapeHtml(tenantDisplayName) + '團隊顧問</h2></div>' +
         '<div class="col-4"><button class="secondary" onclick="ensureDemoAccounts()">建立測試帳號</button></div></div><div class="list">' +
-        (res.consultants || []).map(consultantForm).join('') +
+        consultants.map(consultantForm).join('') +
         '</div></div><div class="panel"><h2>新增' + escapeHtml(tenantDisplayName) + '團隊顧問</h2>' + consultantForm({ isAccepting: '是', weight: 50, projects: 'ALL', meetTool: 'Google Meet', shiftTZ: 'Asia/Taipei' }) + '</div>';
       document.getElementById('view').innerHTML = html;
     }
@@ -769,9 +856,16 @@
     function loadQuestions() {
       loading('表單管理');
       api('getAdminProjectData', {}).then(function (res) {
-        const options = (res.projects || []).map(function (p) {
+        const projectRows = isSystemOwner() && ownerProject !== 'ALL'
+          ? (res.projects || []).filter(function (p) { return p.code === ownerProject; })
+          : (res.projects || []);
+        const options = projectRows.map(function (p) {
           return '<option value="' + escapeHtml(p.code) + '">' + escapeHtml(p.name) + '</option>';
         }).join('');
+        if (!options) {
+          document.getElementById('view').innerHTML = '<div class="panel"><h2>表單管理</h2><p>這個專案範圍目前沒有題庫資料。</p></div>';
+          return;
+        }
         document.getElementById('view').innerHTML =
           '<div class="panel"><h2>表單管理</h2><label>專案</label><select id="questionProject" onchange="loadQuestionRows()">' + options + '</select><div id="questionRows" style="margin-top:16px;"></div></div>';
         loadQuestionRows();
@@ -821,7 +915,7 @@
 
     function loadEmails() {
       loading('信件管理');
-      api('getEmailAutomationData', {}).then(renderEmails).catch(showError);
+      api('getEmailAutomationData', { projectCode: scopedProjectCode() }).then(renderEmails).catch(showError);
     }
 
     function renderEmails(res) {
@@ -898,7 +992,7 @@
 
     function loadAnalytics() {
       loading('戰情數據');
-      api('getAnalyticsData', {}).then(function (res) {
+      api('getAnalyticsData', { projectCode: scopedProjectCode() }).then(function (res) {
         const stats = res.stats || {};
         document.getElementById('view').innerHTML =
           '<div class="panel"><h2>戰情數據</h2><div class="stat-grid">' +
