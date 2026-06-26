@@ -943,7 +943,13 @@
       });
     }
 
-    function importLegacy() {
+    function chunks(items, size) {
+      const result = [];
+      for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
+      return result;
+    }
+
+    async function importLegacy() {
       let payload;
       try {
         payload = JSON.parse(document.getElementById('legacyImportJson').value);
@@ -951,20 +957,53 @@
         document.getElementById('legacyImportMsg').innerHTML = '<span class="bad">匯入資料不是正確 JSON</span>';
         return;
       }
-      api('importLegacyData', payload).then(function (res) {
-        tenantDisplayName = res.tenantName || tenantDisplayName;
-        const counts = res.counts || {};
-        document.getElementById('legacyImportMsg').innerHTML =
+      const msg = document.getElementById('legacyImportMsg');
+      const counts = {
+        projects: 0,
+        questions: 0,
+        consultants: 0,
+        availability: 0,
+        appointments: 0,
+        rejected: 0,
+        waitlist: 0,
+        emailTemplates: 0,
+        leads: 0
+      };
+      const stages = [
+        { label: '清空舊資料', body: { stage: 'reset', tenantName: payload.tenantName, ownerName: payload.ownerName, ownerEmail: payload.ownerEmail } },
+        { label: '專案', key: 'projects', body: { stage: 'projects', items: payload.projects || [] } },
+        { label: '顧問', key: 'consultants', body: { stage: 'consultants', items: payload.consultants || [] } },
+        { label: '題庫', key: 'questions', body: { stage: 'questions', items: payload.questions || [] } },
+        { label: '排班', key: 'availability', body: { stage: 'availability', items: payload.availability || [] } },
+        { label: '婉拒', key: 'rejected', body: { stage: 'rejected', items: payload.rejected || [] } },
+        { label: '等候', key: 'waitlist', body: { stage: 'waitlist', items: payload.waitlist || [] } },
+        { label: '信件範本', key: 'emailTemplates', body: { stage: 'emailTemplates', tenantName: payload.tenantName, items: payload.emailTemplates || [] } },
+        { label: '測驗名單', key: 'leads', body: { stage: 'leads', items: payload.leads || [] } }
+      ];
+      chunks(payload.appointments || [], 35).forEach(function (items, index) {
+        stages.splice(5 + index, 0, { label: '預約 ' + (index + 1), key: 'appointments', body: { stage: 'appointments', items: items } });
+      });
+
+      try {
+        for (let i = 0; i < stages.length; i += 1) {
+          const stage = stages[i];
+          msg.innerHTML = '<span class="ok">匯入中</span> ' + escapeHtml(stage.label) + '（' + (i + 1) + '/' + stages.length + '）';
+          const res = await api('importLegacyData', stage.body);
+          if (stage.key) counts[stage.key] += Number(res.count || 0);
+          if (res.tenantName) tenantDisplayName = res.tenantName;
+        }
+        msg.innerHTML =
           '<span class="ok">匯入完成</span> 專案 ' + (counts.projects || 0) +
           '、題目 ' + (counts.questions || 0) +
           '、顧問 ' + (counts.consultants || 0) +
           '、預約 ' + (counts.appointments || 0) +
-          '、等候 ' + (counts.waitlist || 0);
+          '、等候 ' + (counts.waitlist || 0) +
+          '、信件 ' + (counts.emailTemplates || 0);
         Object.keys(cache).forEach(function (key) { delete cache[key]; });
         bootApp();
-      }).catch(function (err) {
-        document.getElementById('legacyImportMsg').innerHTML = '<span class="bad">' + escapeHtml(err.message) + '</span>';
-      });
+      } catch (err) {
+        msg.innerHTML = '<span class="bad">' + escapeHtml(err.message) + '</span>';
+      }
     }
 
     if (token) {
