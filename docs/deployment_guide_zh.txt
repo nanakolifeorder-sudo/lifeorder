@@ -278,7 +278,101 @@ https://你的-vercel-網址.vercel.app/admin?tenant=client-slug
 
 3. 寄信服務
    初版先建立 Google Calendar invitation。
-   若要完整取代 GAS GmailApp 的信件範本與提醒，建議下一階段接 Resend、SendGrid 或 Gmail API。
+若要完整取代 GAS GmailApp 的信件範本與提醒，建議下一階段接 Resend、SendGrid 或 Gmail API。
+
+
+========================================
+目前測試總管理員規則
+========================================
+
+內部測試或 demo 租戶的最高權限總管理員，統一使用：
+
+名稱：DMtest
+帳號：ncs1491311@gmail.com
+密碼：1111
+
+Vercel 環境變數也建議保持：
+
+OWNER_NAME=DMtest
+OWNER_EMAIL=ncs1491311@gmail.com
+OWNER_PASSWORD=1111
+
+
+========================================
+如何進 Supabase 後台看資料庫
+========================================
+
+1. 打開 Supabase：
+   https://supabase.com/dashboard
+
+2. 進入專案：
+   dm-booking-saas
+
+3. 左側選單點 Table Editor。
+
+4. 你會看到主要資料表：
+
+   tenants
+   每個客戶/測試租戶一列，例如 nicolle-demo。
+
+   projects
+   每個預約頁/專案一列，例如 P01。
+
+   consultants
+   後台登入帳號、顧問資料、Google OAuth 狀態。
+   google_refresh_token 是加密後的 Google token，不要手動改。
+
+   leads
+   客人填表後、還沒成功預約之前，會先進這裡。
+   status 會是 pending、booked、waitlist、rejected。
+
+   appointments
+   成功預約後的正式預約紀錄。
+
+   email_templates
+   後台「信件」分頁設定的跟進信模板。
+
+   email_queue
+   系統準備寄、已寄、取消或失敗的信件紀錄。
+   如果客人已預約，未預約提醒會被改成 cancelled。
+
+5. 如果要看某個租戶的資料，可以在 Table Editor 裡用 Filter：
+   tenant_slug = nicolle-demo
+
+6. 不建議直接在 Supabase 手動改密碼。
+   密碼是雜湊後存放，請從系統後台改，或用安裝流程重設。
+
+
+========================================
+第二階段：信件與停止跟進規則
+========================================
+
+目前第二階段的核心流程：
+
+1. 客人填完預約表單並按「下一步：選擇時間」
+   系統會建立 lead。
+
+2. 如果後台有設定「填表未預約」模板
+   系統會依照延遲小時數建立 email_queue。
+
+3. 客人成功預約後
+   系統會把同租戶、同專案、同 Email 的未預約提醒取消。
+
+4. 如果沒有可預約時段
+   lead 會變成 waitlist，未預約提醒也會停止。
+
+5. 如果問卷觸發資格不符合
+   lead 會變成 rejected，未預約提醒也會停止。
+
+6. Vercel 會每小時呼叫 /api/cron
+   將到期且仍可寄送的 email_queue 透過 Gmail API 寄出。
+
+7. 要寄信前，至少要有一個顧問或管理員按過「連接 Google」。
+   因為寄信會使用該 Google 帳號的 Gmail API 權限。
+
+重要提醒：
+這一版已經接 Gmail API 的寄信能力，但 Google OAuth 需要重新授權，
+因為新增了 Gmail send 權限。
 
 4. 自訂網域
    例如 booking.yourdomain.com，看起來會比 vercel.app 更像正式 SaaS。
