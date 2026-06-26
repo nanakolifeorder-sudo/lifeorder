@@ -141,9 +141,52 @@ create table if not exists email_templates (
   subject text not null,
   body text not null,
   status text not null default '啟用',
-  sender_name text default ''
+  sender_name text default '',
+  stop_when_booked boolean not null default true
+);
+
+alter table email_templates add column if not exists stop_when_booked boolean not null default true;
+
+create table if not exists leads (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  project_code text not null,
+  project_name text not null,
+  client_name text not null,
+  client_email text not null,
+  client_phone text default '',
+  answers text default '',
+  status text not null default 'pending',
+  booked_appointment_id bigint references appointments(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_slug, project_code, client_email)
+);
+
+create table if not exists email_queue (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  project_code text not null,
+  lead_id bigint references leads(id) on delete set null,
+  appointment_id bigint references appointments(id) on delete set null,
+  template_id bigint references email_templates(id) on delete set null,
+  trigger_name text not null,
+  client_name text not null,
+  client_email text not null,
+  subject text not null,
+  body text not null,
+  sender_name text default '',
+  scheduled_at timestamptz not null,
+  sent_at timestamptz,
+  cancelled_at timestamptz,
+  stop_when_booked boolean not null default true,
+  status text not null default 'queued',
+  error_message text default '',
+  created_at timestamptz not null default now()
 );
 
 create index if not exists idx_appointments_tenant_start on appointments(tenant_slug, start_at);
 create index if not exists idx_questions_project on questions(tenant_slug, project_code, sort_order);
 create index if not exists idx_rules_consultant on availability_rules(tenant_slug, consultant_id);
+create index if not exists idx_leads_project_email on leads(tenant_slug, project_code, client_email);
+create index if not exists idx_email_queue_due on email_queue(status, scheduled_at);
