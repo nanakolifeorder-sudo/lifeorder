@@ -26,11 +26,16 @@
     }
     .wrap {
       display: grid;
-      grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr);
+      grid-template-columns: minmax(320px, 520px);
       gap: 20px;
-      max-width: 1060px;
+      max-width: 560px;
       margin: 0 auto;
       align-items: start;
+      justify-content: center;
+    }
+    .wrap.has-notice {
+      grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr);
+      max-width: 1060px;
     }
     .panel {
       background: #fff;
@@ -295,6 +300,7 @@
       }
 
       pendingBooking = payload;
+      api('trackLead', pendingBooking).catch(function () {});
       loadSlots();
     });
 
@@ -343,6 +349,7 @@
         if (res.bookingNotice) {
           document.getElementById('noticeText').innerHTML = escapeHtml(res.bookingNotice).replace(/\n/g, '<br>');
           document.getElementById('noticePanel').style.display = 'block';
+          document.querySelector('.wrap').classList.add('has-notice');
         }
         renderQuestions();
         document.getElementById('loading').classList.add('hidden');
