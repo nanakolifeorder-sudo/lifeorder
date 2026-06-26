@@ -13,6 +13,8 @@ TZ = timezone(timedelta(hours=8))
 def clean(value):
     if value is None:
         return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
     if isinstance(value, str):
         return value.strip()
     return str(value).strip()
@@ -126,6 +128,13 @@ def replace_vars(value):
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
+    return text
+
+
+def phone_text(value):
+    text = clean(value)
+    if re.fullmatch(r"9\d{8}", text):
+        return "0" + text
     return text
 
 
@@ -253,30 +262,54 @@ def main():
         return "P01"
 
     def record_from(row, kind):
-        meet_or_event = clean(cell(row, 9))
-        event_id = ""
+        raw_project = clean(cell(row, 1))
+        alt_project = clean(cell(row, 9))
+        if raw_project in project_by_name:
+            project_name = raw_project
+            derived_event_id = ""
+        elif alt_project in project_by_name:
+            project_name = alt_project
+            derived_event_id = raw_project
+        else:
+            project_name = raw_project
+            derived_event_id = raw_project if raw_project and raw_project not in ("已發送日曆邀請",) else ""
+
+        event_id = derived_event_id
         meet_link = ""
-        if meet_or_event.startswith("http"):
-            meet_link = meet_or_event
-        elif meet_or_event:
-            event_id = meet_or_event
+        for index in range(9, min(len(row), 14)):
+            text = clean(cell(row, index))
+            if text.startswith("http"):
+                meet_link = text
+                break
+        attendance = clean(cell(row, 10))
+        deal_status = clean(cell(row, 11))
+        plan = clean(cell(row, 12))
+        notes = clean(cell(row, 13))
+        if re.fullmatch(r"\d{10,}", attendance):
+            attendance = ""
+        if deal_status.startswith("http"):
+            deal_status = ""
+        if plan.startswith("http"):
+            plan = ""
+        if notes.startswith("http"):
+            notes = ""
         return {
             "createdAt": iso_dt(cell(row, 0)),
-            "projectName": clean(cell(row, 1)),
-            "projectCode": project_code(cell(row, 1)),
+            "projectName": project_name,
+            "projectCode": project_code(project_name),
             "startAt": iso_dt(cell(row, 2)),
             "clientName": clean(cell(row, 3)),
             "email": clean(cell(row, 4)).lower(),
-            "phone": clean(cell(row, 5)),
+            "phone": phone_text(cell(row, 5)),
             "answers": clean(cell(row, 6)),
             "consultantName": clean(cell(row, 7)),
             "status": clean(cell(row, 8)) or kind,
             "eventId": event_id,
             "meetLink": meet_link,
-            "attendance": clean(cell(row, 10)),
-            "dealStatus": clean(cell(row, 11)),
-            "plan": clean(cell(row, 12)),
-            "notes": clean(cell(row, 13)),
+            "attendance": attendance,
+            "dealStatus": deal_status,
+            "plan": plan,
+            "notes": notes,
         }
 
     appointments = [
@@ -330,7 +363,7 @@ def main():
                     "projectName": "園區工程師首購計畫",
                     "clientName": clean(cell(row, 2)),
                     "email": email,
-                    "phone": clean(cell(row, 4)),
+                    "phone": phone_text(cell(row, 4)),
                     "answers": clean(cell(row, 5)),
                     "status": "booked" if booked else "pending",
                 }
