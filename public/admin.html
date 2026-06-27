@@ -213,6 +213,63 @@
     }
     .checkline input { width: auto; }
     .mini { font-size: 13px; color: var(--muted); }
+    .user-summary {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .editor-toolbar, .variable-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .editor-toolbar { border-radius: 6px 6px 0 0; }
+    .variable-bar {
+      border-top: 0;
+      border-bottom: 0;
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+    .editor-toolbar button, .variable-bar button {
+      width: auto;
+      min-width: 36px;
+      padding: 7px 10px;
+      background: var(--panel);
+      color: var(--ink);
+      border-color: var(--line);
+    }
+    .variable-bar button { color: var(--blue); }
+    .editor-toolbar input[type="color"] {
+      width: 34px;
+      height: 32px;
+      padding: 3px;
+      cursor: pointer;
+    }
+    .rich-editor {
+      min-height: 210px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 0 0 6px 6px;
+      background: #fff;
+      color: #202124;
+      line-height: 1.6;
+      overflow: auto;
+    }
+    .rich-editor:focus {
+      outline: 2px solid rgba(26, 115, 232, .28);
+      outline-offset: -2px;
+    }
+    .rich-editor p { color: inherit; margin: 0 0 10px; }
+    .record-heading {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
     @media (max-width: 780px) {
       header { margin: 10px; align-items: flex-start; flex-direction: column; }
       .owner-scope { margin: 0 10px 14px; }
@@ -432,7 +489,7 @@
         { id: 'questions', label: '表單管理', ok: can('FORMS') },
         { id: 'emails', label: '信件管理', ok: can('EMAILS') },
         { id: 'analytics', label: '戰情數據', ok: can('ANALYTICS') },
-        { id: 'createUser', label: '建立使用者', ok: isSystemOwner() }
+        { id: 'users', label: '使用者管理', ok: isSystemOwner() }
       ].filter(function (tab) { return tab.ok; });
     }
 
@@ -455,7 +512,7 @@
         questions: loadQuestions,
         emails: loadEmails,
         analytics: loadAnalytics,
-        createUser: loadCreateUser
+        users: loadUserManagement
       };
       (map[name] || loadCrm)();
     }
@@ -546,30 +603,45 @@
     function clientCard(item) {
       const cls = 'client-card ' + appointmentBucket(item) + ' ' + (item.kind || '');
       const consultantBadge = item.consultant ? '<span class="badge">負責：' + escapeHtml(teamConsultantName(item.consultant)) + '</span>' : '';
-      const actionButtons = item.kind === 'appointment'
+      const isUpcoming = appointmentBucket(item) === 'upcoming';
+      const rescheduleBadge = String(item.status || '').includes('已發送改期')
+        ? '<span class="badge" style="color:#b06000;background:rgba(246,177,0,.16);">已發送改期邀請</span>'
+        : '';
+      const actionButtons = item.kind === 'appointment' && isUpcoming
         ? '<button class="danger" onclick="cancelAppointment(' + item.rowId + ')">取消會議</button>' +
           '<button class="yellow" onclick="alert(&quot;改期流程會在下一階段接上 Google Calendar。&quot;)">改期</button>' +
-          '<button class="purple" onclick="alert(&quot;轉派流程會在下一階段接上顧問派單。&quot;)">轉派</button>'
+          '<button class="purple" onclick="alert(&quot;轉派流程會在下一階段接上顧問派單。&quot;)">轉派</button>' +
+          '<button class="secondary" onclick="sendSelfReschedule(' + item.rowId + ')">發送自選改期</button>'
         : '';
       return '<div class="' + cls + '">' +
         '<div class="card-top">' +
-          '<div><h3>' + escapeHtml(item.meetTime || '未指定時間') + '</h3><div><strong>' + escapeHtml(item.clientName || '未命名客戶') + '</strong> ' + consultantBadge + '</div></div>' +
+          '<div><h3>' + escapeHtml(item.meetTime || '未指定時間') + '</h3><div><strong>' + escapeHtml(item.clientName || '未命名客戶') + '</strong> ' + consultantBadge + ' ' + rescheduleBadge + '</div></div>' +
           '<span class="badge">' + escapeHtml(item.projectName || item.projectCode || '') + '</span>' +
         '</div>' +
         '<p>' + escapeHtml(item.clientPhone || '') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p>' +
         (item.meetLink ? '<p><a href="' + escapeHtml(item.meetLink) + '" target="_blank">開啟會議連結</a></p>' : '') +
         '<div class="answer-box">' + escapeHtml(item.answers || '沒有問卷內容') + '</div>' +
-        (item.kind === 'appointment' ? crmEditor(item) : '') +
+        (item.kind === 'appointment' && crmMode === 'past' ? crmEditor(item) : '') +
         '<div class="actions">' + actionButtons + '</div>' +
       '</div>';
     }
 
+    function attendanceOptions(current) {
+      const value = ['出席', '未出席'].includes(String(current || '')) ? current : '';
+      return [
+        ['', '-- 待確認 --'],
+        ['出席', '出席'],
+        ['未出席', '未出席']
+      ].map(function (option) {
+        return '<option value="' + option[0] + '"' + (value === option[0] ? ' selected' : '') + '>' + option[1] + '</option>';
+      }).join('');
+    }
+
     function crmEditor(item) {
-      return '<div class="row" style="margin-top:12px;">' +
-        '<div class="col-3"><label>出席狀態</label><input id="att_' + item.rowId + '" value="' + escapeHtml(item.attendance || '') + '"></div>' +
-        '<div class="col-3"><label>諮詢狀態</label><input id="deal_' + item.rowId + '" value="' + escapeHtml(item.dealStatus || '') + '"></div>' +
-        '<div class="col-3"><label>報名方案</label><input id="plan_' + item.rowId + '" value="' + escapeHtml(item.plan || '') + '"></div>' +
-        '<div class="col-3"><button onclick="saveCrm(' + item.rowId + ')">儲存</button></div>' +
+      return '<h3 class="record-heading">會後紀錄</h3><div class="row">' +
+        '<div class="col-3"><label>出席狀態</label><select id="att_' + item.rowId + '">' + attendanceOptions(item.attendance) + '</select></div>' +
+        '<div class="col-5"><label>報名方案</label><input id="plan_' + item.rowId + '" value="' + escapeHtml(item.plan || '') + '"></div>' +
+        '<div class="col-4"><button onclick="saveCrm(' + item.rowId + ')">儲存會後紀錄</button></div>' +
         '<div class="col-12"><label>備註紀錄</label><textarea id="notes_' + item.rowId + '">' + escapeHtml(item.notes || '') + '</textarea></div>' +
       '</div>';
     }
@@ -578,7 +650,6 @@
       api('updateCRMRecord', {
         rowId: rowId,
         attendance: field('att_' + rowId),
-        dealStatus: field('deal_' + rowId),
         plan: field('plan_' + rowId),
         notes: field('notes_' + rowId)
       }).then(function () {
@@ -590,6 +661,15 @@
     function cancelAppointment(rowId) {
       if (!confirm('確定取消這場會議？')) return;
       api('handleAppointmentAction', { rowId: rowId, actionType: 'cancel' }).then(function () {
+        delete cache.crm;
+        loadCrm();
+      }).catch(function (err) { alert(err.message); });
+    }
+
+    function sendSelfReschedule(rowId) {
+      if (!confirm('確定要發送這位客戶的自選改期連結？')) return;
+      api('sendSelfRescheduleLink', { rowId: rowId }).then(function (res) {
+        alert(res.message || '自選改期連結已寄出');
         delete cache.crm;
         loadCrm();
       }).catch(function (err) { alert(err.message); });
@@ -757,6 +837,9 @@
           '<div class="col-12 actions">' +
             '<button onclick="saveConsultant(this)">儲存</button>' +
             (row.rowId ? '<button class="secondary" onclick="connectGoogle(' + row.rowId + ')">' + (row.googleConnected ? '重新連結 Google' : '連結 Google') + '</button>' : '') +
+            (row.rowId && String(row.loginEmail || '').toLowerCase() !== String(currentUser?.email || '').toLowerCase()
+              ? '<button class="danger" onclick="deleteConsultant(this)">刪除顧問</button>'
+              : '') +
             '<span class="mini">' + (row.googleConnected ? '已連結 ' + escapeHtml(row.googleEmail || 'Google') : '尚未連結 Google') + '</span>' +
           '</div>' +
         '</div>' +
@@ -798,6 +881,20 @@
         alert('已儲存');
         loadConsultants();
       }).catch(function (err) { alert(err.message); });
+    }
+
+    function deleteConsultant(button) {
+      const row = button.closest('.consultant-row');
+      const name = row.querySelector('.c-name').value.trim() || '這位團隊顧問';
+      if (!confirm('確定刪除 ' + name + '？歷史客戶紀錄會保留，但登入帳號與排班會移除。')) return;
+      button.disabled = true;
+      api('deleteConsultantData', { rowId: row.dataset.id }).then(function (res) {
+        alert(res.message || '已刪除');
+        loadConsultants();
+      }).catch(function (err) {
+        button.disabled = false;
+        alert(err.message);
+      });
     }
 
     function ensureDemoAccounts() {
@@ -935,6 +1032,7 @@
         '<div class="panel"><h2>新增信件範本</h2>' + emailTemplateForm({ status: 'active', triggerName: 'lead_created', timeParam: 0, stopWhenBooked: true }, projectOptions) + '</div>' +
         '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>';
+      initializeEmailEditors([].concat(res.templates || [], [{ body: '' }]));
     }
 
     function emailTemplateForm(row, projectOptions) {
@@ -944,7 +1042,9 @@
           '<div class="col-3"><label>信件名稱</label><input class="e-name" value="' + escapeHtml(row.name || '') + '"></div>' +
           '<div class="col-2"><label>觸發</label><select class="e-trigger">' +
             triggerOption('lead_created', '名單建立', row.triggerName) +
-            triggerOption('booking_created', '預約成功', row.triggerName) +
+          triggerOption('booking_created', '預約成功', row.triggerName) +
+            triggerOption('booking_rescheduled', '預約改期', row.triggerName) +
+            triggerOption('reschedule_link', '發送自選改期連結', row.triggerName) +
             triggerOption('meeting_before', '會議前提醒', row.triggerName) +
             triggerOption('meeting_after', '會議後跟進', row.triggerName) +
             triggerOption('booking_cancelled', '取消預約', row.triggerName) +
@@ -954,7 +1054,27 @@
           '<div class="col-5"><label>主旨</label><input class="e-subject" value="' + escapeHtml(row.subject || '') + '"></div>' +
           '<div class="col-2"><label>狀態</label><select class="e-status"><option value="active"' + (row.status !== 'inactive' ? ' selected' : '') + '>啟用</option><option value="inactive"' + (row.status === 'inactive' ? ' selected' : '') + '>停用</option></select></div>' +
           '<div class="col-5"><label>預約後停止名單追蹤</label><select class="e-stop"><option value="true"' + (row.stopWhenBooked !== false ? ' selected' : '') + '>是</option><option value="false"' + (row.stopWhenBooked === false ? ' selected' : '') + '>否</option></select></div>' +
-          '<div class="col-12"><label>內文</label><textarea class="e-body" style="min-height:160px;">' + escapeHtml(row.body || '') + '</textarea></div>' +
+          '<div class="col-12"><label>內文</label>' +
+            '<div class="editor-toolbar">' +
+              '<button title="粗體" onmousedown="event.preventDefault();formatEmail(this,&quot;bold&quot;)"><strong>B</strong></button>' +
+              '<button title="斜體" onmousedown="event.preventDefault();formatEmail(this,&quot;italic&quot;)"><em>I</em></button>' +
+              '<button title="底線" onmousedown="event.preventDefault();formatEmail(this,&quot;underline&quot;)"><u>U</u></button>' +
+              '<button title="加入超連結" onmousedown="event.preventDefault();addEmailLink(this)">連結</button>' +
+              '<label title="文字顏色" style="margin:0;"><input class="e-color" type="color" value="#202124" onchange="applyEmailColor(this)"></label>' +
+              '<button title="清除格式" onmousedown="event.preventDefault();formatEmail(this,&quot;removeFormat&quot;)">清除格式</button>' +
+            '</div>' +
+            '<div class="variable-bar"><span class="mini">插入變數：</span>' +
+              variableButton('客戶姓名', '{{name}}') +
+              variableButton('Email', '{{email}}') +
+              variableButton('電話', '{{phone}}') +
+              variableButton('專案名稱', '{{project}}') +
+              variableButton('預約時間', '{{time}}') +
+              variableButton('會議連結', '{{meetLink}}') +
+              variableButton('顧問姓名', '{{consultant}}') +
+              variableButton('改期專屬連結', '{{rescheduleLink}}') +
+            '</div>' +
+            '<div class="e-body rich-editor" contenteditable="true" role="textbox" aria-multiline="true" onkeyup="rememberEmailSelection(this)" onmouseup="rememberEmailSelection(this)" onfocus="rememberEmailSelection(this)"></div>' +
+          '</div>' +
           '<div class="col-12 actions"><button onclick="saveEmailTemplate(this)">儲存信件</button></div>' +
         '</div>' +
       '</div>';
@@ -962,6 +1082,88 @@
 
     function triggerOption(value, label, current) {
       return '<option value="' + value + '"' + (current === value ? ' selected' : '') + '>' + label + '</option>';
+    }
+
+    function variableButton(label, value) {
+      return '<button title="插入 ' + escapeHtml(label) + '" onmousedown="event.preventDefault();insertEmailVariable(this,&quot;' + escapeHtml(value) + '&quot;)">' + escapeHtml(label) + '</button>';
+    }
+
+    function safeEditorHtml(value) {
+      const text = String(value || '');
+      if (!/<[a-z][\s\S]*>/i.test(text)) {
+        return text ? '<p>' + escapeHtml(text).replace(/\n/g, '<br>') + '</p>' : '<p><br></p>';
+      }
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      doc.querySelectorAll('script,iframe,object,embed,form,input,button,meta,link,style').forEach(function (node) {
+        node.remove();
+      });
+      doc.body.querySelectorAll('*').forEach(function (node) {
+        Array.from(node.attributes).forEach(function (attr) {
+          if (/^on/i.test(attr.name)) node.removeAttribute(attr.name);
+          if ((attr.name === 'href' || attr.name === 'src') && /^\s*javascript:/i.test(attr.value)) node.removeAttribute(attr.name);
+        });
+      });
+      return doc.body.innerHTML || '<p><br></p>';
+    }
+
+    function initializeEmailEditors(rows) {
+      document.querySelectorAll('.email-row').forEach(function (node, index) {
+        const editor = node.querySelector('.e-body');
+        editor.innerHTML = safeEditorHtml(rows[index]?.body || '');
+      });
+    }
+
+    function emailEditorFor(control) {
+      return control.closest('.email-row').querySelector('.e-body');
+    }
+
+    function rememberEmailSelection(editor) {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) return;
+      const range = selection.getRangeAt(0);
+      if (editor.contains(range.commonAncestorContainer)) editor._savedRange = range.cloneRange();
+    }
+
+    function restoreEmailSelection(editor) {
+      editor.focus();
+      if (!editor._savedRange) return;
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(editor._savedRange);
+    }
+
+    function formatEmail(control, command) {
+      const editor = emailEditorFor(control);
+      restoreEmailSelection(editor);
+      document.execCommand(command, false, null);
+      rememberEmailSelection(editor);
+    }
+
+    function addEmailLink(control) {
+      const url = prompt('請輸入完整連結網址：', 'https://');
+      if (!url) return;
+      const editor = emailEditorFor(control);
+      restoreEmailSelection(editor);
+      document.execCommand('createLink', false, url);
+      editor.querySelectorAll('a').forEach(function (link) {
+        link.target = '_blank';
+        link.rel = 'noopener';
+      });
+      rememberEmailSelection(editor);
+    }
+
+    function applyEmailColor(control) {
+      const editor = emailEditorFor(control);
+      restoreEmailSelection(editor);
+      document.execCommand('foreColor', false, control.value);
+      rememberEmailSelection(editor);
+    }
+
+    function insertEmailVariable(control, value) {
+      const editor = emailEditorFor(control);
+      restoreEmailSelection(editor);
+      document.execCommand('insertText', false, value);
+      rememberEmailSelection(editor);
     }
 
     function saveEmailTemplate(button) {
@@ -974,7 +1176,7 @@
         timeParam: Number(row.querySelector('.e-time').value || 0),
         senderName: row.querySelector('.e-sender').value,
         subject: row.querySelector('.e-subject').value,
-        body: row.querySelector('.e-body').value,
+        body: row.querySelector('.e-body').innerHTML,
         status: row.querySelector('.e-status').value,
         stopWhenBooked: row.querySelector('.e-stop').value !== 'false'
       }).then(function () {
@@ -1008,8 +1210,36 @@
       return '<div class="stat">' + escapeHtml(label) + '<strong>' + value + '</strong></div>';
     }
 
-    function loadCreateUser() {
+    function loadUserManagement() {
+      loading('使用者管理');
+      api('getOwnerScopeData', {}).then(renderUserManagement).catch(showError);
+    }
+
+    function renderUserManagement(res) {
+      ownerScope = res;
+      const users = (res.tenants || []).map(function (item) {
+        return '<div class="item user-row" data-tenant="' + escapeHtml(item.slug) + '">' +
+          '<div class="row">' +
+            '<div class="col-3"><label>使用者名稱</label><input class="u-name" value="' + escapeHtml(item.name || '') + '"></div>' +
+            '<div class="col-3"><label>管理員名稱</label><input class="u-owner-name" value="' + escapeHtml(item.owner_name || '') + '"></div>' +
+            '<div class="col-4"><label>主要聯絡 Email</label><input class="u-owner-email" value="' + escapeHtml(item.owner_email || '') + '"></div>' +
+            '<div class="col-2"><label>使用者代碼</label><input readonly value="' + escapeHtml(item.slug) + '"></div>' +
+            '<div class="col-12 user-summary">' +
+              '<span class="badge">專案 ' + Number(item.project_count || 0) + '</span>' +
+              '<span class="badge">團隊帳號 ' + Number(item.consultant_count || 0) + '</span>' +
+              '<span class="badge">預約紀錄 ' + Number(item.appointment_count || 0) + '</span>' +
+              (item.slug === tenant ? '<span class="badge">目前檢視中</span>' : '') +
+            '</div>' +
+            '<div class="col-12 actions"><button onclick="saveManagedUser(this)">儲存使用者資料</button>' +
+              (item.slug === tenant ? '' : '<button class="secondary" onclick="switchOwnerTenant(&quot;' + escapeHtml(item.slug) + '&quot;)">進入後台</button>') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
       document.getElementById('view').innerHTML =
+        '<div class="panel"><h2>使用者管理</h2><p>管理所有已開通團隊；進入後台後可管理該團隊的專案、顧問與客戶。</p><div class="list">' +
+          (users || '<p>目前還沒有使用者。</p>') +
+        '</div></div>' +
         '<div class="panel"><h2>建立使用者</h2><div class="row">' +
           '<div class="col-3"><label>使用者代碼</label><input id="newTenant" placeholder="client-name"></div>' +
           '<div class="col-3"><label>使用者名稱 / 預設專案名稱</label><input id="newTenantName" value="DM Chen"></div>' +
@@ -1020,6 +1250,30 @@
         '</div></div>' +
         '<div class="panel"><h2>舊系統資料匯入</h2><textarea id="legacyImportJson" style="min-height:220px;" placeholder="貼上由舊 Excel 轉出的匯入資料"></textarea>' +
         '<div class="actions"><button class="purple" onclick="importLegacy()">匯入到目前使用者</button><span id="legacyImportMsg"></span></div></div>';
+    }
+
+    function saveManagedUser(button) {
+      const row = button.closest('.user-row');
+      button.disabled = true;
+      api('saveTenantAsOwner', {
+        targetTenant: row.dataset.tenant,
+        tenantName: row.querySelector('.u-name').value.trim(),
+        ownerName: row.querySelector('.u-owner-name').value.trim(),
+        ownerEmail: row.querySelector('.u-owner-email').value.trim()
+      }).then(function () {
+        if (row.dataset.tenant === tenant) {
+          tenantDisplayName = row.querySelector('.u-name').value.trim() || tenantDisplayName;
+          currentUser.tenantName = tenantDisplayName;
+          document.getElementById('tenantLabel').textContent = '使用者：' + tenantDisplayName + '｜權限：' + roleLabel(currentUser.role);
+          renderTabs();
+        }
+        alert('使用者資料已儲存');
+        loadOwnerScopeBar();
+        loadUserManagement();
+      }).catch(function (err) {
+        button.disabled = false;
+        alert(err.message);
+      });
     }
 
     function createUserTenant() {

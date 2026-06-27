@@ -103,6 +103,15 @@
     .status { margin-top: 14px; color: var(--muted); }
     .error { color: var(--red); }
     .success { color: var(--green); }
+    .reschedule-notice {
+      border: 1px solid #f6b100;
+      background: #fff8e1;
+      color: #7a5100;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-weight: 700;
+    }
     .complete {
       text-align: center;
       padding: 28px;
@@ -124,6 +133,7 @@
 
     <section class="panel" id="formPanel">
       <h1 id="title">預約諮詢</h1>
+      <div class="reschedule-notice hidden" id="rescheduleNotice">這是專屬改期頁面，原始資料已自動帶入，請直接選擇新的時間。</div>
       <p id="loading">正在載入預約設定...</p>
       <form id="bookingForm" class="hidden">
         <div class="field">
@@ -159,6 +169,7 @@
     const params = new URLSearchParams(location.search);
     const tenant = (params.get('tenant') || params.get('t') || '').toLowerCase();
     const projectCode = (params.get('p') || 'P01').toUpperCase();
+    const rescheduleToken = params.get('rid') || '';
     const skipForm = params.get('skipForm') === 'true';
     const apiBase = '/api';
 
@@ -300,7 +311,7 @@
       }
 
       pendingBooking = payload;
-      api('trackLead', pendingBooking).catch(function () {});
+      if (!rescheduleToken) api('trackLead', pendingBooking).catch(function () {});
       loadSlots();
     });
 
@@ -325,7 +336,7 @@
         document.getElementById('slotsPanel').classList.add('hidden');
         document.getElementById('donePanel').classList.remove('hidden');
         document.getElementById('donePanel').innerHTML =
-          '<h2 class="success">預約成功</h2>' +
+          '<h2 class="success">' + (rescheduleToken ? '改期成功' : '預約成功') + '</h2>' +
           '<p>已建立 Google Calendar 與 Google Meet，會議資訊也會寄給你。</p>' +
           (res.meetLink ? '<p><a href="' + escapeHtml(res.meetLink) + '" target="_blank" rel="noopener">開啟會議連結</a></p>' : '');
       });
@@ -352,9 +363,31 @@
           document.querySelector('.wrap').classList.add('has-notice');
         }
         renderQuestions();
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('bookingForm').classList.remove('hidden');
-        api('logPageView', { projectCode }).catch(function () {});
+        if (rescheduleToken) {
+          api('getRescheduleData', { rescheduleToken: rescheduleToken }).then(function (appointment) {
+            pendingBooking = {
+              projectCode: appointment.projectCode || projectCode,
+              name: appointment.clientName,
+              email: appointment.clientEmail,
+              phone: appointment.clientPhone || '',
+              answers: appointment.answers || '',
+              rescheduleToken: rescheduleToken
+            };
+            document.getElementById('clientName').value = appointment.clientName || '';
+            document.getElementById('clientEmail').value = appointment.clientEmail || '';
+            document.getElementById('clientPhone').value = appointment.clientPhone || '';
+            document.getElementById('rescheduleNotice').classList.remove('hidden');
+            document.getElementById('backBtn').classList.add('hidden');
+            document.getElementById('loading').classList.add('hidden');
+            loadSlots();
+          }).catch(function (error) {
+            document.getElementById('loading').innerHTML = '<span class="error">' + escapeHtml(error.message || '改期連結無效') + '</span>';
+          });
+        } else {
+          document.getElementById('loading').classList.add('hidden');
+          document.getElementById('bookingForm').classList.remove('hidden');
+          api('logPageView', { projectCode }).catch(function () {});
+        }
       });
     }
 

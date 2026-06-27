@@ -103,6 +103,7 @@ def normalize_trigger(value):
         "會議後跟進": "meeting_after",
         "取消預約時": "booking_cancelled",
         "取消時": "booking_cancelled",
+        "預約改期時": "booking_rescheduled",
         "發送改期連結時": "reschedule_link",
         "名單建立": "lead_created",
         "表單送出": "lead_created",
@@ -125,6 +126,7 @@ def replace_vars(value):
         "{{會議連結}}": "{{meetLink}}",
         "{{顧問姓名}}": "{{consultant}}",
         "{{顧問}}": "{{consultant}}",
+        "{{改期專屬連結}}": "{{rescheduleLink}}",
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
