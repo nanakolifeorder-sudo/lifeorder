@@ -271,8 +271,12 @@
 
       api('getAvailableTimes', { projectCode }).then(function (slots) {
         if (!Array.isArray(slots) || !slots.length) {
-          document.getElementById('slotStatus').textContent = '目前沒有可預約時間，已幫你加入等候名單。';
-          api('logMissed', pendingBooking);
+          if (rescheduleToken) {
+            document.getElementById('slotStatus').textContent = '目前沒有可供改期的時間，請聯繫顧問協助安排。';
+          } else {
+            document.getElementById('slotStatus').textContent = '目前沒有可預約時間，已幫你加入等候名單。';
+            api('logMissed', pendingBooking);
+          }
           return;
         }
         document.getElementById('slotStatus').textContent = '請選擇一個時段。';
@@ -365,6 +369,7 @@
         renderQuestions();
         if (rescheduleToken) {
           api('getRescheduleData', { rescheduleToken: rescheduleToken }).then(function (appointment) {
+            if (!appointment.success) throw new Error(appointment.message || '改期連結無效');
             pendingBooking = {
               projectCode: appointment.projectCode || projectCode,
               name: appointment.clientName,
