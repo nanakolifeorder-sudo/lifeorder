@@ -33,9 +33,17 @@
       align-items: start;
       justify-content: center;
     }
+    .wrap.booking-calendar {
+      grid-template-columns: minmax(680px, 880px);
+      max-width: 920px;
+    }
     .wrap.has-notice {
       grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr);
       max-width: 1060px;
+    }
+    .wrap.has-notice.booking-calendar {
+      grid-template-columns: minmax(220px, 280px) minmax(680px, 1fr);
+      max-width: 1180px;
     }
     .panel {
       background: #fff;
@@ -82,11 +90,73 @@
     }
     button.secondary { background: #fff; color: var(--blue); border: 1px solid var(--blue); }
     button:disabled { opacity: 0.58; cursor: wait; }
+    .calendar-layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) minmax(220px, 280px);
+      gap: 22px;
+      margin-top: 16px;
+    }
+    .calendar-toolbar {
+      display: grid;
+      grid-template-columns: 42px 1fr 42px;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .calendar-toolbar button {
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      background: #fff;
+      color: var(--blue);
+      border: 1px solid var(--line);
+    }
+    .calendar-toolbar strong { text-align: center; font-size: 18px; }
+    .weekdays, .calendar-days {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .weekdays span {
+      padding: 7px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .calendar-day {
+      width: 100%;
+      aspect-ratio: 1;
+      min-height: 46px;
+      padding: 0;
+      border: 1px solid var(--line);
+      background: #f1f3f4;
+      color: #9aa0a6;
+      font-size: 15px;
+    }
+    .calendar-day.available {
+      background: #fff;
+      color: var(--blue);
+      border-color: var(--blue);
+    }
+    .calendar-day:disabled { cursor: not-allowed; }
+    .calendar-day.available:hover, .calendar-day.selected {
+      background: var(--blue);
+      color: #fff;
+    }
+    .calendar-day.blank { visibility: hidden; }
+    .time-panel {
+      min-height: 360px;
+      padding-left: 20px;
+      border-left: 1px solid var(--line);
+    }
     .slots {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 10px;
-      margin-top: 16px;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      max-height: 320px;
+      overflow: auto;
+      padding-right: 4px;
     }
     .slot {
       border: 1px solid var(--blue);
@@ -119,8 +189,11 @@
     .complete a { color: var(--blue); font-weight: 700; }
     @media (max-width: 760px) {
       body { padding: 12px; }
-      .wrap { grid-template-columns: 1fr; }
+      .wrap, .wrap.booking-calendar, .wrap.has-notice.booking-calendar { grid-template-columns: 1fr; max-width: 560px; }
       .panel { padding: 18px; }
+      .calendar-layout { grid-template-columns: 1fr; }
+      .time-panel { min-height: 0; padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+      .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; }
     }
   </style>
 </head>
@@ -156,8 +229,22 @@
         <h2>選擇可預約時間</h2>
         <p>以下時段會即時避開顧問已連結行事曆裡的忙碌行程。</p>
         <div id="slotStatus" class="status">正在讀取可預約時間...</div>
-        <div id="slots" class="slots"></div>
-        <button id="confirmBtn" disabled>確認預約</button>
+        <div id="calendarLayout" class="calendar-layout hidden">
+          <div>
+            <div class="calendar-toolbar">
+              <button id="prevMonth" type="button" title="上一個月">‹</button>
+              <strong id="calendarMonth"></strong>
+              <button id="nextMonth" type="button" title="下一個月">›</button>
+            </div>
+            <div class="weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+            <div id="calendarDays" class="calendar-days"></div>
+          </div>
+          <div class="time-panel">
+            <h3 id="selectedDateTitle">請先選擇日期</h3>
+            <div id="slots" class="slots"></div>
+          </div>
+        </div>
+        <button id="confirmBtn" class="hidden" disabled style="margin-top:16px;">確認預約</button>
         <button class="secondary" id="backBtn" type="button" style="margin-top:10px;">返回修改資料</button>
       </section>
 
@@ -167,10 +254,13 @@
 
   <script>
     const params = new URLSearchParams(location.search);
-    const isLocalPreview = location.protocol === 'file:';
+    const isLocalPreview = location.protocol === 'file:' ||
+      location.hostname === 'localhost' ||
+      location.hostname === '127.0.0.1';
     const tenant = (params.get('tenant') || params.get('t') || (isLocalPreview ? 'dm-test' : '')).toLowerCase();
     const projectCode = (params.get('p') || 'P01').toUpperCase();
     const rescheduleToken = params.get('rid') || '';
+    const invitationToken = params.get('invite') || '';
     const skipForm = params.get('skipForm') === 'true';
     const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
 
@@ -178,8 +268,12 @@
     let projectName = '';
     let rejectType = 'text';
     let rejectValue = '';
+    let consultationUrl = '';
     let pendingBooking = null;
     let selectedSlot = null;
+    let availableSlots = [];
+    let slotGroups = {};
+    let calendarCursor = '';
 
     function api(action, payload) {
       return fetch(apiBase + '?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
@@ -223,6 +317,7 @@
     }
 
     function collectAnswers() {
+      if (skipForm) return '';
       const answers = [];
       for (let i = 0; i < questions.length; i += 1) {
         const q = questions[i];
@@ -268,35 +363,104 @@
     function loadSlots() {
       document.getElementById('bookingForm').classList.add('hidden');
       document.getElementById('slotsPanel').classList.remove('hidden');
+      document.querySelector('.wrap').classList.add('booking-calendar');
       document.getElementById('slotStatus').textContent = '正在讀取可預約時間...';
       document.getElementById('slots').innerHTML = '';
+      document.getElementById('calendarLayout').classList.add('hidden');
       selectedSlot = null;
       document.getElementById('confirmBtn').disabled = true;
+      document.getElementById('confirmBtn').classList.add('hidden');
 
       api('getAvailableTimes', { projectCode }).then(function (slots) {
         if (!Array.isArray(slots) || !slots.length) {
           if (rescheduleToken) {
             document.getElementById('slotStatus').textContent = '目前沒有可供改期的時間，請聯繫顧問協助安排。';
+          } else if (invitationToken) {
+            document.getElementById('slotStatus').textContent = '目前暫時沒有可選時段，請稍後再開啟這封邀請信。';
           } else {
             document.getElementById('slotStatus').textContent = '目前沒有可預約時間，已幫你加入等候名單。';
             api('logMissed', pendingBooking);
           }
           return;
         }
-        document.getElementById('slotStatus').textContent = '請選擇一個時段。';
-        document.getElementById('slots').innerHTML = slots.map(function (slot, index) {
-          return '<button class="slot" data-index="' + index + '" data-ts="' + slot.timestamp + '">' + escapeHtml(slot.displayText) + '</button>';
-        }).join('');
-        document.querySelectorAll('.slot').forEach(function (button) {
-          button.addEventListener('click', function () {
-            document.querySelectorAll('.slot').forEach(function (b) { b.classList.remove('selected'); });
-            button.classList.add('selected');
-            selectedSlot = Number(button.dataset.ts);
-            document.getElementById('confirmBtn').disabled = false;
-          });
+        availableSlots = slots;
+        slotGroups = {};
+        slots.forEach(function (slot) {
+          const fallbackDate = new Date(Number(slot.timestamp)).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+          const dateKey = slot.dateKey || fallbackDate;
+          if (!slotGroups[dateKey]) slotGroups[dateKey] = [];
+          slotGroups[dateKey].push(slot);
         });
+        calendarCursor = Object.keys(slotGroups).sort()[0].slice(0, 7);
+        document.getElementById('slotStatus').textContent = '請先選擇日期，再選擇時間。';
+        document.getElementById('calendarLayout').classList.remove('hidden');
+        renderCalendar();
       });
     }
+
+    function calendarMonths() {
+      return Array.from(new Set(Object.keys(slotGroups).map(function (date) { return date.slice(0, 7); }))).sort();
+    }
+
+    function moveCalendarMonth(offset) {
+      const months = calendarMonths();
+      const index = months.indexOf(calendarCursor);
+      const next = months[index + offset];
+      if (!next) return;
+      calendarCursor = next;
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const parts = calendarCursor.split('-').map(Number);
+      const year = parts[0];
+      const month = parts[1];
+      const firstDay = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+      const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      document.getElementById('calendarMonth').textContent = year + ' 年 ' + month + ' 月';
+      const cells = [];
+      for (let blank = 0; blank < firstDay; blank += 1) {
+        cells.push('<button type="button" class="calendar-day blank" disabled></button>');
+      }
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const dateKey = calendarCursor + '-' + String(day).padStart(2, '0');
+        const enabled = Boolean(slotGroups[dateKey]?.length);
+        cells.push('<button type="button" class="calendar-day' + (enabled ? ' available' : '') + '" ' +
+          (enabled ? 'onclick="selectCalendarDate(&quot;' + dateKey + '&quot;)"' : 'disabled') + '>' + day + '</button>');
+      }
+      document.getElementById('calendarDays').innerHTML = cells.join('');
+      const months = calendarMonths();
+      const index = months.indexOf(calendarCursor);
+      document.getElementById('prevMonth').disabled = index <= 0;
+      document.getElementById('nextMonth').disabled = index >= months.length - 1;
+    }
+
+    function selectCalendarDate(dateKey) {
+      document.querySelectorAll('.calendar-day').forEach(function (button) {
+        button.classList.toggle('selected', button.textContent === String(Number(dateKey.slice(-2))) && dateKey.startsWith(calendarCursor));
+      });
+      selectedSlot = null;
+      const slots = slotGroups[dateKey] || [];
+      const first = slots[0] || {};
+      document.getElementById('selectedDateTitle').textContent = first.dateLabel || dateKey;
+      document.getElementById('slots').innerHTML = slots.map(function (slot) {
+        const timeLabel = slot.timeLabel || String(slot.displayText || '').split(' ').pop();
+        return '<button class="slot" type="button" data-ts="' + slot.timestamp + '">' + escapeHtml(timeLabel) + '</button>';
+      }).join('');
+      document.querySelectorAll('.slot').forEach(function (button) {
+        button.addEventListener('click', function () {
+          document.querySelectorAll('.slot').forEach(function (item) { item.classList.remove('selected'); });
+          button.classList.add('selected');
+          selectedSlot = Number(button.dataset.ts);
+          document.getElementById('confirmBtn').disabled = false;
+        });
+      });
+      document.getElementById('confirmBtn').classList.remove('hidden');
+      document.getElementById('confirmBtn').disabled = true;
+    }
+
+    document.getElementById('prevMonth').addEventListener('click', function () { moveCalendarMonth(-1); });
+    document.getElementById('nextMonth').addEventListener('click', function () { moveCalendarMonth(1); });
 
     document.getElementById('bookingForm').addEventListener('submit', function (event) {
       event.preventDefault();
@@ -304,7 +468,8 @@
         projectCode,
         name: document.getElementById('clientName').value.trim(),
         email: document.getElementById('clientEmail').value.trim(),
-        phone: document.getElementById('clientPhone').value.trim()
+        phone: document.getElementById('clientPhone').value.trim(),
+        invitationToken: invitationToken || ''
       };
 
       try {
@@ -327,6 +492,7 @@
     document.getElementById('backBtn').addEventListener('click', function () {
       document.getElementById('slotsPanel').classList.add('hidden');
       document.getElementById('bookingForm').classList.remove('hidden');
+      document.querySelector('.wrap').classList.remove('booking-calendar');
     });
 
     document.getElementById('confirmBtn').addEventListener('click', function () {
@@ -344,10 +510,29 @@
         }
         document.getElementById('slotsPanel').classList.add('hidden');
         document.getElementById('donePanel').classList.remove('hidden');
+        if (rescheduleToken) {
+          document.getElementById('donePanel').innerHTML =
+            '<h2 class="success">改期成功</h2><p>新的會議資訊已寄到你的 Email。</p>';
+          return;
+        }
         document.getElementById('donePanel').innerHTML =
-          '<h2 class="success">' + (rescheduleToken ? '改期成功' : '預約成功') + '</h2>' +
-          '<p>已建立行事曆與視訊會議，會議資訊也會寄給你。</p>' +
-          (res.meetLink ? '<p><a href="' + escapeHtml(res.meetLink) + '" target="_blank" rel="noopener">開啟會議連結</a></p>' : '');
+          '<h2 class="success">預約成功</h2>' +
+          '<p><strong>請先不要關閉此畫面！</strong></p>' +
+          (consultationUrl
+            ? '<p>畫面將在 <strong id="redirectSeconds">5</strong> 秒後前往「諮詢前注意事項」，請務必看完。</p>'
+            : '<p>會議資訊已寄到你的 Email，可以關閉此畫面。</p>');
+        if (consultationUrl) {
+          let seconds = 5;
+          const timer = setInterval(function () {
+            seconds -= 1;
+            const counter = document.getElementById('redirectSeconds');
+            if (counter) counter.textContent = String(seconds);
+            if (seconds <= 0) {
+              clearInterval(timer);
+              location.href = consultationUrl;
+            }
+          }, 1000);
+        }
       });
     });
 
@@ -364,6 +549,7 @@
         projectName = res.projectName || '預約諮詢';
         rejectType = res.rejectType || 'text';
         rejectValue = res.rejectValue || '';
+        consultationUrl = res.mainUrl || '';
         questions = res.questions || [];
         document.getElementById('title').textContent = projectName + '｜預約諮詢';
         if (res.bookingNotice) {
@@ -392,6 +578,31 @@
             loadSlots();
           }).catch(function (error) {
             document.getElementById('loading').innerHTML = '<span class="error">' + escapeHtml(error.message || '改期連結無效') + '</span>';
+          });
+        } else if (invitationToken) {
+          api('getBookingInviteData', { invitationToken: invitationToken }).then(function (invite) {
+            if (!invite.success) throw new Error(invite.message || '邀請連結無效');
+            document.getElementById('clientName').value = invite.clientName || '';
+            document.getElementById('clientEmail').value = invite.clientEmail || '';
+            document.getElementById('clientPhone').value = invite.clientPhone || '';
+            document.getElementById('clientEmail').readOnly = true;
+            document.getElementById('loading').classList.add('hidden');
+            if (invite.requireForm) {
+              document.getElementById('bookingForm').classList.remove('hidden');
+            } else {
+              pendingBooking = {
+                projectCode: invite.projectCode || projectCode,
+                name: invite.clientName || invite.clientEmail,
+                email: invite.clientEmail,
+                phone: invite.clientPhone || '',
+                answers: invite.answers || '由後台直接發送時段選擇邀請。',
+                invitationToken: invitationToken
+              };
+              document.getElementById('backBtn').classList.add('hidden');
+              loadSlots();
+            }
+          }).catch(function (error) {
+            document.getElementById('loading').innerHTML = '<span class="error">' + escapeHtml(error.message || '邀請連結無效') + '</span>';
           });
         } else {
           document.getElementById('loading').classList.add('hidden');

@@ -294,6 +294,15 @@
     .copy-field input { min-width: 0; }
     .copy-field button { flex: 0 0 auto; }
     .option-editor { display: grid; gap: 7px; }
+    .question-row .row { align-items: start; }
+    .question-row .q-options-wrap {
+      padding-top: 2px;
+      border-top: 1px solid var(--line);
+      margin-top: 2px;
+    }
+    .question-row .option-editor {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     .option-row { display: flex; gap: 7px; align-items: center; }
     .option-row input { min-width: 0; }
     .option-row button {
@@ -311,6 +320,48 @@
       color: var(--ink);
       line-height: 1.5;
     }
+    .project-checks {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 8px;
+    }
+    .rich-editor img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 10px 0;
+      border-radius: 6px;
+    }
+    .invite-box {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+    .usage-meter {
+      height: 10px;
+      overflow: hidden;
+      border-radius: 5px;
+      background: var(--line);
+      margin-top: 8px;
+    }
+    .usage-meter span {
+      display: block;
+      height: 100%;
+      background: var(--green);
+    }
+    .usage-meter span.warn { background: var(--yellow); }
+    .usage-meter span.danger { background: var(--red); }
+    dialog {
+      width: min(620px, calc(100vw - 28px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0;
+      color: var(--ink);
+      background: var(--panel);
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+    }
+    dialog::backdrop { background: rgba(0,0,0,.58); }
+    .dialog-body { padding: 20px; }
     @media (max-width: 780px) {
       header { margin: 10px; align-items: flex-start; flex-direction: column; }
       .owner-scope { margin: 0 10px 14px; }
@@ -318,6 +369,7 @@
       .row { grid-template-columns: 1fr; }
       .row > * { grid-column: auto !important; }
       .stat-grid, .permission-grid { grid-template-columns: 1fr 1fr; }
+      .project-checks, .question-row .option-editor { grid-template-columns: 1fr; }
       .card-top { flex-direction: column; }
       table { display: block; overflow-x: auto; }
       details.item > summary { grid-template-columns: 1fr; gap: 6px; }
@@ -361,6 +413,10 @@
 
   <script>
     const params = new URLSearchParams(location.search);
+    const isLocalPreview = location.protocol === 'file:' ||
+      location.hostname === 'localhost' ||
+      location.hostname === '127.0.0.1';
+    const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
     let tenant = (params.get('tenant') || params.get('t') || 'dm-test').toLowerCase();
     let tenantDisplayName = 'DM Chen';
     function tokenKey() { return 'dm_saas_' + tenant + '_token'; }
@@ -373,10 +429,11 @@
     let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
     let ownerScope = { tenants: [], projects: [] };
     let scheduleConsultants = [];
+    let adminProjects = [];
     const cache = {};
 
     function api(action, payload) {
-      return fetch('/api?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
+      return fetch(apiBase + '?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -499,7 +556,8 @@
     function bootApp() {
       tenantDisplayName = currentUser.tenantName || tenantDisplayName || 'DM Chen';
       if (isSystemOwner()) crmProject = ownerProject;
-      document.getElementById('loginWrap').classList.add('hidden');
+      const loginWrap = document.getElementById('loginWrap');
+      if (loginWrap) loginWrap.remove();
       document.getElementById('appHeader').classList.remove('hidden');
       document.getElementById('app').classList.remove('hidden');
       document.getElementById('userName').textContent = currentUser.name || 'DMtest';
@@ -557,6 +615,7 @@
         { id: 'questions', label: '表單管理', ok: can('FORMS') },
         { id: 'emails', label: '信件管理', ok: can('EMAILS') },
         { id: 'analytics', label: '戰情數據', ok: can('ANALYTICS') },
+        { id: 'usage', label: '系統用量', ok: isSystemOwner() },
         { id: 'users', label: '使用者管理', ok: isSystemOwner() }
       ].filter(function (tab) { return tab.ok; });
     }
@@ -580,6 +639,7 @@
         questions: loadQuestions,
         emails: loadEmails,
         analytics: loadAnalytics,
+        usage: loadSystemUsage,
         users: loadUserManagement
       };
       (map[name] || loadCrm)();
@@ -677,10 +737,12 @@
         : '';
       const actionButtons = item.kind === 'appointment' && isUpcoming
         ? '<button class="danger" onclick="cancelAppointment(' + item.rowId + ')">取消會議</button>' +
-          '<button class="yellow" onclick="alert(&quot;改期流程會在下一階段接上 Google Calendar。&quot;)">改期</button>' +
-          '<button class="purple" onclick="alert(&quot;轉派流程會在下一階段接上顧問派單。&quot;)">轉派</button>' +
+          '<button class="yellow" onclick="openAdminReschedule(' + item.rowId + ',&quot;' + escapeHtml(item.projectCode || '') + '&quot;)">改期</button>' +
+          '<button class="purple" onclick="openTransfer(' + item.rowId + ',' + Number(item.consultantId || 0) + ',&quot;' + escapeHtml(item.projectCode || '') + '&quot;)">轉派</button>' +
           '<button class="secondary" onclick="sendSelfReschedule(' + item.rowId + ')">發送自選改期</button>'
-        : '';
+        : (item.kind === 'waitlist'
+          ? '<button class="secondary" onclick="sendWaitlistInvite(' + item.rowId + ')">發送時段選擇</button>'
+          : '');
       return '<div class="' + cls + '">' +
         '<div class="card-top">' +
           '<div><h3>' + escapeHtml(item.meetTime || '未指定時間') + '</h3><div><strong>' + escapeHtml(item.clientName || '未命名客戶') + '</strong> ' + consultantBadge + ' ' + rescheduleBadge + '</div></div>' +
@@ -738,6 +800,91 @@
       if (!confirm('確定要發送這位客戶的自選改期連結？')) return;
       api('sendSelfRescheduleLink', { rowId: rowId }).then(function (res) {
         alert(res.message || '自選改期連結已寄出');
+        delete cache.crm;
+        loadCrm();
+      }).catch(function (err) { alert(err.message); });
+    }
+
+    function actionDialog(title, body, confirmLabel, onConfirm) {
+      let dialog = document.getElementById('actionDialog');
+      if (!dialog) {
+        document.body.insertAdjacentHTML('beforeend', '<dialog id="actionDialog"><div class="dialog-body"></div></dialog>');
+        dialog = document.getElementById('actionDialog');
+      }
+      dialog.querySelector('.dialog-body').innerHTML =
+        '<h2>' + escapeHtml(title) + '</h2>' + body +
+        '<div class="actions"><button id="dialogConfirm">' + escapeHtml(confirmLabel) + '</button><button class="secondary" id="dialogCancel" type="button">取消</button></div>';
+      dialog.querySelector('#dialogCancel').onclick = function () { dialog.close(); };
+      dialog.querySelector('#dialogConfirm').onclick = onConfirm;
+      dialog.showModal();
+      return dialog;
+    }
+
+    function openAdminReschedule(rowId, projectCode) {
+      api('getAvailableTimes', { projectCode: projectCode }).then(function (slots) {
+        if (!Array.isArray(slots) || !slots.length) throw new Error('目前沒有可供改期的時段。');
+        const options = slots.map(function (slot) {
+          return '<option value="' + Number(slot.timestamp) + '">' + escapeHtml(slot.displayText) + '</option>';
+        }).join('');
+        const dialog = actionDialog('直接改期', '<label>新的日期與時間</label><select id="rescheduleSlot">' + options + '</select>', '確認改期', function () {
+          const button = dialog.querySelector('#dialogConfirm');
+          button.disabled = true;
+          api('handleAppointmentAction', {
+            rowId: rowId,
+            actionType: 'reschedule',
+            timestamp: Number(dialog.querySelector('#rescheduleSlot').value)
+          }).then(function (res) {
+            dialog.close();
+            alert(res.message || '改期完成');
+            delete cache.crm;
+            loadCrm();
+          }).catch(function (err) {
+            button.disabled = false;
+            alert(err.message);
+          });
+        });
+      }).catch(function (err) { alert(err.message); });
+    }
+
+    function openTransfer(rowId, currentConsultantId, projectCode) {
+      const consultants = (cache.crm?.allConsultants || []).filter(function (consultant) {
+        const projects = Array.isArray(consultant.project_codes) ? consultant.project_codes : ['ALL'];
+        const connected = String(consultant.meet_tool || '').includes('Microsoft')
+          ? consultant.microsoft_connected
+          : consultant.google_connected;
+        return Number(consultant.id) !== Number(currentConsultantId) &&
+          consultant.accepting && connected && (projects.includes('ALL') || projects.includes(projectCode));
+      });
+      if (!consultants.length) {
+        alert('目前沒有其他可轉派的顧問。');
+        return;
+      }
+      const options = consultants.map(function (consultant) {
+        return '<option value="' + Number(consultant.id) + '">' + escapeHtml(teamConsultantName(consultant.name)) + '</option>';
+      }).join('');
+      const dialog = actionDialog('轉派顧問', '<label>接手顧問</label><select id="transferConsultant">' + options + '</select>', '確認轉派', function () {
+        const button = dialog.querySelector('#dialogConfirm');
+        button.disabled = true;
+        api('handleAppointmentAction', {
+          rowId: rowId,
+          actionType: 'transfer',
+          targetConsultantId: Number(dialog.querySelector('#transferConsultant').value)
+        }).then(function (res) {
+          dialog.close();
+          alert(res.message || '轉派完成');
+          delete cache.crm;
+          loadCrm();
+        }).catch(function (err) {
+          button.disabled = false;
+          alert(err.message);
+        });
+      });
+    }
+
+    function sendWaitlistInvite(rowId) {
+      if (!confirm('確定寄出只需選擇日期與時間的邀請連結？')) return;
+      api('sendWaitlistInvite', { rowId: rowId }).then(function (res) {
+        alert(res.message || '時段選擇連結已寄出');
         delete cache.crm;
         loadCrm();
       }).catch(function (err) { alert(err.message); });
@@ -916,22 +1063,56 @@
       return 'CONSULTANT';
     }
 
-    function consultantForm(row) {
+    function projectPermissionChecks(value, projects) {
+      const selected = String(value || 'ALL').toUpperCase().split(',').map(function (code) { return code.trim(); }).filter(Boolean);
+      const allSelected = selected.includes('ALL');
+      const items = [['ALL', '全部專案']].concat((projects || []).map(function (project) {
+        return [project.code, project.name || project.code];
+      }));
+      return '<div class="project-checks">' + items.map(function (item) {
+        const checked = item[0] === 'ALL' ? allSelected : (!allSelected && selected.includes(item[0]));
+        return '<label class="checkline"><input class="c-project-check" type="checkbox" value="' + escapeHtml(item[0]) + '"' +
+          (checked ? ' checked' : '') + ' onchange="toggleConsultantProject(this)"> ' + escapeHtml(item[1]) + '</label>';
+      }).join('') + '</div>';
+    }
+
+    function toggleConsultantProject(input) {
+      const row = input.closest('.consultant-row');
+      const all = row.querySelector('.c-project-check[value="ALL"]');
+      if (input.value === 'ALL' && input.checked) {
+        row.querySelectorAll('.c-project-check:not([value="ALL"])').forEach(function (checkbox) { checkbox.checked = false; });
+      } else if (input.value !== 'ALL' && input.checked) {
+        all.checked = false;
+      }
+      const checked = row.querySelectorAll('.c-project-check:checked');
+      if (!checked.length) all.checked = true;
+    }
+
+    function showPasswordReset(button) {
+      const slot = button.closest('.password-reset-slot');
+      slot.innerHTML = '<label>新密碼</label><input class="c-password" type="password" autocomplete="new-password" data-1p-ignore data-lpignore="true" placeholder="輸入新密碼">';
+      slot.querySelector('input').focus();
+    }
+
+    function consultantForm(row, projects) {
       const id = row.rowId || 'new';
       const isTenantAdminRole = roleValue(row) === 'TENANT_ADMIN';
       const weight = Number(row.weight || 50);
       const weightLevel = weight <= 25 ? '10' : (weight >= 75 ? '100' : '50');
+      const passwordControl = row.rowId
+        ? '<div class="password-reset-slot"><button class="secondary" type="button" onclick="showPasswordReset(this)">設定新密碼</button></div>'
+        : '<div class="password-reset-slot"><label>登入密碼</label><input class="c-password" type="password" autocomplete="new-password" data-1p-ignore data-lpignore="true" required></div>';
       return '<div class="item consultant-row" data-id="' + id + '">' +
         '<div class="row">' +
           '<div class="col-3"><label>姓名</label><input class="c-name" value="' + escapeHtml(row.name || '') + '"><div class="mini">' + escapeHtml(row.name ? teamConsultantName(row.name) : '') + '</div></div>' +
           '<div class="col-3"><label>Email</label><input class="c-email" value="' + escapeHtml(row.loginEmail || '') + '"></div>' +
-          '<div class="col-2"><label>密碼</label><input class="c-password" type="password" placeholder="不改可留空"></div>' +
+          '<div class="col-2">' + passwordControl + '</div>' +
           '<div class="col-2"><label>接收派單</label><select class="c-accept"><option value="是"' + (row.isAccepting !== '否' ? ' selected' : '') + '>是</option><option value="否"' + (row.isAccepting === '否' ? ' selected' : '') + '>否</option></select></div>' +
           '<div class="col-2"><label>派單優先度</label><select class="c-weight">' +
             selectedOption('10', weightLevel, '高') + selectedOption('50', weightLevel, '一般') + selectedOption('100', weightLevel, '低') +
           '</select></div>' +
           '<div class="col-3"><label>Calendar ID</label><input class="c-cal" value="' + escapeHtml(row.calId || 'primary') + '"></div>' +
-          '<div class="col-3"><label>可看專案代號</label><input class="c-projects" value="' + escapeHtml(row.projects || 'ALL') + '"></div>' +
+          '<div class="col-12"><label>可看專案</label>' + projectPermissionChecks(row.projects, projects) + '</div>' +
           '<div class="col-2"><label>角色</label><select class="c-role-main"><option value="CONSULTANT"' + (!isTenantAdminRole ? ' selected' : '') + '>團隊顧問</option><option value="TENANT_ADMIN"' + (isTenantAdminRole ? ' selected' : '') + '>使用者管理員</option></select></div>' +
           '<div class="col-2"><label>視訊工具</label><select class="c-meet">' + videoToolOptions(row.meetTool) + '</select></div>' +
           '<div class="col-2"><label>時區</label><select class="c-tz">' + timeZoneOptions(row.shiftTZ) + '</select></div>' +
@@ -950,11 +1131,12 @@
     }
 
     function renderConsultants(res) {
+      adminProjects = res.projects || [];
       const consultants = (res.consultants || []).filter(projectMatchesScope);
       const html = '<div class="panel"><div class="row"><div class="col-8"><h2>' + escapeHtml(tenantDisplayName) + '團隊顧問</h2></div>' +
         '<div class="col-4"><button class="secondary" onclick="ensureDemoAccounts()">建立測試帳號</button></div></div><div class="list">' +
-        consultants.map(consultantForm).join('') +
-        '</div></div><div class="panel"><h2>新增' + escapeHtml(tenantDisplayName) + '團隊顧問</h2>' + consultantForm({ isAccepting: '是', weight: 50, projects: 'ALL', meetTool: 'Google Meet', shiftTZ: 'Asia/Taipei' }) + '</div>';
+        consultants.map(function (row) { return consultantForm(row, adminProjects); }).join('') +
+        '</div></div><div class="panel"><h2>新增' + escapeHtml(tenantDisplayName) + '團隊顧問</h2>' + consultantForm({ isAccepting: '是', weight: 50, projects: 'ALL', meetTool: 'Google Meet', shiftTZ: 'Asia/Taipei' }, adminProjects) + '</div>';
       document.getElementById('view').innerHTML = html;
     }
 
@@ -967,15 +1149,17 @@
     function saveConsultant(button) {
       const row = button.closest('.consultant-row');
       const id = row.dataset.id;
+      const projectCodes = Array.from(row.querySelectorAll('.c-project-check:checked')).map(function (input) { return input.value; });
+      const passwordInput = row.querySelector('.c-password');
       const payload = {
         rowId: id === 'new' ? '' : id,
         name: row.querySelector('.c-name').value.trim(),
         loginEmail: row.querySelector('.c-email').value.trim(),
-        password: row.querySelector('.c-password').value,
+        password: passwordInput ? passwordInput.value : '',
         calId: row.querySelector('.c-cal').value.trim() || 'primary',
         isAccepting: row.querySelector('.c-accept').value,
         weight: Number(row.querySelector('.c-weight').value || 50),
-        projects: row.querySelector('.c-projects').value.trim() || 'ALL',
+        projects: projectCodes.includes('ALL') || !projectCodes.length ? 'ALL' : projectCodes.join(','),
         sysRole: collectPermissions(row),
         meetTool: row.querySelector('.c-meet').value.trim() || 'Google Meet',
         shiftTZ: row.querySelector('.c-tz').value.trim() || 'Asia/Taipei'
@@ -1040,6 +1224,12 @@
     function projectForm(row) {
       const bookingUrl = row.code ? bookingUrlFor(row.code) : '';
       const isNew = !row.rowId;
+      const inviteBox = isNew ? '' :
+        '<div class="col-12 invite-box"><h3>發送預約邀請</h3><div class="row">' +
+          '<div class="col-5"><label>客戶 Email</label><input class="p-invite-email" type="email" autocomplete="off" placeholder="client@example.com"></div>' +
+          '<div class="col-4"><label>邀請方式</label><select class="p-invite-form"><option value="true">先填寫諮詢前表單</option><option value="false">直接選擇日期與時間</option></select></div>' +
+          '<div class="col-3"><button type="button" onclick="sendProjectInvite(this)">發送邀請連結</button></div>' +
+        '</div></div>';
       return '<details class="item project-row" data-id="' + (row.rowId || 'new') + '"' + (isNew ? ' open' : '') + '>' +
         '<summary><span>' + escapeHtml(row.code || '新增') + '</span><span>' + escapeHtml(row.name || '尚未命名專案') + '</span><span>' + escapeHtml(row.status || '啟用') + '</span></summary>' +
         '<div class="details-body"><div class="row">' +
@@ -1047,18 +1237,19 @@
           '<div class="col-4"><label>專案名稱</label><input class="p-name" value="' + escapeHtml(row.name || '') + '"></div>' +
           '<div class="col-2"><label>狀態</label><select class="p-status"><option value="active"' + (row.status !== 'inactive' ? ' selected' : '') + '>啟用</option><option value="inactive"' + (row.status === 'inactive' ? ' selected' : '') + '>停用</option></select></div>' +
           '<div class="col-4"><label>預約連結</label><div class="copy-field"><input class="p-booking" readonly value="' + escapeHtml(bookingUrl) + '"><button class="secondary" type="button" onclick="copyBookingUrl(this)">複製</button></div></div>' +
-          '<div class="col-6"><label>課前說明網址</label><input class="p-main" value="' + escapeHtml(row.mainUrl || '') + '"></div>' +
+          '<div class="col-6"><label>諮詢前說明網址</label><input class="p-main" value="' + escapeHtml(row.mainUrl || '') + '"></div>' +
           '<div class="col-6"><label>防呆網址</label><input class="p-fallback" value="' + escapeHtml(row.fallbackUrl || '') + '"></div>' +
           '<div class="col-6"><label>客製化注意事項</label><textarea class="p-notice">' + escapeHtml(row.bookingNotice || '') + '</textarea></div>' +
           '<div class="col-6"><label>婉拒訊息</label><textarea class="p-reject">' + escapeHtml(row.rejectValue || '') + '</textarea></div>' +
-          '<div class="col-12 actions"><button onclick="saveProject(this)">儲存專案</button></div>' +
+          '<div class="col-12 actions"><button onclick="saveProject(this)">儲存專案</button></div>' + inviteBox +
         '</div></div>' +
       '</details>';
     }
 
     function renderProjects(res) {
+      const baseUrl = (location.protocol === 'file:' ? 'https://dm-booking-saas.vercel.app' : location.origin) + '/booking?tenant=' + encodeURIComponent(tenant);
       document.getElementById('view').innerHTML =
-        '<div class="panel"><h2>專案管理</h2><p>Booking 基礎網址：' + escapeHtml(res.systemBaseUrl || '') + '</p><div class="list">' +
+        '<div class="panel"><h2>專案管理</h2><label>Booking 基礎網址</label><div class="copy-field" style="margin-bottom:16px;"><input readonly value="' + escapeHtml(baseUrl) + '"><button class="secondary" type="button" onclick="copyBookingUrl(this)">複製</button></div><div class="list">' +
         (res.projects || []).map(projectForm).join('') +
         '</div></div><div class="panel"><h2>新增專案</h2>' + projectForm({ status: 'active' }) + '</div>';
     }
@@ -1079,6 +1270,28 @@
         alert('已儲存');
         loadProjects();
       }).catch(function (err) { alert(err.message); });
+    }
+
+    function sendProjectInvite(button) {
+      const row = button.closest('.project-row');
+      const email = row.querySelector('.p-invite-email').value.trim();
+      if (!email) {
+        alert('請輸入客戶 Email');
+        return;
+      }
+      button.disabled = true;
+      api('sendBookingInvite', {
+        projectCode: row.querySelector('.p-code').value,
+        email: email,
+        requireForm: row.querySelector('.p-invite-form').value === 'true'
+      }).then(function (res) {
+        alert(res.message || '預約邀請已寄出');
+        row.querySelector('.p-invite-email').value = '';
+      }).catch(function (err) {
+        alert(err.message);
+      }).finally(function () {
+        button.disabled = false;
+      });
     }
 
     function loadQuestions() {
@@ -1118,12 +1331,12 @@
       const choiceType = row.type === '單選' || row.type === '多選';
       return '<div class="item question-row">' +
         '<div class="row">' +
-          '<div class="col-5"><label>題目</label><input class="q-title" value="' + escapeHtml(row.title || '') + '"></div>' +
-          '<div class="col-2"><label>題型</label><select class="q-type" onchange="toggleQuestionOptions(this)"><option value="文字"' + (!choiceType ? ' selected' : '') + '>文字</option><option value="單選"' + (row.type === '單選' ? ' selected' : '') + '>單選</option><option value="多選"' + (row.type === '多選' ? ' selected' : '') + '>多選</option></select></div>' +
-          '<div class="col-3 q-options-wrap' + (choiceType ? '' : ' hidden') + '"><label>選項（每列一項）</label><div class="option-editor">' +
+          '<div class="col-6"><label>題目</label><input class="q-title" value="' + escapeHtml(row.title || '') + '"></div>' +
+          '<div class="col-3"><label>題型</label><select class="q-type" onchange="toggleQuestionOptions(this)"><option value="文字"' + (!choiceType ? ' selected' : '') + '>文字</option><option value="單選"' + (row.type === '單選' ? ' selected' : '') + '>單選</option><option value="多選"' + (row.type === '多選' ? ' selected' : '') + '>多選</option></select></div>' +
+          '<div class="col-3"><label>淘汰詞</label><input class="q-reject" value="' + escapeHtml(row.rejectWord || '') + '" placeholder="沒有可留空"></div>' +
+          '<div class="col-12 q-options-wrap' + (choiceType ? '' : ' hidden') + '"><label>選項</label><div class="option-editor">' +
             options.map(questionOptionRow).join('') +
-          '</div><button class="secondary" type="button" style="margin-top:7px;" onclick="addQuestionOption(this)">新增選項</button></div>' +
-          '<div class="col-2"><label>淘汰詞</label><input class="q-reject" value="' + escapeHtml(row.rejectWord || '') + '"></div>' +
+          '</div><button class="secondary" type="button" style="margin-top:8px;" onclick="addQuestionOption(this)">新增選項</button></div>' +
         '</div>' +
       '</div>';
     }
@@ -1192,10 +1405,10 @@
       }).join('');
       const templates = (res.templates || []).map(function (row) { return emailTemplateForm(row, projectOptions); }).join('');
       const leads = (res.leads || []).slice(0, 20).map(function (lead) {
-        return '<tr><td>' + escapeHtml(lead.client_name) + '</td><td>' + escapeHtml(lead.client_email) + '</td><td>' + escapeHtml(lead.project_name) + '</td><td>' + escapeHtml(lead.status) + '</td></tr>';
+        return '<tr><td>' + escapeHtml(lead.client_name) + '</td><td>' + escapeHtml(lead.client_email) + '</td><td>' + escapeHtml(lead.project_name) + '</td><td>' + escapeHtml(emailStatusLabel(lead.status)) + '</td></tr>';
       }).join('');
       const queue = (res.queue || []).slice(0, 20).map(function (item) {
-        return '<tr><td>' + escapeHtml(item.client_email) + '</td><td>' + escapeHtml(item.subject) + '</td><td>' + escapeHtml(item.status) + '</td><td>' + escapeHtml(item.error_message || '') + '</td></tr>';
+        return '<tr><td>' + escapeHtml(item.client_email) + '</td><td>' + escapeHtml(item.subject) + '</td><td>' + escapeHtml(emailStatusLabel(item.status)) + '</td><td>' + escapeHtml(item.error_message || '') + '</td></tr>';
       }).join('');
       document.getElementById('view').innerHTML =
         '<div class="panel"><div class="row"><div class="col-5"><h2>信件管理</h2></div><div class="col-4"><label>目前專案</label><select onchange="loadEmailsByProject(this.value)">' + filterOptions + '</select></div><div class="col-3"><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div><div class="list" style="margin-top:16px;">' +
@@ -1204,6 +1417,20 @@
         '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>';
       initializeEmailEditors([].concat(res.templates || [], [{ body: '' }]));
+    }
+
+    function emailStatusLabel(status) {
+      const labels = {
+        pending: '尚未預約',
+        waitlist: '等候名單',
+        rejected: '已婉拒',
+        booked: '已預約',
+        queued: '等待寄送',
+        sent: '已寄出',
+        failed: '寄送失敗',
+        cancelled: '已停止'
+      };
+      return labels[String(status || '').toLowerCase()] || status || '未設定';
     }
 
     function emailTemplateForm(row, projectOptions) {
@@ -1231,8 +1458,10 @@
               '<button title="斜體" onmousedown="event.preventDefault();formatEmail(this,&quot;italic&quot;)"><em>I</em></button>' +
               '<button title="底線" onmousedown="event.preventDefault();formatEmail(this,&quot;underline&quot;)"><u>U</u></button>' +
               '<button title="加入超連結" onmousedown="event.preventDefault();addEmailLink(this)">連結</button>' +
+              '<button title="插入圖片" onmousedown="event.preventDefault();chooseEmailImage(this)">圖片</button>' +
               '<label title="文字顏色" style="margin:0;"><input class="e-color" type="color" value="#202124" onchange="applyEmailColor(this)"></label>' +
               '<button title="清除格式" onmousedown="event.preventDefault();formatEmail(this,&quot;removeFormat&quot;)">清除格式</button>' +
+              '<input class="e-image-input hidden" type="file" accept="image/png,image/jpeg,image/webp" onchange="insertEmailImage(this)">' +
             '</div>' +
             '<div class="variable-bar"><span class="mini">插入變數：</span>' +
               variableButton('客戶姓名', '{{name}}') +
@@ -1330,6 +1559,63 @@
       rememberEmailSelection(editor);
     }
 
+    function chooseEmailImage(control) {
+      const row = control.closest('.email-row');
+      const editor = row.querySelector('.e-body');
+      rememberEmailSelection(editor);
+      row.querySelector('.e-image-input').click();
+    }
+
+    function compressEmailImage(file) {
+      return new Promise(function (resolve, reject) {
+        if (!file || file.size > 2.5 * 1024 * 1024) {
+          reject(new Error('單張原始圖片不可超過 2.5MB。'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = function () { reject(new Error('無法讀取圖片。')); };
+        reader.onload = function () {
+          const image = new Image();
+          image.onerror = function () { reject(new Error('圖片格式無法使用。')); };
+          image.onload = function () {
+            const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.width * scale));
+            canvas.height = Math.max(1, Math.round(image.height * scale));
+            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            const bytes = Math.ceil((dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75);
+            if (bytes > 768 * 1024) {
+              reject(new Error('圖片壓縮後仍超過 750KB，請先裁切或縮小。'));
+              return;
+            }
+            resolve(dataUrl);
+          };
+          image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function insertEmailImage(input) {
+      const row = input.closest('.email-row');
+      const editor = row.querySelector('.e-body');
+      if (editor.querySelectorAll('img').length >= 4) {
+        alert('每封信最多放 4 張圖片。');
+        input.value = '';
+        return;
+      }
+      compressEmailImage(input.files?.[0]).then(function (dataUrl) {
+        restoreEmailSelection(editor);
+        document.execCommand('insertHTML', false, '<img src="' + dataUrl + '" alt="信件圖片" style="max-width:100%;height:auto;">');
+        rememberEmailSelection(editor);
+      }).catch(function (err) {
+        alert(err.message);
+      }).finally(function () {
+        input.value = '';
+      });
+    }
+
     function insertEmailVariable(control, value) {
       const editor = emailEditorFor(control);
       restoreEmailSelection(editor);
@@ -1379,6 +1665,41 @@
 
     function statBox(label, value) {
       return '<div class="stat">' + escapeHtml(label) + '<strong>' + value + '</strong></div>';
+    }
+
+    function usageCard(label, used, limit, unit, note) {
+      const percent = limit ? Math.min(100, Math.round(used / limit * 100)) : 0;
+      const cls = percent >= 90 ? 'danger' : (percent >= 70 ? 'warn' : '');
+      return '<div class="stat"><h3>' + escapeHtml(label) + '</h3><strong>' + escapeHtml(used + ' / ' + limit + ' ' + unit) + '</strong>' +
+        '<div class="usage-meter"><span class="' + cls + '" style="width:' + percent + '%"></span></div><p class="mini" style="margin-top:8px;">' + escapeHtml(note || '') + '</p></div>';
+    }
+
+    function loadSystemUsage() {
+      loading('系統用量');
+      api('getSystemUsage', {}).then(function (res) {
+        const dbMb = Number(res.databaseMb || 0);
+        const imageMb = Number(res.emailImageMb || 0);
+        document.getElementById('view').innerHTML =
+          '<div class="panel"><h2>系統用量</h2><p>這裡顯示本系統可直接量到的資料；Vercel 與 Supabase 平台帳單仍以官方 Usage 頁為準。</p>' +
+            '<div class="stat-grid">' +
+              usageCard('Supabase 資料庫', dbMb, 500, 'MB', '免費方案到 500MB；70% 開始提醒。') +
+              usageCard('信件範本與圖片', imageMb, 10, 'MB', '目前使用者的信件範本總上限 10MB。') +
+              statBox('本月已寄信', res.emailsSentMonth || 0) +
+              statBox('寄送失敗', res.emailsFailedMonth || 0) +
+            '</div>' +
+          '</div>' +
+          '<div class="panel"><h2>全系統規模</h2><div class="stat-grid">' +
+            statBox('使用者', res.tenants || 0) +
+            statBox('專案', res.projects || 0) +
+            statBox('團隊帳號', res.consultants || 0) +
+            statBox('預約紀錄', res.appointments || 0) +
+          '</div></div>' +
+          '<div class="panel"><h2>外部平台檢查</h2><table><thead><tr><th>平台</th><th>免費額度重點</th><th>查看位置</th></tr></thead><tbody>' +
+            '<tr><td>Vercel</td><td>Functions、CPU 時間、傳輸量</td><td><a href="https://vercel.com/dashboard/usage" target="_blank" rel="noopener">開啟 Usage</a></td></tr>' +
+            '<tr><td>Supabase</td><td>資料庫 500MB、檔案 1GB、傳輸 5GB</td><td><a href="https://supabase.com/dashboard/org/ymrbowkvryacgoewugog/usage" target="_blank" rel="noopener">開啟 Usage</a></td></tr>' +
+            '<tr><td>Google Cloud</td><td>Gmail API 配額與錯誤</td><td><a href="https://console.cloud.google.com/apis/dashboard" target="_blank" rel="noopener">開啟 API 儀表板</a></td></tr>' +
+          '</tbody></table></div>';
+      }).catch(showError);
     }
 
     function loadUserManagement() {
