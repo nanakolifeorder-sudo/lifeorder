@@ -3,7 +3,7 @@ Systeme 預約頁安裝碼
 
 你只要改下面 3 個值：
 1. appUrl：你的 Vercel 網址，例如 https://dm-booking-saas.vercel.app
-2. tenant：客戶租戶代碼，例如 nicolle-demo
+2. tenant：使用者代碼，例如 dm-test
 3. project：專案代碼，例如 P01
 -->
 

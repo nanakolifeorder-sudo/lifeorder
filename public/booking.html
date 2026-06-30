@@ -154,7 +154,7 @@
 
       <section id="slotsPanel" class="hidden">
         <h2>選擇可預約時間</h2>
-        <p>以下時段會即時避開顧問 Google Calendar 裡已忙碌的行程。</p>
+        <p>以下時段會即時避開顧問已連結行事曆裡的忙碌行程。</p>
         <div id="slotStatus" class="status">正在讀取可預約時間...</div>
         <div id="slots" class="slots"></div>
         <button id="confirmBtn" disabled>確認預約</button>
@@ -167,11 +167,12 @@
 
   <script>
     const params = new URLSearchParams(location.search);
-    const tenant = (params.get('tenant') || params.get('t') || '').toLowerCase();
+    const isLocalPreview = location.protocol === 'file:';
+    const tenant = (params.get('tenant') || params.get('t') || (isLocalPreview ? 'dm-test' : '')).toLowerCase();
     const projectCode = (params.get('p') || 'P01').toUpperCase();
     const rescheduleToken = params.get('rid') || '';
     const skipForm = params.get('skipForm') === 'true';
-    const apiBase = '/api';
+    const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
 
     let questions = [];
     let projectName = '';
@@ -208,7 +209,7 @@
         const required = q.isRequired !== '否';
         let html = '<div class="field" data-q="' + index + '">';
         html += '<label>' + escapeHtml(q.title) + (required ? ' *' : '') + '</label>';
-        if (q.type === '單選' || q.type === '複選') {
+        if (q.type === '單選' || q.type === '多選' || q.type === '複選') {
           const type = q.type === '單選' ? 'radio' : 'checkbox';
           (q.options || []).forEach(function (opt, optIndex) {
             html += '<label class="choice"><input type="' + type + '" name="q_' + index + '" value="' + escapeHtml(opt) + '"><span>' + escapeHtml(opt) + '</span></label>';
@@ -231,7 +232,7 @@
         if (q.type === '單選') {
           const selected = document.querySelector('input[name="q_' + i + '"]:checked');
           value = selected ? selected.value : '';
-        } else if (q.type === '複選') {
+        } else if (q.type === '多選' || q.type === '複選') {
           value = Array.from(document.querySelectorAll('input[name="q_' + i + '"]:checked')).map(function (el) { return el.value; }).join(', ');
         } else {
           value = (document.querySelector('[name="q_' + i + '"]') || {}).value || '';
@@ -242,13 +243,16 @@
         }
         answers.push('Q: ' + q.title + '\nA: ' + (value || '未填寫'));
 
-        if (q.rejectWord && value.indexOf(q.rejectWord) !== -1) {
-          const err = new Error('reject');
-          err.reject = true;
-          throw err;
-        }
+        if (q.rejectWord && value.indexOf(q.rejectWord) !== -1) answers.rejected = true;
       }
-      return answers.join('\n\n');
+      const answerText = answers.join('\n\n');
+      if (answers.rejected) {
+        const err = new Error('reject');
+        err.reject = true;
+        err.answers = answerText;
+        throw err;
+      }
+      return answerText;
     }
 
     function showReject(payload) {
@@ -307,6 +311,7 @@
         payload.answers = collectAnswers();
       } catch (error) {
         if (error.reject) {
+          payload.answers = error.answers || '';
           showReject(payload);
           return;
         }
@@ -328,7 +333,7 @@
       if (!selectedSlot || !pendingBooking) return;
       const btn = this;
       btn.disabled = true;
-      btn.textContent = '正在建立 Google Meet...';
+      btn.textContent = '正在建立視訊會議...';
       api('submitBooking', Object.assign({}, pendingBooking, { timestamp: selectedSlot })).then(function (res) {
         if (!res.success) {
           alert(res.message || '預約失敗，請重新選擇時段。');
@@ -341,7 +346,7 @@
         document.getElementById('donePanel').classList.remove('hidden');
         document.getElementById('donePanel').innerHTML =
           '<h2 class="success">' + (rescheduleToken ? '改期成功' : '預約成功') + '</h2>' +
-          '<p>已建立 Google Calendar 與 Google Meet，會議資訊也會寄給你。</p>' +
+          '<p>已建立行事曆與視訊會議，會議資訊也會寄給你。</p>' +
           (res.meetLink ? '<p><a href="' + escapeHtml(res.meetLink) + '" target="_blank" rel="noopener">開啟會議連結</a></p>' : '');
       });
     });

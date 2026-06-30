@@ -66,6 +66,10 @@
       color: var(--ink);
       background: var(--panel);
     }
+    body[data-theme="dark"] input[type="time"],
+    body[data-theme="dark"] input[type="date"] {
+      color-scheme: dark;
+    }
     textarea { min-height: 94px; resize: vertical; }
     button {
       border: 1px solid transparent;
@@ -270,6 +274,43 @@
       padding-top: 14px;
       border-top: 1px solid var(--line);
     }
+    details.item { padding: 0; overflow: hidden; }
+    details.item > summary {
+      display: grid;
+      grid-template-columns: 130px minmax(180px, 1fr) 100px;
+      gap: 14px;
+      align-items: center;
+      padding: 16px;
+      cursor: pointer;
+      font-weight: 700;
+      list-style-position: inside;
+    }
+    details.item > summary:hover { background: var(--panel); }
+    details.item > .details-body {
+      padding: 0 16px 16px;
+      border-top: 1px solid var(--line);
+    }
+    .copy-field { display: flex; gap: 7px; align-items: center; }
+    .copy-field input { min-width: 0; }
+    .copy-field button { flex: 0 0 auto; }
+    .option-editor { display: grid; gap: 7px; }
+    .option-row { display: flex; gap: 7px; align-items: center; }
+    .option-row input { min-width: 0; }
+    .option-row button {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      flex: 0 0 38px;
+    }
+    .warning-box {
+      margin: 14px 0;
+      padding: 12px;
+      border: 1px solid var(--yellow);
+      border-radius: 6px;
+      background: rgba(246, 177, 0, .1);
+      color: var(--ink);
+      line-height: 1.5;
+    }
     @media (max-width: 780px) {
       header { margin: 10px; align-items: flex-start; flex-direction: column; }
       .owner-scope { margin: 0 10px 14px; }
@@ -279,6 +320,7 @@
       .stat-grid, .permission-grid { grid-template-columns: 1fr 1fr; }
       .card-top { flex-direction: column; }
       table { display: block; overflow-x: auto; }
+      details.item > summary { grid-template-columns: 1fr; gap: 6px; }
     }
   </style>
 </head>
@@ -319,7 +361,7 @@
 
   <script>
     const params = new URLSearchParams(location.search);
-    let tenant = (params.get('tenant') || params.get('t') || 'nicolle-demo').toLowerCase();
+    let tenant = (params.get('tenant') || params.get('t') || 'dm-test').toLowerCase();
     let tenantDisplayName = 'DM Chen';
     function tokenKey() { return 'dm_saas_' + tenant + '_token'; }
     let token = localStorage.getItem(tokenKey()) || '';
@@ -327,6 +369,7 @@
     let currentView = 'crm';
     let crmMode = 'upcoming';
     let crmProject = 'ALL';
+    let emailProject = 'ALL';
     let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
     let ownerScope = { tenants: [], projects: [] };
     let scheduleConsultants = [];
@@ -358,6 +401,31 @@
     function field(id) {
       const node = document.getElementById(id);
       return node ? node.value.trim() : '';
+    }
+
+    function selectedOption(value, current, label) {
+      return '<option value="' + escapeHtml(value) + '"' + (String(value) === String(current) ? ' selected' : '') + '>' + escapeHtml(label || value) + '</option>';
+    }
+
+    function timeZoneOptions(current) {
+      return [
+        ['Asia/Taipei', '台北（UTC+8）'],
+        ['Asia/Tokyo', '東京（UTC+9）'],
+        ['Asia/Hong_Kong', '香港（UTC+8）'],
+        ['Asia/Singapore', '新加坡（UTC+8）'],
+        ['America/Los_Angeles', '美西（洛杉磯）'],
+        ['America/New_York', '美東（紐約）'],
+        ['Europe/London', '英國（倫敦）'],
+        ['Australia/Sydney', '澳洲（雪梨）']
+      ].map(function (item) { return selectedOption(item[0], current || 'Asia/Taipei', item[1]); }).join('');
+    }
+
+    function videoToolOptions(current) {
+      return [
+        ['Google Meet', 'Google Meet'],
+        ['Zoom', 'Zoom'],
+        ['Microsoft Teams', 'Microsoft Teams']
+      ].map(function (item) { return selectedOption(item[0], current || 'Google Meet', item[1]); }).join('');
     }
 
     function permissions() {
@@ -679,7 +747,11 @@
       loading('我的排班');
       if (isAdmin()) {
         api('getAdminConsultantData', {}).then(function (res) {
-          scheduleConsultants = (res.consultants || []).filter(projectMatchesScope);
+          scheduleConsultants = (res.consultants || []).filter(projectMatchesScope).filter(function (consultant) {
+            if (isSystemOwner()) return true;
+            const isSelf = String(consultant.loginEmail || '').toLowerCase() === String(currentUser?.email || '').toLowerCase();
+            return isSelf || consultant.role === 'consultant';
+          });
           const options = scheduleConsultants.map(function (c) {
             return '<option value="' + c.rowId + '">' + escapeHtml(teamConsultantName(c.name)) + '</option>';
           }).join('');
@@ -729,16 +801,34 @@
         '</div>';
       }).join('');
       const google = res.googleConnected
-        ? '<span class="ok">已連結：' + escapeHtml(res.googleEmail || 'Google') + '</span>'
+        ? '<span class="ok">Google Calendar、Meet 與 Gmail 已連結：' + escapeHtml(res.googleEmail || 'Google') + '</span>'
         : '<button class="secondary" onclick="connectGoogle(' + res.consultantId + ')">連結 Google Calendar / Meet / Gmail</button>';
+      const microsoft = res.microsoftConnected
+        ? '<span class="ok">Microsoft Calendar 與 Teams 已連結：' + escapeHtml(res.microsoftEmail || 'Microsoft') + '</span>'
+        : '<button class="secondary" onclick="connectMicrosoft(' + res.consultantId + ')"' + (res.microsoftEnabled ? '' : ' disabled') + '>連結 Microsoft Calendar / Teams</button>';
+      let scheduleWarning = '';
+      if (!res.accepting) {
+        scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>「接收新預約」是關閉狀態。請改成「是」並儲存排班。</div>';
+      } else if (res.meetTool === 'Google Meet' && !res.googleConnected) {
+        scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請先連結 Google Calendar。</div>';
+      } else if (res.meetTool === 'Microsoft Teams' && !res.microsoftConnected) {
+        scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請先連結 Microsoft Calendar。</div>';
+      } else if (res.meetTool === 'Zoom') {
+        scheduleWarning = '<div class="warning-box"><strong>Zoom 尚未完成 OAuth 串接。</strong>目前請選 Google Meet 或 Microsoft Teams。</div>';
+      } else if (!(res.weekly || []).length && !(res.specific || []).length) {
+        scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請至少設定一組完整的開始與結束時間。</div>';
+      }
       document.getElementById('scheduleEditor').innerHTML =
         '<div class="row">' +
-          '<div class="col-3"><label>時區</label><input id="shiftTZ" value="' + escapeHtml(res.shiftTZ || 'Asia/Taipei') + '"></div>' +
+          '<div class="col-2"><label>接收新預約</label><select id="scheduleAccepting">' + selectedOption('true', String(Boolean(res.accepting)), '是') + selectedOption('false', String(Boolean(res.accepting)), '否') + '</select></div>' +
+          '<div class="col-3"><label>視訊工具</label><select id="scheduleMeetTool">' + videoToolOptions(res.meetTool) + '</select></div>' +
+          '<div class="col-3"><label>時區</label><select id="shiftTZ">' + timeZoneOptions(res.shiftTZ) + '</select></div>' +
           '<div class="col-2"><label>間隔分鐘</label><input id="interval" type="number" value="' + (res.settings?.interval || 60) + '"></div>' +
           '<div class="col-2"><label>前緩衝</label><input id="bufferBefore" type="number" value="' + (res.settings?.bufferBefore || 0) + '"></div>' +
           '<div class="col-2"><label>後緩衝</label><input id="bufferAfter" type="number" value="' + (res.settings?.bufferAfter || 0) + '"></div>' +
-          '<div class="col-3">' + google + '</div>' +
         '</div>' +
+        scheduleWarning +
+        '<div class="actions">' + google + microsoft + (res.microsoftEnabled ? '' : '<span class="mini">Microsoft OAuth 程式已備妥，需先在 Vercel 設定 Entra 應用程式金鑰。</span>') + '</div>' +
         '<h3 style="margin-top:16px;">每週固定時段</h3>' + rows +
         '<h3 style="margin-top:16px;">指定日期加開</h3>' + specificRows +
         '<div class="actions"><button onclick="saveSchedule(' + res.consultantId + ')">儲存排班</button></div>';
@@ -771,6 +861,8 @@
       const rules = collectScheduleRules();
       api('saveConsultantWeeklyAndSettings', {
         consultantId: consultantId,
+        accepting: field('scheduleAccepting') === 'true',
+        meetTool: field('scheduleMeetTool'),
         shiftTZ: field('shiftTZ'),
         settings: {
           interval: Number(field('interval') || 60),
@@ -789,6 +881,12 @@
 
     function connectGoogle(consultantId) {
       api('getGoogleConnectUrl', { consultantId: consultantId, returnTo: location.href }).then(function (res) {
+        location.href = res.url;
+      }).catch(function (err) { alert(err.message); });
+    }
+
+    function connectMicrosoft(consultantId) {
+      api('getMicrosoftConnectUrl', { consultantId: consultantId, returnTo: location.href }).then(function (res) {
         location.href = res.url;
       }).catch(function (err) { alert(err.message); });
     }
@@ -821,26 +919,31 @@
     function consultantForm(row) {
       const id = row.rowId || 'new';
       const isTenantAdminRole = roleValue(row) === 'TENANT_ADMIN';
+      const weight = Number(row.weight || 50);
+      const weightLevel = weight <= 25 ? '10' : (weight >= 75 ? '100' : '50');
       return '<div class="item consultant-row" data-id="' + id + '">' +
         '<div class="row">' +
           '<div class="col-3"><label>姓名</label><input class="c-name" value="' + escapeHtml(row.name || '') + '"><div class="mini">' + escapeHtml(row.name ? teamConsultantName(row.name) : '') + '</div></div>' +
           '<div class="col-3"><label>Email</label><input class="c-email" value="' + escapeHtml(row.loginEmail || '') + '"></div>' +
           '<div class="col-2"><label>密碼</label><input class="c-password" type="password" placeholder="不改可留空"></div>' +
           '<div class="col-2"><label>接收派單</label><select class="c-accept"><option value="是"' + (row.isAccepting !== '否' ? ' selected' : '') + '>是</option><option value="否"' + (row.isAccepting === '否' ? ' selected' : '') + '>否</option></select></div>' +
-          '<div class="col-2"><label>派單權重</label><input class="c-weight" type="number" value="' + escapeHtml(row.weight || 50) + '"></div>' +
+          '<div class="col-2"><label>派單優先度</label><select class="c-weight">' +
+            selectedOption('10', weightLevel, '高') + selectedOption('50', weightLevel, '一般') + selectedOption('100', weightLevel, '低') +
+          '</select></div>' +
           '<div class="col-3"><label>Calendar ID</label><input class="c-cal" value="' + escapeHtml(row.calId || 'primary') + '"></div>' +
           '<div class="col-3"><label>可看專案代號</label><input class="c-projects" value="' + escapeHtml(row.projects || 'ALL') + '"></div>' +
           '<div class="col-2"><label>角色</label><select class="c-role-main"><option value="CONSULTANT"' + (!isTenantAdminRole ? ' selected' : '') + '>團隊顧問</option><option value="TENANT_ADMIN"' + (isTenantAdminRole ? ' selected' : '') + '>使用者管理員</option></select></div>' +
-          '<div class="col-2"><label>視訊工具</label><input class="c-meet" value="' + escapeHtml(row.meetTool || 'Google Meet') + '"></div>' +
-          '<div class="col-2"><label>時區</label><input class="c-tz" value="' + escapeHtml(row.shiftTZ || 'Asia/Taipei') + '"></div>' +
+          '<div class="col-2"><label>視訊工具</label><select class="c-meet">' + videoToolOptions(row.meetTool) + '</select></div>' +
+          '<div class="col-2"><label>時區</label><select class="c-tz">' + timeZoneOptions(row.shiftTZ) + '</select></div>' +
           '<div class="col-12"><label>團隊顧問附加權限</label>' + permissionChecks(row.sysRole || '') + '</div>' +
           '<div class="col-12 actions">' +
             '<button onclick="saveConsultant(this)">儲存</button>' +
             (row.rowId ? '<button class="secondary" onclick="connectGoogle(' + row.rowId + ')">' + (row.googleConnected ? '重新連結 Google' : '連結 Google') + '</button>' : '') +
+            (row.rowId ? '<button class="secondary" onclick="connectMicrosoft(' + row.rowId + ')"' + (row.microsoftEnabled ? '' : ' disabled') + '>' + (row.microsoftConnected ? '重新連結 Microsoft' : '連結 Microsoft') + '</button>' : '') +
             (row.rowId && String(row.loginEmail || '').toLowerCase() !== String(currentUser?.email || '').toLowerCase()
               ? '<button class="danger" onclick="deleteConsultant(this)">刪除顧問</button>'
               : '') +
-            '<span class="mini">' + (row.googleConnected ? '已連結 ' + escapeHtml(row.googleEmail || 'Google') : '尚未連結 Google') + '</span>' +
+            '<span class="mini">' + (row.googleConnected ? 'Google 已連結 ' + escapeHtml(row.googleEmail || '') : 'Google 尚未連結') + '；' + (row.microsoftConnected ? 'Microsoft 已連結 ' + escapeHtml(row.microsoftEmail || '') : 'Microsoft 尚未連結') + '</span>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -909,20 +1012,48 @@
       api('getAdminProjectData', {}).then(renderProjects).catch(showError);
     }
 
+    function bookingUrlFor(code) {
+      const origin = location.protocol === 'file:' ? 'https://dm-booking-saas.vercel.app' : location.origin;
+      return origin + '/booking?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(String(code || '').toUpperCase());
+    }
+
+    function copyBookingUrl(button) {
+      const input = button.closest('.copy-field').querySelector('input');
+      const copied = function () {
+        const original = button.textContent;
+        button.textContent = '已複製';
+        setTimeout(function () { button.textContent = original; }, 1200);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value).then(copied).catch(function () {
+          input.select();
+          document.execCommand('copy');
+          copied();
+        });
+        return;
+      }
+      input.select();
+      document.execCommand('copy');
+      copied();
+    }
+
     function projectForm(row) {
-      return '<div class="item project-row" data-id="' + (row.rowId || 'new') + '">' +
-        '<div class="row">' +
+      const bookingUrl = row.code ? bookingUrlFor(row.code) : '';
+      const isNew = !row.rowId;
+      return '<details class="item project-row" data-id="' + (row.rowId || 'new') + '"' + (isNew ? ' open' : '') + '>' +
+        '<summary><span>' + escapeHtml(row.code || '新增') + '</span><span>' + escapeHtml(row.name || '尚未命名專案') + '</span><span>' + escapeHtml(row.status || '啟用') + '</span></summary>' +
+        '<div class="details-body"><div class="row">' +
           '<div class="col-2"><label>代號</label><input class="p-code" value="' + escapeHtml(row.code || '') + '"></div>' +
           '<div class="col-4"><label>專案名稱</label><input class="p-name" value="' + escapeHtml(row.name || '') + '"></div>' +
           '<div class="col-2"><label>狀態</label><select class="p-status"><option value="active"' + (row.status !== 'inactive' ? ' selected' : '') + '>啟用</option><option value="inactive"' + (row.status === 'inactive' ? ' selected' : '') + '>停用</option></select></div>' +
-          '<div class="col-4"><label>預約連結</label><input readonly value="' + escapeHtml(row.bookingUrl || '') + '"></div>' +
+          '<div class="col-4"><label>預約連結</label><div class="copy-field"><input class="p-booking" readonly value="' + escapeHtml(bookingUrl) + '"><button class="secondary" type="button" onclick="copyBookingUrl(this)">複製</button></div></div>' +
           '<div class="col-6"><label>課前說明網址</label><input class="p-main" value="' + escapeHtml(row.mainUrl || '') + '"></div>' +
           '<div class="col-6"><label>防呆網址</label><input class="p-fallback" value="' + escapeHtml(row.fallbackUrl || '') + '"></div>' +
           '<div class="col-6"><label>客製化注意事項</label><textarea class="p-notice">' + escapeHtml(row.bookingNotice || '') + '</textarea></div>' +
           '<div class="col-6"><label>婉拒訊息</label><textarea class="p-reject">' + escapeHtml(row.rejectValue || '') + '</textarea></div>' +
           '<div class="col-12 actions"><button onclick="saveProject(this)">儲存專案</button></div>' +
-        '</div>' +
-      '</div>';
+        '</div></div>' +
+      '</details>';
     }
 
     function renderProjects(res) {
@@ -980,14 +1111,42 @@
     }
 
     function questionForm(row) {
+      const options = Array.isArray(row.options)
+        ? row.options
+        : String(row.options || '').split(/\r?\n/).map(function (value) { return value.trim(); }).filter(Boolean);
+      while (options.length < 2) options.push('');
+      const choiceType = row.type === '單選' || row.type === '多選';
       return '<div class="item question-row">' +
         '<div class="row">' +
           '<div class="col-5"><label>題目</label><input class="q-title" value="' + escapeHtml(row.title || '') + '"></div>' +
-          '<div class="col-2"><label>題型</label><select class="q-type"><option value="文字"' + (row.type !== '單選' && row.type !== '多選' ? ' selected' : '') + '>文字</option><option value="單選"' + (row.type === '單選' ? ' selected' : '') + '>單選</option><option value="多選"' + (row.type === '多選' ? ' selected' : '') + '>多選</option></select></div>' +
-          '<div class="col-3"><label>選項</label><textarea class="q-options">' + escapeHtml(row.options || '') + '</textarea></div>' +
+          '<div class="col-2"><label>題型</label><select class="q-type" onchange="toggleQuestionOptions(this)"><option value="文字"' + (!choiceType ? ' selected' : '') + '>文字</option><option value="單選"' + (row.type === '單選' ? ' selected' : '') + '>單選</option><option value="多選"' + (row.type === '多選' ? ' selected' : '') + '>多選</option></select></div>' +
+          '<div class="col-3 q-options-wrap' + (choiceType ? '' : ' hidden') + '"><label>選項（每列一項）</label><div class="option-editor">' +
+            options.map(questionOptionRow).join('') +
+          '</div><button class="secondary" type="button" style="margin-top:7px;" onclick="addQuestionOption(this)">新增選項</button></div>' +
           '<div class="col-2"><label>淘汰詞</label><input class="q-reject" value="' + escapeHtml(row.rejectWord || '') + '"></div>' +
         '</div>' +
       '</div>';
+    }
+
+    function questionOptionRow(value) {
+      return '<div class="option-row"><input class="q-option" value="' + escapeHtml(value || '') + '" placeholder="輸入一個選項"><button class="danger" type="button" title="刪除選項" onclick="removeQuestionOption(this)">×</button></div>';
+    }
+
+    function toggleQuestionOptions(select) {
+      select.closest('.question-row').querySelector('.q-options-wrap').classList.toggle('hidden', select.value === '文字');
+    }
+
+    function addQuestionOption(button) {
+      button.previousElementSibling.insertAdjacentHTML('beforeend', questionOptionRow(''));
+    }
+
+    function removeQuestionOption(button) {
+      const editor = button.closest('.option-editor');
+      if (editor.querySelectorAll('.option-row').length <= 1) {
+        button.previousElementSibling.value = '';
+        return;
+      }
+      button.closest('.option-row').remove();
     }
 
     function addQuestionRow() {
@@ -999,7 +1158,7 @@
         return {
           title: row.querySelector('.q-title').value.trim(),
           type: row.querySelector('.q-type').value,
-          options: row.querySelector('.q-options').value,
+          options: Array.from(row.querySelectorAll('.q-option')).map(function (input) { return input.value.trim(); }).filter(Boolean),
           rejectWord: row.querySelector('.q-reject').value,
           isRequired: true
         };
@@ -1012,12 +1171,24 @@
 
     function loadEmails() {
       loading('信件管理');
-      api('getEmailAutomationData', { projectCode: scopedProjectCode() }).then(renderEmails).catch(showError);
+      const scope = emailProject === 'ALL' ? scopedProjectCode() : emailProject;
+      api('getEmailAutomationData', { projectCode: scope }).then(renderEmails).catch(showError);
+    }
+
+    function loadEmailsByProject(projectCode) {
+      emailProject = projectCode || 'ALL';
+      loadEmails();
     }
 
     function renderEmails(res) {
       const projectOptions = (res.projects || []).map(function (p) {
         return '<option value="' + escapeHtml(p.code) + '">' + escapeHtml(p.name) + '</option>';
+      }).join('');
+      if (emailProject !== 'ALL' && !(res.projects || []).some(function (project) { return project.code === emailProject; })) {
+        emailProject = 'ALL';
+      }
+      const filterOptions = '<option value="ALL">所有專案</option>' + (res.projects || []).map(function (p) {
+        return '<option value="' + escapeHtml(p.code) + '"' + (emailProject === p.code ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>';
       }).join('');
       const templates = (res.templates || []).map(function (row) { return emailTemplateForm(row, projectOptions); }).join('');
       const leads = (res.leads || []).slice(0, 20).map(function (lead) {
@@ -1027,9 +1198,9 @@
         return '<tr><td>' + escapeHtml(item.client_email) + '</td><td>' + escapeHtml(item.subject) + '</td><td>' + escapeHtml(item.status) + '</td><td>' + escapeHtml(item.error_message || '') + '</td></tr>';
       }).join('');
       document.getElementById('view').innerHTML =
-        '<div class="panel"><div class="row"><div class="col-8"><h2>信件管理</h2></div><div class="col-4"><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div><div class="list">' +
+        '<div class="panel"><div class="row"><div class="col-5"><h2>信件管理</h2></div><div class="col-4"><label>目前專案</label><select onchange="loadEmailsByProject(this.value)">' + filterOptions + '</select></div><div class="col-3"><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div><div class="list" style="margin-top:16px;">' +
         templates + '</div></div>' +
-        '<div class="panel"><h2>新增信件範本</h2>' + emailTemplateForm({ status: 'active', triggerName: 'lead_created', timeParam: 0, stopWhenBooked: true }, projectOptions) + '</div>' +
+        '<div class="panel"><h2>新增信件範本</h2>' + emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, status: 'active', triggerName: 'lead_created', timeParam: 0, stopWhenBooked: true }, projectOptions) + '</div>' +
         '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>';
       initializeEmailEditors([].concat(res.templates || [], [{ body: '' }]));
@@ -1223,7 +1394,7 @@
             '<div class="col-3"><label>使用者名稱</label><input class="u-name" value="' + escapeHtml(item.name || '') + '"></div>' +
             '<div class="col-3"><label>管理員名稱</label><input class="u-owner-name" value="' + escapeHtml(item.owner_name || '') + '"></div>' +
             '<div class="col-4"><label>主要聯絡 Email</label><input class="u-owner-email" value="' + escapeHtml(item.owner_email || '') + '"></div>' +
-            '<div class="col-2"><label>使用者代碼</label><input readonly value="' + escapeHtml(item.slug) + '"></div>' +
+            '<div class="col-2"><label>使用者代碼</label><input class="u-slug" value="' + escapeHtml(item.slug) + '" pattern="[a-z0-9][a-z0-9-]{1,48}"><div class="mini">小寫英文、數字與連字號</div></div>' +
             '<div class="col-12 user-summary">' +
               '<span class="badge">專案 ' + Number(item.project_count || 0) + '</span>' +
               '<span class="badge">團隊帳號 ' + Number(item.consultant_count || 0) + '</span>' +
@@ -1257,10 +1428,18 @@
       button.disabled = true;
       api('saveTenantAsOwner', {
         targetTenant: row.dataset.tenant,
+        newTenant: row.querySelector('.u-slug').value.trim().toLowerCase(),
         tenantName: row.querySelector('.u-name').value.trim(),
         ownerName: row.querySelector('.u-owner-name').value.trim(),
         ownerEmail: row.querySelector('.u-owner-email').value.trim()
-      }).then(function () {
+      }).then(function (res) {
+        const newTenant = res.user?.slug || row.dataset.tenant;
+        if (row.dataset.tenant === tenant && newTenant !== tenant) {
+          localStorage.setItem('dm_saas_' + newTenant + '_token', token);
+          localStorage.removeItem(tokenKey());
+          location.href = '/admin?tenant=' + encodeURIComponent(newTenant);
+          return;
+        }
         if (row.dataset.tenant === tenant) {
           tenantDisplayName = row.querySelector('.u-name').value.trim() || tenantDisplayName;
           currentUser.tenantName = tenantDisplayName;

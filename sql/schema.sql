@@ -34,6 +34,8 @@ create table if not exists consultants (
   calendar_id text not null default 'primary',
   google_email text,
   google_refresh_token text,
+  microsoft_email text,
+  microsoft_refresh_token text,
   accepting boolean not null default true,
   weight integer not null default 50,
   permissions text not null default '',
@@ -48,6 +50,9 @@ create table if not exists consultants (
   created_at timestamptz not null default now(),
   unique (tenant_slug, login_email)
 );
+
+alter table consultants add column if not exists microsoft_email text;
+alter table consultants add column if not exists microsoft_refresh_token text;
 
 create table if not exists availability_rules (
   id bigserial primary key,
@@ -82,6 +87,7 @@ create table if not exists appointments (
   consultant_id bigint references consultants(id) on delete set null,
   consultant_name text not null,
   calendar_id text,
+  calendar_provider text not null default 'google',
   event_id text,
   meet_link text default '',
   start_at timestamptz,
@@ -97,6 +103,8 @@ create table if not exists appointments (
   notes text default '',
   created_at timestamptz not null default now()
 );
+
+alter table appointments add column if not exists calendar_provider text not null default 'google';
 
 create table if not exists rejected_clients (
   id bigserial primary key,
