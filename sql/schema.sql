@@ -7,8 +7,11 @@ create table if not exists tenants (
   owner_email text not null,
   owner_password_hash text not null,
   app_base_url text,
+  booking_base_urls jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
+
+alter table tenants add column if not exists booking_base_urls jsonb not null default '[]'::jsonb;
 
 create table if not exists projects (
   id bigserial primary key,

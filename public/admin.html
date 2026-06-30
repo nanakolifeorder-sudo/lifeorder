@@ -325,6 +325,23 @@
       grid-template-columns: repeat(4, minmax(150px, 1fr));
       gap: 8px;
     }
+    .booking-base-row input[type="radio"] {
+      width: 20px;
+      height: 20px;
+      margin-top: 10px;
+    }
+    .email-purpose-group {
+      border-top: 1px solid var(--line);
+      padding: 0;
+    }
+    .email-purpose-group > summary {
+      cursor: pointer;
+      padding: 14px 4px;
+      color: var(--blue);
+      font-weight: 800;
+      list-style-position: inside;
+    }
+    .email-purpose-group > .email-purpose-body { padding: 0 0 12px; }
     .rich-editor img {
       display: block;
       max-width: 100%;
@@ -394,7 +411,13 @@
 
   <section class="owner-scope hidden" id="ownerScopeBar"></section>
 
-  <section class="login-wrap" id="loginWrap">
+  <section class="login-wrap" id="authLoading">
+    <div class="panel" style="text-align:center;">
+      <strong>正在載入使用者視角...</strong>
+    </div>
+  </section>
+
+  <section class="login-wrap hidden" id="loginWrap">
     <div class="panel">
       <h2>登入後台</h2>
       <label>Email</label>
@@ -558,6 +581,8 @@
       if (isSystemOwner()) crmProject = ownerProject;
       const loginWrap = document.getElementById('loginWrap');
       if (loginWrap) loginWrap.remove();
+      const authLoading = document.getElementById('authLoading');
+      if (authLoading) authLoading.remove();
       document.getElementById('appHeader').classList.remove('hidden');
       document.getElementById('app').classList.remove('hidden');
       document.getElementById('userName').textContent = currentUser.name || 'DMtest';
@@ -823,16 +848,34 @@
     function openAdminReschedule(rowId, projectCode) {
       api('getAvailableTimes', { projectCode: projectCode }).then(function (slots) {
         if (!Array.isArray(slots) || !slots.length) throw new Error('目前沒有可供改期的時段。');
-        const options = slots.map(function (slot) {
-          return '<option value="' + Number(slot.timestamp) + '">' + escapeHtml(slot.displayText) + '</option>';
+        const grouped = {};
+        slots.forEach(function (slot) {
+          const dateKey = slot.dateKey || new Date(Number(slot.timestamp)).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+          if (!grouped[dateKey]) grouped[dateKey] = [];
+          grouped[dateKey].push(slot);
+        });
+        const dates = Object.keys(grouped).sort();
+        const dateOptions = dates.map(function (dateKey) {
+          const label = grouped[dateKey][0]?.dateLabel || dateKey;
+          return '<option value="' + escapeHtml(dateKey) + '">' + escapeHtml(label) + '</option>';
         }).join('');
-        const dialog = actionDialog('直接改期', '<label>新的日期與時間</label><select id="rescheduleSlot">' + options + '</select>', '確認改期', function () {
+        const dialog = actionDialog(
+          '直接改期',
+          '<div class="row"><div class="col-6"><label>先選日期</label><select id="rescheduleDate">' + dateOptions + '</select></div>' +
+          '<div class="col-6"><label>再選時間</label><select id="rescheduleTime"></select></div></div>',
+          '確認改期',
+          function () {
           const button = dialog.querySelector('#dialogConfirm');
+          const timestamp = Number(dialog.querySelector('#rescheduleTime').value);
+          if (!timestamp) {
+            alert('請選擇新的時間。');
+            return;
+          }
           button.disabled = true;
           api('handleAppointmentAction', {
             rowId: rowId,
             actionType: 'reschedule',
-            timestamp: Number(dialog.querySelector('#rescheduleSlot').value)
+            timestamp: timestamp
           }).then(function (res) {
             dialog.close();
             alert(res.message || '改期完成');
@@ -843,6 +886,14 @@
             alert(err.message);
           });
         });
+        const renderTimes = function () {
+          const dateKey = dialog.querySelector('#rescheduleDate').value;
+          dialog.querySelector('#rescheduleTime').innerHTML = (grouped[dateKey] || []).map(function (slot) {
+            return '<option value="' + Number(slot.timestamp) + '">' + escapeHtml(slot.timeLabel || slot.displayText) + '</option>';
+          }).join('');
+        };
+        dialog.querySelector('#rescheduleDate').onchange = renderTimes;
+        renderTimes();
       }).catch(function (err) { alert(err.message); });
     }
 
@@ -973,6 +1024,8 @@
           '<div class="col-2"><label>間隔分鐘</label><input id="interval" type="number" value="' + (res.settings?.interval || 60) + '"></div>' +
           '<div class="col-2"><label>前緩衝</label><input id="bufferBefore" type="number" value="' + (res.settings?.bufferBefore || 0) + '"></div>' +
           '<div class="col-2"><label>後緩衝</label><input id="bufferAfter" type="number" value="' + (res.settings?.bufferAfter || 0) + '"></div>' +
+          '<div class="col-3"><label>最早可預約（幾天後）</label><input id="minDays" type="number" min="0" max="365" value="' + (res.settings?.minDays ?? 1) + '"><div class="mini">0 代表今天，1 代表明天</div></div>' +
+          '<div class="col-3"><label>開放到未來第幾天</label><input id="maxDays" type="number" min="1" max="365" value="' + (res.settings?.maxDays ?? 14) + '"><div class="mini">例如 30 代表顯示未來 30 天</div></div>' +
         '</div>' +
         scheduleWarning +
         '<div class="actions">' + google + microsoft + (res.microsoftEnabled ? '' : '<span class="mini">Microsoft OAuth 程式已備妥，需先在 Vercel 設定 Entra 應用程式金鑰。</span>') + '</div>' +
@@ -1006,6 +1059,12 @@
 
     function saveSchedule(consultantId) {
       const rules = collectScheduleRules();
+      const minDays = Number(field('minDays'));
+      const maxDays = Number(field('maxDays'));
+      if (!Number.isFinite(minDays) || !Number.isFinite(maxDays) || minDays < 0 || maxDays < minDays) {
+        alert('預約開放區間不正確：最晚天數必須大於或等於最早天數。');
+        return;
+      }
       api('saveConsultantWeeklyAndSettings', {
         consultantId: consultantId,
         accepting: field('scheduleAccepting') === 'true',
@@ -1015,8 +1074,8 @@
           interval: Number(field('interval') || 60),
           bufferBefore: Number(field('bufferBefore') || 0),
           bufferAfter: Number(field('bufferAfter') || 0),
-          minDays: 1,
-          maxDays: 14
+          minDays: minDays,
+          maxDays: maxDays
         },
         weeklyRules: rules.weeklyRules,
         specificRules: rules.specificRules
@@ -1196,11 +1255,6 @@
       api('getAdminProjectData', {}).then(renderProjects).catch(showError);
     }
 
-    function bookingUrlFor(code) {
-      const origin = location.protocol === 'file:' ? 'https://dm-booking-saas.vercel.app' : location.origin;
-      return origin + '/booking?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(String(code || '').toUpperCase());
-    }
-
     function copyBookingUrl(button) {
       const input = button.closest('.copy-field').querySelector('input');
       const copied = function () {
@@ -1222,7 +1276,7 @@
     }
 
     function projectForm(row) {
-      const bookingUrl = row.code ? bookingUrlFor(row.code) : '';
+      const bookingUrl = row.bookingUrl || '';
       const isNew = !row.rowId;
       const inviteBox = isNew ? '' :
         '<div class="col-12 invite-box"><h3>發送預約邀請</h3><div class="row">' +
@@ -1246,10 +1300,53 @@
       '</details>';
     }
 
+    function bookingBaseRow(url, primary, systemUrl) {
+      const isSystem = url === systemUrl;
+      return '<div class="row item booking-base-row">' +
+        '<div class="col-1"><label>主要</label><input type="radio" name="bookingBasePrimary"' + (url === primary ? ' checked' : '') + '></div>' +
+        '<div class="col-8"><label>' + (isSystem ? '系統網址' : '自訂網址') + '</label><input class="booking-base-url" value="' + escapeHtml(url) + '"' + (isSystem ? ' readonly' : '') + '></div>' +
+        '<div class="col-3 actions">' +
+          (isSystem ? '<span class="ok">可直接使用</span>' : '<button class="danger" type="button" onclick="removeBookingBase(this)">移除</button>') +
+        '</div>' +
+      '</div>';
+    }
+
+    function addBookingBase() {
+      const list = document.getElementById('bookingBaseList');
+      list.insertAdjacentHTML('beforeend', bookingBaseRow('', '__none__', document.getElementById('systemBookingBase').value));
+      const rows = list.querySelectorAll('.booking-base-row');
+      rows[rows.length - 1].querySelector('.booking-base-url').focus();
+    }
+
+    function removeBookingBase(button) {
+      const row = button.closest('.booking-base-row');
+      if (row.querySelector('input[type="radio"]').checked) {
+        document.querySelector('.booking-base-row input[type="radio"]').checked = true;
+      }
+      row.remove();
+    }
+
+    function saveBookingBases() {
+      const rows = Array.from(document.querySelectorAll('.booking-base-row'));
+      const urls = rows.map(function (row) { return row.querySelector('.booking-base-url').value.trim(); }).filter(Boolean);
+      const selected = rows.find(function (row) { return row.querySelector('input[type="radio"]').checked; });
+      const primary = selected ? selected.querySelector('.booking-base-url').value.trim() : urls[0];
+      api('saveBookingBaseUrls', { urls: urls, primary: primary }).then(function () {
+        alert('主要 Booking 網址已儲存');
+        loadProjects();
+      }).catch(function (err) { alert(err.message); });
+    }
+
     function renderProjects(res) {
-      const baseUrl = (location.protocol === 'file:' ? 'https://dm-booking-saas.vercel.app' : location.origin) + '/booking?tenant=' + encodeURIComponent(tenant);
+      const systemBase = String(res.systemBaseUrl || '').split('/booking?')[0];
+      const baseRows = (res.bookingBaseUrls || [systemBase]).map(function (url) {
+        return bookingBaseRow(url, res.primaryBookingBaseUrl || systemBase, systemBase);
+      }).join('');
       document.getElementById('view').innerHTML =
-        '<div class="panel"><h2>專案管理</h2><label>Booking 基礎網址</label><div class="copy-field" style="margin-bottom:16px;"><input readonly value="' + escapeHtml(baseUrl) + '"><button class="secondary" type="button" onclick="copyBookingUrl(this)">複製</button></div><div class="list">' +
+        '<div class="panel"><div class="row"><div class="col-8"><h2>Booking 網址管理</h2><p class="mini">保留系統網址，也可新增已指向本系統的自訂網域；所有專案只會使用勾選的主要網址。</p></div>' +
+        '<div class="col-4 actions"><button class="secondary" type="button" onclick="addBookingBase()">新增網址</button><button type="button" onclick="saveBookingBases()">儲存主要網址</button></div></div>' +
+        '<input id="systemBookingBase" type="hidden" value="' + escapeHtml(systemBase) + '"><div id="bookingBaseList">' + baseRows + '</div></div>' +
+        '<div class="panel"><h2>專案管理</h2><div class="list">' +
         (res.projects || []).map(projectForm).join('') +
         '</div></div><div class="panel"><h2>新增專案</h2>' + projectForm({ status: 'active' }) + '</div>';
     }
@@ -1403,7 +1500,22 @@
       const filterOptions = '<option value="ALL">所有專案</option>' + (res.projects || []).map(function (p) {
         return '<option value="' + escapeHtml(p.code) + '"' + (emailProject === p.code ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>';
       }).join('');
-      const templates = (res.templates || []).map(function (row) { return emailTemplateForm(row, projectOptions); }).join('');
+      const triggerOrder = ['lead_created', 'booking_created', 'booking_rescheduled', 'reschedule_link', 'meeting_before', 'meeting_after', 'booking_cancelled'];
+      const allTriggers = triggerOrder.concat((res.templates || []).map(function (row) { return row.triggerName; }).filter(function (trigger, index, list) {
+        return trigger && !triggerOrder.includes(trigger) && list.indexOf(trigger) === index;
+      }));
+      const sortedTemplates = (res.templates || []).slice().sort(function (a, b) {
+        const triggerDiff = allTriggers.indexOf(a.triggerName) - allTriggers.indexOf(b.triggerName);
+        if (triggerDiff) return triggerDiff;
+        const timeDiff = Number(a.timeParam || 0) - Number(b.timeParam || 0);
+        return timeDiff || Number(a.rowId || 0) - Number(b.rowId || 0);
+      });
+      const groupedTemplates = allTriggers.map(function (trigger) {
+        const rows = sortedTemplates.filter(function (row) { return row.triggerName === trigger; });
+        if (!rows.length) return '';
+        return '<details class="email-purpose-group"><summary>' + escapeHtml(emailTriggerLabel(trigger)) + '（' + rows.length + ' 封）</summary>' +
+          '<div class="email-purpose-body">' + rows.map(function (row) { return emailTemplateForm(row, projectOptions); }).join('') + '</div></details>';
+      }).join('');
       const leads = (res.leads || []).slice(0, 20).map(function (lead) {
         return '<tr><td>' + escapeHtml(lead.client_name) + '</td><td>' + escapeHtml(lead.client_email) + '</td><td>' + escapeHtml(lead.project_name) + '</td><td>' + escapeHtml(emailStatusLabel(lead.status)) + '</td></tr>';
       }).join('');
@@ -1412,11 +1524,24 @@
       }).join('');
       document.getElementById('view').innerHTML =
         '<div class="panel"><div class="row"><div class="col-5"><h2>信件管理</h2></div><div class="col-4"><label>目前專案</label><select onchange="loadEmailsByProject(this.value)">' + filterOptions + '</select></div><div class="col-3"><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div><div class="list" style="margin-top:16px;">' +
-        templates + '</div></div>' +
-        '<div class="panel"><h2>新增信件範本</h2>' + emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, status: 'active', triggerName: 'lead_created', timeParam: 0, stopWhenBooked: true }, projectOptions) + '</div>' +
+        '<h3>新增信件範本</h3>' + emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, status: 'active', triggerName: 'lead_created', timeParam: 0, stopWhenBooked: true }, projectOptions) +
+        '<h3 style="margin-top:20px;">已建立的自動信件</h3>' + groupedTemplates + '</div></div>' +
         '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>';
-      initializeEmailEditors([].concat(res.templates || [], [{ body: '' }]));
+      initializeEmailEditors(res.templates || []);
+    }
+
+    function emailTriggerLabel(trigger) {
+      const labels = {
+        lead_created: '名單建立後',
+        booking_created: '預約成功後',
+        booking_rescheduled: '預約改期後',
+        reschedule_link: '自選改期連結',
+        meeting_before: '會議前提醒',
+        meeting_after: '會議後跟進',
+        booking_cancelled: '取消預約後'
+      };
+      return labels[trigger] || trigger || '其他信件';
     }
 
     function emailStatusLabel(status) {
@@ -1426,16 +1551,20 @@
         rejected: '已婉拒',
         booked: '已預約',
         queued: '等待寄送',
+        sending: '寄送中',
         sent: '已寄出',
         failed: '寄送失敗',
+        error: '寄送失敗',
         cancelled: '已停止'
       };
       return labels[String(status || '').toLowerCase()] || status || '未設定';
     }
 
     function emailTemplateForm(row, projectOptions) {
-      return '<div class="item email-row" data-id="' + (row.rowId || 'new') + '">' +
-        '<div class="row">' +
+      const isNew = !row.rowId;
+      return '<details class="item email-row" data-id="' + (row.rowId || 'new') + '"' + (isNew ? ' open' : '') + '>' +
+        '<summary><span>' + escapeHtml(row.name || '新增信件') + '</span><span>' + escapeHtml(emailTriggerLabel(row.triggerName)) + '</span><span>' + Number(row.timeParam || 0) + ' 小時</span></summary>' +
+        '<div class="details-body"><div class="row">' +
           '<div class="col-2"><label>專案</label><select class="e-project">' + projectOptions.replace('value="' + row.projectCode + '"', 'value="' + row.projectCode + '" selected') + '</select></div>' +
           '<div class="col-3"><label>信件名稱</label><input class="e-name" value="' + escapeHtml(row.name || '') + '"></div>' +
           '<div class="col-2"><label>觸發</label><select class="e-trigger">' +
@@ -1476,8 +1605,8 @@
             '<div class="e-body rich-editor" contenteditable="true" role="textbox" aria-multiline="true" onkeyup="rememberEmailSelection(this)" onmouseup="rememberEmailSelection(this)" onfocus="rememberEmailSelection(this)"></div>' +
           '</div>' +
           '<div class="col-12 actions"><button onclick="saveEmailTemplate(this)">儲存信件</button></div>' +
-        '</div>' +
-      '</div>';
+        '</div></div>' +
+      '</details>';
     }
 
     function triggerOption(value, label, current) {
@@ -1507,9 +1636,11 @@
     }
 
     function initializeEmailEditors(rows) {
-      document.querySelectorAll('.email-row').forEach(function (node, index) {
+      const bodyById = {};
+      rows.forEach(function (row) { bodyById[String(row.rowId)] = row.body || ''; });
+      document.querySelectorAll('.email-row').forEach(function (node) {
         const editor = node.querySelector('.e-body');
-        editor.innerHTML = safeEditorHtml(rows[index]?.body || '');
+        editor.innerHTML = safeEditorHtml(bodyById[node.dataset.id] || '');
       });
     }
 
@@ -1869,7 +2000,12 @@
         bootApp();
       }).catch(function () {
         localStorage.removeItem(tokenKey());
+        document.getElementById('authLoading').classList.add('hidden');
+        document.getElementById('loginWrap').classList.remove('hidden');
       });
+    } else {
+      document.getElementById('authLoading').classList.add('hidden');
+      document.getElementById('loginWrap').classList.remove('hidden');
     }
   </script>
 </body>
