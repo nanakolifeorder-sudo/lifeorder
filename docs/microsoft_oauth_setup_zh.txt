@@ -1,0 +1,69 @@
+Microsoft Calendar / Teams OAuth 設定
+
+目前程式已支援：
+
+1. 顧問用 Microsoft 企業帳號授權。
+2. 讀取 Outlook / Microsoft 365 Calendar 忙碌時段。
+3. 建立 Calendar 事件。
+4. 自動建立 Microsoft Teams 線上會議連結。
+5. 取消或改期時同步刪除原行事曆事件。
+
+一、建立 Microsoft Entra 應用程式
+
+1. 開啟 https://entra.microsoft.com/
+2. 進入「應用程式」>「應用程式註冊」。
+3. 按「新增註冊」。
+4. 名稱可填：DM Booking SaaS。
+5. 支援的帳戶類型選「任何組織目錄中的帳戶」。
+6. Web 重新導向 URI 填：
+
+   https://dm-booking-saas.vercel.app/api/microsoft-oauth-callback
+
+二、設定 API 權限
+
+在 Microsoft Graph 加入 Delegated permissions：
+
+- User.Read
+- Calendars.ReadWrite
+- offline_access
+- openid
+- profile
+- email
+
+企業若限制使用者自行同意權限，需要由 Microsoft 365 / Entra 管理員按「代表組織授與管理員同意」。
+
+三、建立用戶端密碼
+
+1. 到「憑證與密碼」。
+2. 新增一組用戶端密碼。
+3. 立即保存「值」欄位；離開頁面後不會再顯示。
+
+四、加入 Vercel 環境變數
+
+在 Vercel 專案 Settings > Environment Variables 加入：
+
+MICROSOFT_CLIENT_ID=應用程式（用戶端）識別碼
+MICROSOFT_CLIENT_SECRET=剛建立的用戶端密碼值
+MICROSOFT_TENANT_ID=organizations
+
+三項都套用 Production、Preview、Development，儲存後重新部署。
+
+五、測試
+
+1. 進入後台「團隊顧問」或「我的排班」。
+2. 視訊工具選 Microsoft Teams。
+3. 按「連結 Microsoft Calendar / Teams」。
+4. 使用有 Exchange Online 與 Teams 授權的企業帳號登入。
+5. 排班頁顯示「Microsoft Calendar 與 Teams 已連結」後，開啟接收新預約並儲存。
+
+注意：
+
+- 沒有 Microsoft 企業測試帳號時，可以先完成 Entra 與 Vercel 設定，但無法驗證最後的 Teams 會議建立。
+- Microsoft 帳號需要可用的 Exchange Online 行事曆；Teams 會議功能也取決於該帳號的 Microsoft 365 授權。
+- Zoom 目前只有下拉選項，尚未接 Zoom OAuth；選 Zoom 時前台不會開放時段，以免誤建成其他視訊工具。
+
+官方文件：
+
+- OAuth 授權碼流程：https://learn.microsoft.com/entra/identity-platform/v2-oauth2-auth-code-flow
+- Calendar View：https://learn.microsoft.com/graph/api/calendar-list-calendarview
+- Calendar 與 Teams 線上會議：https://learn.microsoft.com/graph/choose-online-meeting-api
