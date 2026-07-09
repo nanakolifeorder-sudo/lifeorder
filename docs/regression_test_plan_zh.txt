@@ -1,0 +1,55 @@
+﻿# 正式商用前回歸測試清單
+
+最後更新：2026-07-09
+
+## 已有自動檢查
+- `npm run check`：檢查 API/lib JS 語法，以及 admin/booking/unsubscribe 的 inline script 語法。
+- 資料庫 migration：`sql/upgrade-security-email-backup.sql`。
+
+## 必測流程
+1. Google OAuth 正常授權
+   - 顧問按「連結 Google Calendar / Meet / Gmail」。
+   - 完成授權後回到後台，顯示 Google 已連結。
+   - 前台可看到可預約時段。
+
+2. OAuth 過期或撤銷
+   - 到 Google 帳戶移除本系統授權。
+   - 回前台讀取時段或建立預約。
+   - 預期：不顯示壞掉的時段，後台/告警能看見 Calendar 或 Gmail 失敗原因。
+
+3. 預約成功
+   - 客戶填表並選時段。
+   - 預期：Google Calendar 建立活動、Meet 連結建立、客戶收到通知信、CRM 出現即將到來。
+
+4. 同時重複預約
+   - 用兩個視窗同時送出同一個時段。
+   - 預期：只有一筆成功，另一筆收到「這個時段剛剛已被預約，請重新選擇」。
+
+5. 取消
+   - CRM 點取消會議。
+   - 預期：Calendar 活動取消、CRM 進取消與婉拒、寄出取消通知。
+
+6. 改期
+   - CRM 點改期，先選日期再選時間。
+   - 預期：舊 Calendar 活動取消、新活動建立、客戶收到取消與新時段通知。
+
+7. 轉派
+   - 轉派給另一位已連 Google 的顧問。
+   - 預期：新顧問 Calendar 建立活動，原顧問活動移除或不再有效，CRM 顯示新顧問。
+
+8. Calendar 建立失敗
+   - 暫時移除顧問 Google 授權或使用錯誤 Calendar ID。
+   - 預期：預約不寫入成功狀態，後台信件/系統告警可看到錯誤。
+
+9. 信件失敗重試
+   - 暫時移除 Gmail 授權後觸發信件。
+   - 預期：系統排程重試，達上限後建立「信件寄送失敗」告警。
+
+10. 退訂與拒收
+   - 點自動信底部退訂連結。
+   - 預期：email_suppressions 新增資料，後續非必要跟進信停止寄送。
+
+11. Systeme Webhook
+   - Systeme 送 Contact created 或 Opt-in 到 `/api?action=systemeWebhook&tenant=...`。
+   - 必須帶 `X-DM-Webhook-Secret` 或 `X-DM-Signature`。
+   - 預期：leads 新增或更新，名單建立信件被排入佇列。

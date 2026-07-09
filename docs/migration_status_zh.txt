@@ -123,3 +123,23 @@ DM Booking SaaS 遷移狀態
 - 使用者授權與稽核紀錄
 - 服務條款、隱私權政策與資料刪除流程
 - 壓力測試、寄信額度監控與付費方案門檻
+
+## 2026-07-09 正式化與安全更新
+
+已完成：
+- 新增 OAuth 正式化公開頁：首頁、隱私權政策、服務條款、資料刪除說明。
+- 新增退訂頁 `/unsubscribe` 與退訂 API，信件自動附退訂頁尾，支援 `{{unsubscribeLink}}` / `{{退訂連結}}` 變數。
+- 新增信件退訂/拒收名單、管理員告警、信件失敗重試欄位與 migration。
+- 信件寄送失敗會自動重試；若資料庫尚未套 migration，會 fallback 到舊欄位避免卡死。
+- 新增登入失敗紀錄與 15 分鐘暴力登入防護。
+- 新增 Systeme Webhook secret/HMAC 驗證入口，用於註冊名單同步。
+- 新增同顧問同時段重複預約防護與 Calendar 建立失敗告警。
+- 後台隱藏未真正啟用的 Zoom 選項；Microsoft 只在 Entra env 完成時顯示。
+- 新增 GitHub Actions 每日 Supabase 備份 workflow 與設定說明。
+- 新增 `npm run check`，會檢查 API/lib 與 HTML inline script 語法。
+- 新增正式商用前回歸測試清單：OAuth 過期、取消、改期、轉派、Calendar 建立失敗、退訂、Webhook。
+
+待人工完成：
+- 到 Supabase SQL Editor 執行 `sql/upgrade-security-email-backup.sql`。
+- 到 GitHub Actions secrets 新增 `SUPABASE_DATABASE_URL`，讓每日備份真正啟用。
+- Google OAuth 若要給外部客戶正式使用，仍需提交 Google OAuth app verification。

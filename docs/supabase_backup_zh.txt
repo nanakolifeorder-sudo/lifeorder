@@ -1,0 +1,15 @@
+﻿# Supabase 免費版每日備份設定
+
+這個專案已加入 GitHub Actions：`.github/workflows/daily-supabase-backup.yml`。
+
+## 啟用方式
+1. 到 GitHub repo：Settings > Secrets and variables > Actions。
+2. 新增 Repository secret：`SUPABASE_DATABASE_URL`。
+3. 值填 Supabase 的 Postgres connection string，格式類似：`postgresql://postgres.xxx:password@aws-...pooler.supabase.com:6543/postgres?sslmode=require`。
+4. 到 Actions > Daily Supabase Backup，按 Run workflow 測試一次。
+5. 成功後，每天 UTC 18:15 會自動備份，也就是台灣時間 02:15。
+
+## 注意
+- GitHub artifact 目前保留 14 天，避免免費空間累積太多。
+- Supabase Free 沒有平台自動備份，這個 workflow 是白嫖模式下最小可行保護。
+- 如果未來開始正式收費，建議改 Supabase Pro 或加一份雲端硬碟/物件儲存長期備份。

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -502,9 +502,7 @@
 
     function videoToolOptions(current) {
       return [
-        ['Google Meet', 'Google Meet'],
-        ['Zoom', 'Zoom'],
-        ['Microsoft Teams', 'Microsoft Teams']
+        ['Google Meet', 'Google Meet']
       ].map(function (item) { return selectedOption(item[0], current || 'Google Meet', item[1]); }).join('');
     }
 
@@ -1001,9 +999,9 @@
       const google = res.googleConnected
         ? '<span class="ok">Google Calendar、Meet 與 Gmail 已連結：' + escapeHtml(res.googleEmail || 'Google') + '</span>'
         : '<button class="secondary" onclick="connectGoogle(' + res.consultantId + ')">連結 Google Calendar / Meet / Gmail</button>';
-      const microsoft = res.microsoftConnected
+      const microsoft = res.microsoftEnabled ? (res.microsoftConnected
         ? '<span class="ok">Microsoft Calendar 與 Teams 已連結：' + escapeHtml(res.microsoftEmail || 'Microsoft') + '</span>'
-        : '<button class="secondary" onclick="connectMicrosoft(' + res.consultantId + ')"' + (res.microsoftEnabled ? '' : ' disabled') + '>連結 Microsoft Calendar / Teams</button>';
+        : '<button class="secondary" onclick="connectMicrosoft(' + res.consultantId + ')">連結 Microsoft Calendar / Teams</button>') : '';
       let scheduleWarning = '';
       if (!res.accepting) {
         scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>「接收新預約」是關閉狀態。請改成「是」並儲存排班。</div>';
@@ -1011,8 +1009,7 @@
         scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請先連結 Google Calendar。</div>';
       } else if (res.meetTool === 'Microsoft Teams' && !res.microsoftConnected) {
         scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請先連結 Microsoft Calendar。</div>';
-      } else if (res.meetTool === 'Zoom') {
-        scheduleWarning = '<div class="warning-box"><strong>Zoom 尚未完成 OAuth 串接。</strong>目前請選 Google Meet 或 Microsoft Teams。</div>';
+
       } else if (!(res.weekly || []).length && !(res.specific || []).length) {
         scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請至少設定一組完整的開始與結束時間。</div>';
       }
@@ -1028,7 +1025,7 @@
           '<div class="col-3"><label>開放到未來第幾天</label><input id="maxDays" type="number" min="1" max="365" value="' + (res.settings?.maxDays ?? 14) + '"><div class="mini">例如 30 代表顯示未來 30 天</div></div>' +
         '</div>' +
         scheduleWarning +
-        '<div class="actions">' + google + microsoft + (res.microsoftEnabled ? '' : '<span class="mini">Microsoft OAuth 程式已備妥，需先在 Vercel 設定 Entra 應用程式金鑰。</span>') + '</div>' +
+        '<div class="actions">' + google + microsoft + '</div>' +
         '<h3 style="margin-top:16px;">每週固定時段</h3>' + rows +
         '<h3 style="margin-top:16px;">指定日期加開</h3>' + specificRows +
         '<div class="actions"><button onclick="saveSchedule(' + res.consultantId + ')">儲存排班</button></div>';
@@ -1179,11 +1176,11 @@
           '<div class="col-12 actions">' +
             '<button onclick="saveConsultant(this)">儲存</button>' +
             (row.rowId ? '<button class="secondary" onclick="connectGoogle(' + row.rowId + ')">' + (row.googleConnected ? '重新連結 Google' : '連結 Google') + '</button>' : '') +
-            (row.rowId ? '<button class="secondary" onclick="connectMicrosoft(' + row.rowId + ')"' + (row.microsoftEnabled ? '' : ' disabled') + '>' + (row.microsoftConnected ? '重新連結 Microsoft' : '連結 Microsoft') + '</button>' : '') +
+            (row.rowId && row.microsoftEnabled ? '<button class="secondary" onclick="connectMicrosoft(' + row.rowId + ')">' + (row.microsoftConnected ? '重新連結 Microsoft' : '連結 Microsoft') + '</button>' : '') +
             (row.rowId && String(row.loginEmail || '').toLowerCase() !== String(currentUser?.email || '').toLowerCase()
               ? '<button class="danger" onclick="deleteConsultant(this)">刪除顧問</button>'
               : '') +
-            '<span class="mini">' + (row.googleConnected ? 'Google 已連結 ' + escapeHtml(row.googleEmail || '') : 'Google 尚未連結') + '；' + (row.microsoftConnected ? 'Microsoft 已連結 ' + escapeHtml(row.microsoftEmail || '') : 'Microsoft 尚未連結') + '</span>' +
+            '<span class="mini">' + (row.googleConnected ? 'Google 已連結 ' + escapeHtml(row.googleEmail || '') : 'Google 尚未連結') + (row.microsoftEnabled ? '；' + (row.microsoftConnected ? 'Microsoft 已連結 ' + escapeHtml(row.microsoftEmail || '') : 'Microsoft 尚未連結') : '') + '</span>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -1520,14 +1517,23 @@
         return '<tr><td>' + escapeHtml(lead.client_name) + '</td><td>' + escapeHtml(lead.client_email) + '</td><td>' + escapeHtml(lead.project_name) + '</td><td>' + escapeHtml(emailStatusLabel(lead.status)) + '</td></tr>';
       }).join('');
       const queue = (res.queue || []).slice(0, 20).map(function (item) {
-        return '<tr><td>' + escapeHtml(item.client_email) + '</td><td>' + escapeHtml(item.subject) + '</td><td>' + escapeHtml(emailStatusLabel(item.status)) + '</td><td>' + escapeHtml(item.error_message || '') + '</td></tr>';
+        const retry = Number(item.retry_count || 0) ? '（已重試 ' + Number(item.retry_count || 0) + '/' + Number(item.max_attempts || 3) + '）' : '';
+        return '<tr><td>' + escapeHtml(item.client_email) + '</td><td>' + escapeHtml(item.subject) + '</td><td>' + escapeHtml(emailStatusLabel(item.status) + retry) + '</td><td>' + escapeHtml(item.error_message || '') + '</td></tr>';
+      }).join('');
+      const alerts = (res.alerts || []).slice(0, 20).map(function (item) {
+        return '<tr><td>' + escapeHtml(item.level || '') + '</td><td>' + escapeHtml(item.title || '') + '</td><td>' + escapeHtml(item.message || '') + '</td></tr>';
+      }).join('');
+      const suppressions = (res.suppressions || []).slice(0, 20).map(function (item) {
+        return '<tr><td>' + escapeHtml(item.client_email || '') + '</td><td>' + escapeHtml(emailStatusLabel(item.reason || 'unsubscribe')) + '</td><td>' + escapeHtml(item.source || '') + '</td></tr>';
       }).join('');
       document.getElementById('view').innerHTML =
         '<div class="panel"><div class="row"><div class="col-5"><h2>信件管理</h2></div><div class="col-4"><label>目前專案</label><select onchange="loadEmailsByProject(this.value)">' + filterOptions + '</select></div><div class="col-3"><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div><div class="list" style="margin-top:16px;">' +
         '<h3>新增信件範本</h3>' + emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, status: 'active', triggerName: 'lead_created', timeParam: 0, stopWhenBooked: true }, projectOptions) +
         '<h3 style="margin-top:20px;">已建立的自動信件</h3>' + groupedTemplates + '</div></div>' +
         '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
-        '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>';
+        '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>' +
+        '<div class="panel"><h2>寄信告警</h2><table><thead><tr><th>等級</th><th>標題</th><th>內容</th></tr></thead><tbody>' + alerts + '</tbody></table></div>' +
+        '<div class="panel"><h2>退訂與拒收名單</h2><table><thead><tr><th>Email</th><th>原因</th><th>來源</th></tr></thead><tbody>' + suppressions + '</tbody></table></div>';
       initializeEmailEditors(res.templates || []);
     }
 
@@ -1555,7 +1561,10 @@
         sent: '已寄出',
         failed: '寄送失敗',
         error: '寄送失敗',
-        cancelled: '已停止'
+        cancelled: '已停止',
+        unsubscribe: '已退訂',
+        suppression: '拒收名單',
+        recipient_suppressed: '拒收名單'
       };
       return labels[String(status || '').toLowerCase()] || status || '未設定';
     }
@@ -1601,6 +1610,7 @@
               variableButton('會議連結', '{{meetLink}}') +
               variableButton('顧問姓名', '{{consultant}}') +
               variableButton('改期專屬連結', '{{rescheduleLink}}') +
+              variableButton('退訂連結', '{{unsubscribeLink}}') +
             '</div>' +
             '<div class="e-body rich-editor" contenteditable="true" role="textbox" aria-multiline="true" onkeyup="rememberEmailSelection(this)" onmouseup="rememberEmailSelection(this)" onfocus="rememberEmailSelection(this)"></div>' +
           '</div>' +

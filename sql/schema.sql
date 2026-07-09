@@ -1,4 +1,4 @@
-create extension if not exists pgcrypto;
+﻿create extension if not exists pgcrypto;
 
 create table if not exists tenants (
   slug text primary key,
@@ -8,10 +8,21 @@ create table if not exists tenants (
   owner_password_hash text not null,
   app_base_url text,
   booking_base_urls jsonb not null default '[]'::jsonb,
+  webhook_secret text default '',
   created_at timestamptz not null default now()
 );
 
 alter table tenants add column if not exists booking_base_urls jsonb not null default '[]'::jsonb;
+alter table tenants add column if not exists webhook_secret text default '';
+
+create table if not exists login_attempts (
+  id bigserial primary key,
+  tenant_slug text not null,
+  email text not null,
+  ip_address text not null default '',
+  success boolean not null default false,
+  created_at timestamptz not null default now()
+);
 
 create table if not exists projects (
   id bigserial primary key,
@@ -193,11 +204,45 @@ create table if not exists email_queue (
   stop_when_booked boolean not null default true,
   status text not null default 'queued',
   error_message text default '',
+  retry_count integer not null default 0,
+  max_attempts integer not null default 3,
+  last_attempt_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table email_queue add column if not exists retry_count integer not null default 0;
+alter table email_queue add column if not exists max_attempts integer not null default 3;
+alter table email_queue add column if not exists last_attempt_at timestamptz;
+
+create table if not exists email_suppressions (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  client_email text not null,
+  reason text not null default 'unsubscribe',
+  source text not null default 'system',
+  created_at timestamptz not null default now(),
+  unique (tenant_slug, client_email)
+);
+
+create table if not exists admin_alerts (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  level text not null default 'warning',
+  title text not null,
+  message text not null default '',
+  context jsonb not null default '{}'::jsonb,
+  resolved_at timestamptz,
   created_at timestamptz not null default now()
 );
 
 create index if not exists idx_appointments_tenant_start on appointments(tenant_slug, start_at);
+create unique index if not exists uq_active_appointment_slot
+  on appointments(tenant_slug, consultant_id, start_at)
+  where status not in ('已取消', 'cancelled', 'canceled');
 create index if not exists idx_questions_project on questions(tenant_slug, project_code, sort_order);
 create index if not exists idx_rules_consultant on availability_rules(tenant_slug, consultant_id);
 create index if not exists idx_leads_project_email on leads(tenant_slug, project_code, client_email);
 create index if not exists idx_email_queue_due on email_queue(status, scheduled_at);
+create index if not exists idx_email_queue_retry on email_queue(status, scheduled_at, retry_count);
+create index if not exists idx_login_attempts_lookup on login_attempts(tenant_slug, email, ip_address, created_at);
+create index if not exists idx_admin_alerts_tenant_unresolved on admin_alerts(tenant_slug, resolved_at, created_at desc);
