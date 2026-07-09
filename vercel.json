@@ -16,6 +16,42 @@
                      {
                          "source":  "/unsubscribe",
                          "destination":  "/unsubscribe.html"
+                     },
+                     {
+                         "source":  "/",
+                         "destination":  "/index.html"
+                     },
+                     {
+                         "source":  "/index.html",
+                         "destination":  "/index.html"
+                     },
+                     {
+                         "source":  "/privacy",
+                         "destination":  "/privacy.html"
+                     },
+                     {
+                         "source":  "/privacy.html",
+                         "destination":  "/privacy.html"
+                     },
+                     {
+                         "source":  "/terms",
+                         "destination":  "/terms.html"
+                     },
+                     {
+                         "source":  "/terms.html",
+                         "destination":  "/terms.html"
+                     },
+                     {
+                         "source":  "/data-deletion",
+                         "destination":  "/data-deletion.html"
+                     },
+                     {
+                         "source":  "/data-deletion.html",
+                         "destination":  "/data-deletion.html"
+                     },
+                     {
+                         "source":  "/unsubscribe.html",
+                         "destination":  "/unsubscribe.html"
                      }
                  ],
     "crons":  [
