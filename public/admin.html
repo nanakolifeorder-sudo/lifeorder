@@ -464,6 +464,7 @@
     let crmMode = 'upcoming';
     let crmProject = 'ALL';
     let crmTagFilter = 'ALL';
+    let crmPipelineFilter = 'ALL';
     let crmSearch = '';
     let crmSelectedContacts = {};
     let emailProject = 'ALL';
@@ -721,13 +722,20 @@
       }).catch(showError);
     }
 
+    function crmPipelineValue(item) {
+      const raw = String(item.lifecycleStage || item.status || '').trim().toLowerCase();
+      const aliases = { pending: 'lead', new_lead: 'lead', follow_up: 'unbooked', lost: 'rejected', canceled: 'cancelled', won: 'completed' };
+      return aliases[raw] || raw;
+    }
+
     function appointmentBucket(item) {
       const status = String(item.status || '').toLowerCase();
-      if (item.kind === 'waitlist') return 'waitlist';
-      if (item.kind === 'lead' || item.kind === 'contact') return 'unbooked';
-      if (item.kind === 'rejected' || status.includes('取消') || status.includes('婉拒') || status.includes('cancel')) return 'cancelled';
+      const stage = crmPipelineValue(item);
+      if (item.kind === 'waitlist' || stage === 'waitlist') return 'waitlist';
+      if (item.kind === 'rejected' || stage === 'rejected' || stage === 'cancelled' || status.includes('取消') || status.includes('婉拒') || status.includes('cancel')) return 'cancelled';
       if (item.kind === 'appointment' && item.timeObj && item.timeObj < Date.now()) return 'past';
-      return 'upcoming';
+      if (item.kind === 'appointment') return 'upcoming';
+      return 'unbooked';
     }
 
     function statusChip(mode, label, count) {
@@ -767,9 +775,10 @@
       document.getElementById('view').innerHTML =
         '<div class="panel">' +
           '<div class="row">' +
-            '<div class="col-3"><h2>客戶總覽 CRM</h2></div>' +
-            '<div class="col-3"><label>專案篩選</label><select id="crmProject" onchange="loadCrmByProject(this.value)">' + projectOptions + '</select></div>' +
-            '<div class="col-3"><label>標籤篩選</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
+            '<div class="col-2"><h2>客戶總覽 CRM</h2></div>' +
+            '<div class="col-2"><label>專案篩選</label><select id="crmProject" onchange="loadCrmByProject(this.value)">' + projectOptions + '</select></div>' +
+            '<div class="col-2"><label>標籤篩選</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
+            '<div class="col-3"><label>流程篩選</label><select id="crmPipelineFilter" onchange="crmPipelineFilter=this.value; renderCrm(cache.crm);">' + crmPipelineOptions(crmPipelineFilter, true) + '</select></div>' +
             '<div class="col-3"><label>搜尋</label><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名 / Email / 電話 / 答案" oninput="crmSearch=this.value; renderCrm(cache.crm);"></div>' +
           '</div>' +
           '<div class="stat-grid">' +
@@ -795,17 +804,7 @@
       window.crmVisibleRows = rows || [];
       const selectable = window.crmVisibleRows.filter(function (row) { return row.crmContactId; });
       const selectedIds = Object.keys(crmSelectedContacts).filter(function (id) { return crmSelectedContacts[id]; });
-      const statusOptions = [
-        ['', '不變更狀態'],
-        ['lead', '一般名單'],
-        ['quiz_completed', '測驗完成'],
-        ['unbooked', '未預約'],
-        ['booked', '已預約'],
-        ['waitlist', '等候名單'],
-        ['rejected', '已婉拒'],
-        ['cancelled', '已取消'],
-        ['completed', '已完成']
-      ].map(function (item) { return '<option value="' + item[0] + '">' + item[1] + '</option>'; }).join('');
+      const statusOptions = crmPipelineOptions('', false);
       return '<div class="panel"><div class="row">' +
         '<div class="col-2"><button class="secondary" onclick="selectVisibleCrmContacts(true)">全選目前結果</button></div>' +
         '<div class="col-2"><button class="secondary" onclick="selectVisibleCrmContacts(false)">清除選取</button></div>' +
@@ -838,18 +837,33 @@
       renderCrm(cache.crm);
     }
 
+    function crmPipelineList(includeAll) {
+      const list = includeAll ? [['ALL', '全部流程']] : [['', '不變更狀態']];
+      return list.concat([
+        ['lead', '新名單'],
+        ['quiz_completed', '已作答'],
+        ['unbooked', '待追蹤 / 未預約'],
+        ['booked', '已預約'],
+        ['waitlist', '等候名單'],
+        ['completed', '已完成'],
+        ['rejected', '未成交 / 已婉拒'],
+        ['cancelled', '已取消']
+      ]);
+    }
+
+    function crmPipelineLabel(value) {
+      const found = crmPipelineList(false).find(function (item) { return item[0] === String(value || '').toLowerCase(); });
+      return found ? found[1] : (value || '');
+    }
+
+    function crmPipelineOptions(current, includeAll) {
+      return crmPipelineList(includeAll).map(function (item) {
+        return '<option value="' + escapeHtml(item[0]) + '"' + (String(current || '') === item[0] ? ' selected' : '') + '>' + escapeHtml(item[1]) + '</option>';
+      }).join('');
+    }
+
     function crmStatusLabel(value) {
-      const labels = {
-        lead: '一般名單',
-        quiz_completed: '測驗完成',
-        unbooked: '未預約',
-        booked: '已預約',
-        waitlist: '等候名單',
-        rejected: '已婉拒',
-        cancelled: '已取消',
-        completed: '已完成'
-      };
-      return labels[String(value || '').toLowerCase()] || value || '';
+      return crmPipelineLabel(value);
     }
 
     function batchUpdateCrmContacts() {
@@ -990,9 +1004,10 @@
     function crmMatchesFilters(item) {
       const tags = Array.isArray(item.tags) ? item.tags : [];
       if (crmTagFilter !== 'ALL' && !tags.includes(crmTagFilter)) return false;
+      if (crmPipelineFilter !== 'ALL' && crmPipelineValue(item) !== crmPipelineFilter) return false;
       const needle = String(crmSearch || '').trim().toLowerCase();
       if (!needle) return true;
-      return [item.clientName, item.clientEmail, item.clientPhone, item.projectName, item.projectCode, item.answers, item.status]
+      return [item.clientName, item.clientEmail, item.clientPhone, item.projectName, item.projectCode, item.answers, item.status, crmPipelineLabel(crmPipelineValue(item))]
         .concat(tags)
         .some(function (value) { return String(value || '').toLowerCase().includes(needle); });
     }
@@ -1026,7 +1041,9 @@
       const rescheduleBadge = String(item.status || '').includes('已發送改期')
         ? '<span class="badge" style="color:#b06000;background:rgba(246,177,0,.16);">已發送改期邀請</span>'
         : '';
-      const kindBadge = (item.kind === 'lead' || item.kind === 'contact') ? '<span class="badge">未預約</span>' : '';
+      const stageValue = crmPipelineValue(item);
+      const stageBadge = stageValue ? '<span class="badge">' + escapeHtml(crmPipelineLabel(stageValue)) + '</span>' : '';
+      const kindBadge = '';
       const actionButtons = item.kind === 'appointment' && isUpcoming
         ? '<button class="danger" onclick="cancelAppointment(' + item.rowId + ')">取消會議</button>' +
           '<button class="yellow" onclick="openAdminReschedule(' + item.rowId + ',&quot;' + escapeHtml(item.projectCode || '') + '&quot;)">改期</button>' +
@@ -1037,7 +1054,7 @@
           : '');
       return '<div class="' + cls + '">' +
         '<div class="card-top">' +
-          '<div>' + crmSelectionCheckbox(item) + '<h3>' + escapeHtml(item.meetTime || ((item.kind === 'lead' || item.kind === 'contact') ? '尚未預約' : '未指定時間')) + '</h3><div><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> ' + kindBadge + ' ' + consultantBadge + ' ' + rescheduleBadge + '</div></div>' +
+          '<div>' + crmSelectionCheckbox(item) + '<h3>' + escapeHtml(item.meetTime || ((item.kind === 'lead' || item.kind === 'contact') ? '尚未預約' : '未指定時間')) + '</h3><div><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> ' + kindBadge + ' ' + stageBadge + ' ' + consultantBadge + ' ' + rescheduleBadge + '</div></div>' +
           '<span class="badge">' + escapeHtml(item.projectName || item.projectCode || '') + '</span>' +
         '</div>' +
         '<p>' + escapeHtml(item.clientPhone || '') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p>' +
@@ -1101,8 +1118,8 @@
       dialog.querySelector('.dialog-body').innerHTML =
         '<div class="card-top"><div><h2>' + escapeHtml(contact.name || '客戶資料卡') + '</h2><p>' + escapeHtml(contact.phone || '') + (contact.email ? ' ｜ ' + escapeHtml(contact.email) : '') + '</p></div><button class="secondary" onclick="detailDialog().close()">關閉</button></div>' +
         '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + statBox('Email 紀錄', summary.emailCount || 0) + statBox('點擊紀錄', summary.clickCount || 0) + '</div>' +
-        '<div class="detail-section"><h3>基本資料</h3><p>狀態：' + escapeHtml(summary.lifecycleStage || contact.lifecycle_stage || '') + '｜專案：' + escapeHtml(summary.projectCode || contact.project_code || '') + '</p><p>最新測驗：' + escapeHtml(compactDate(summary.latestQuizAt)) + '｜最新預約：' + escapeHtml(compactDate(summary.latestAppointmentAt)) + '</p></div>' +
-        '<div class="detail-section"><h3>名單分類</h3><div class="row"><div class="col-8"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-4"><button onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存標籤</button></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
+        '<div class="detail-section"><h3>基本資料</h3><p>狀態：' + escapeHtml(crmPipelineLabel(summary.lifecycleStage || contact.lifecycle_stage || '')) + '｜專案：' + escapeHtml(summary.projectCode || contact.project_code || '') + '</p><p>最新測驗：' + escapeHtml(compactDate(summary.latestQuizAt)) + '｜最新預約：' + escapeHtml(compactDate(summary.latestAppointmentAt)) + '</p></div>' +
+        '<div class="detail-section"><h3>名單分類</h3><div class="row"><div class="col-5"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-3"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-4"><button onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存分類</button></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
         '<div class="detail-section"><h3>測驗紀錄</h3>' + (latest ? '<p>版本：' + escapeHtml(latest.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(latest.submittedAt)) + '</p><div class="actions"><a target="_blank" href="' + escapeHtml(latest.reportUrl || '') + '">開啟報告連結</a></div>' + renderScoreItems(latest.scoreItems || []) : '<p class="mini">沒有測驗紀錄。</p>') + '</div>' +
         '<div class="detail-section"><h3>作答詳情</h3>' + renderAnswerRows(answers) + '</div>' +
         '<div class="detail-section"><h3>報告結果</h3>' + renderHistoryList(latest ? latest.matchedContent || [] : [], '沒有報告區間內容。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '｜' + escapeHtml(item.label || '') + '</strong><p>' + escapeHtml(item.title || '') + '</p><p>' + escapeHtml(item.body || '') + '</p></div>'; }) + '</div>' +
@@ -1115,7 +1132,8 @@
       if (!contactId) return;
       const tags = splitCrmTags(field('crmDetailTags'));
       const notes = field('crmDetailNotes');
-      api('saveCRMContactLabels', { contactId: contactId, tags: tags, notes: notes }).then(function (res) {
+      const lifecycleStage = field('crmDetailStage');
+      api('saveCRMContactLabels', { contactId: contactId, tags: tags, notes: notes, lifecycleStage: lifecycleStage }).then(function (res) {
         delete cache.crm;
         return Promise.all([
           api('getCRMContactDetail', { contactId: contactId }),
