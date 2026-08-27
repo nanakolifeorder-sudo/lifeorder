@@ -167,6 +167,9 @@
     .client-card.lead, .client-card.contact { border-left-color: var(--green); }
     .name-link { border:0; background:transparent; color:var(--blue); padding:0; white-space:normal; text-align:left; font:inherit; font-weight:800; }
     .crm-card-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .crm-batch-toolbar { display:grid; grid-template-columns:auto auto minmax(220px,1fr) minmax(220px,1fr) auto; gap:10px; align-items:end; }
+    .crm-batch-toolbar button { width:auto; }
+    .crm-batch-summary { margin-top:8px; }
     .crm-card-title h3 { margin:0; color:var(--ink); }
     .crm-card-meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
     .crm-meta-item { border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--panel); min-width:0; }
@@ -416,6 +419,7 @@
       .row { grid-template-columns: 1fr; }
       .row > * { grid-column: auto !important; }
       .stat-grid, .permission-grid, .crm-card-meta, .detail-contact-grid { grid-template-columns: 1fr 1fr; }
+      .crm-batch-toolbar { grid-template-columns:1fr; }
       .project-checks, .question-row .option-editor { grid-template-columns: 1fr; }
       .card-top { flex-direction: column; }
       table { display: block; overflow-x: auto; }
@@ -820,14 +824,13 @@
       const selectable = window.crmVisibleRows.filter(function (row) { return row.crmContactId; });
       const selectedIds = Object.keys(crmSelectedContacts).filter(function (id) { return crmSelectedContacts[id]; });
       const statusOptions = crmPipelineOptions('', false);
-      return '<div class="panel"><div class="row">' +
-        '<div class="col-2"><button class="secondary" onclick="selectVisibleCrmContacts(true)">全選目前結果</button></div>' +
-        '<div class="col-2"><button class="secondary" onclick="selectVisibleCrmContacts(false)">清除選取</button></div>' +
-        '<div class="col-3"><label>批次新增標籤</label><input id="crmBatchTags" placeholder="例如：高意願, 待追蹤"></div>' +
-        '<div class="col-3"><label>批次狀態</label><select id="crmBatchStatus">' + statusOptions + '</select></div>' +
-        '<div class="col-2"><button onclick="batchUpdateCrmContacts()">批次更新</button></div>' +
-        '<div class="col-12"><button class="secondary" onclick="exportCrmRows()">匯出目前結果 CSV</button><p class="mini">目前結果 ' + selectable.length + ' 筆，可更新 ' + selectedIds.length + ' 筆已選名單。</p></div>' +
-      '</div></div>';
+      return '<div class="panel"><div class="crm-batch-toolbar">' +
+        '<button class="secondary" onclick="selectVisibleCrmContacts(true)">全選目前結果</button>' +
+        '<button class="secondary" onclick="selectVisibleCrmContacts(false)">清除選取</button>' +
+        '<div><label>批次新增標籤</label><input id="crmBatchTags" placeholder="例如：高意願, 待追蹤"></div>' +
+        '<div><label>批次狀態</label><select id="crmBatchStatus">' + statusOptions + '</select></div>' +
+        '<button onclick="batchUpdateCrmContacts()">批次更新</button>' +
+      '</div><div class="crm-batch-summary"><button class="secondary" onclick="exportCrmRows()">匯出目前結果 CSV</button><p class="mini">目前結果 ' + selectable.length + ' 筆，可更新 ' + selectedIds.length + ' 筆已選名單。</p></div></div>';
     }
 
     function crmSelectionCheckbox(item) {
@@ -1118,6 +1121,11 @@
       if (!dialog) {
         document.body.insertAdjacentHTML('beforeend', '<dialog id="clientDetailDialog"><div class="dialog-body"></div></dialog>');
         dialog = document.getElementById('clientDetailDialog');
+        dialog.addEventListener('click', function (event) {
+          const rect = dialog.getBoundingClientRect();
+          const clickedBackdrop = event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
+          if (clickedBackdrop) dialog.close();
+        });
       }
       return dialog;
     }
