@@ -295,6 +295,18 @@
     .copy-field button { flex: 0 0 auto; }
     .option-editor { display: grid; gap: 7px; }
     .question-row .row { align-items: start; }
+    .report-editor-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr); gap:16px; align-items:start; }
+    .report-block-row summary { grid-template-columns: 1fr 140px 120px; }
+    .preview-frame { border:1px solid var(--line); border-radius:8px; background:var(--panel-2); padding:16px; min-height:420px; }
+    .preview-frame.mobile { max-width:390px; margin:0 auto; }
+    .preview-card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px; margin-bottom:12px; }
+    .preview-radar { width:100%; max-width:320px; aspect-ratio:1; display:block; margin:0 auto; }
+    .preview-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .preview-score { border:1px solid var(--line); border-radius:8px; padding:12px; background:var(--panel-2); }
+    .preview-cta { display:inline-flex; min-height:42px; align-items:center; justify-content:center; padding:10px 14px; border-radius:6px; background:var(--blue); color:#fff; font-weight:700; text-decoration:none; }
+    .block-tools { display:flex; gap:6px; flex-wrap:wrap; }
+    .block-tools button { padding:7px 9px; }
+    @media (max-width:860px) { .report-editor-grid { grid-template-columns:1fr; } .preview-grid { grid-template-columns:1fr; } }
     .question-row .q-options-wrap {
       padding-top: 2px;
       border-top: 1px solid var(--line);
@@ -636,6 +648,7 @@
         { id: 'consultants', label: tenantDisplayName + '團隊顧問', ok: isAdmin() },
         { id: 'projects', label: '專案管理', ok: can('PROJECTS') },
         { id: 'questions', label: '表單管理', ok: can('FORMS') },
+        { id: 'reportEditor', label: '報告編輯器', ok: can('FORMS') },
         { id: 'emails', label: '信件管理', ok: can('EMAILS') },
         { id: 'analytics', label: '戰情數據', ok: can('ANALYTICS') },
         { id: 'usage', label: '系統用量', ok: isSystemOwner() },
@@ -660,6 +673,7 @@
         consultants: loadConsultants,
         projects: loadProjects,
         questions: loadQuestions,
+        reportEditor: loadReportEditor,
         emails: loadEmails,
         analytics: loadAnalytics,
         usage: loadSystemUsage,
@@ -1473,6 +1487,189 @@
       api('saveAdminQuestions', { projectCode: field('questionProject'), questions: questions }).then(function () {
         alert('已儲存');
         loadQuestionRows();
+      }).catch(function (err) { alert(err.message); });
+    }
+
+
+    function loadReportEditor() {
+      loading('報告編輯器');
+      api('getAdminProjectData', {}).then(function (projectRes) {
+        const projectRows = isSystemOwner() && ownerProject !== 'ALL'
+          ? (projectRes.projects || []).filter(function (p) { return p.code === ownerProject; })
+          : (projectRes.projects || []);
+        const options = projectRows.map(function (p) {
+          return '<option value="' + escapeHtml(p.code) + '">' + escapeHtml(p.name) + '</option>';
+        }).join('');
+        if (!options) {
+          document.getElementById('view').innerHTML = '<div class="panel"><h2>報告編輯器</h2><p>目前沒有可編輯的專案。</p></div>';
+          return;
+        }
+        document.getElementById('view').innerHTML =
+          '<div class="panel"><div class="row"><div class="col-5"><h2>報告編輯器</h2></div>' +
+          '<div class="col-4"><label>專案</label><select id="reportProject" onchange="loadReportEditorData()">' + options + '</select></div>' +
+          '<div class="col-3"><label>版本</label><select id="reportVersion" onchange="loadReportEditorData()"><option value="A">A</option></select></div></div>' +
+          '<div id="reportEditorBody" style="margin-top:16px;"></div></div>';
+        loadReportEditorData();
+      }).catch(showError);
+    }
+
+    function loadReportEditorData() {
+      const projectCode = field('reportProject');
+      const versionCode = field('reportVersion') || 'A';
+      api('getQuizReportEditor', { projectCode: projectCode, versionCode: versionCode }).then(renderReportEditor).catch(showError);
+    }
+
+    function reportBlockTypeOptions(current) {
+      const types = [
+        ['heading', '標題'], ['text', '文字'], ['list', '項目清單'], ['image', '圖片'],
+        ['score_chart', '分數圖表'], ['score_table', '分數表'], ['button', '按鈕'], ['link', '連結'],
+        ['booking_cta', '預約 CTA'], ['score_range_content', '依分數區間內容']
+      ];
+      return types.map(function (item) { return '<option value="' + item[0] + '"' + (current === item[0] ? ' selected' : '') + '>' + item[1] + '</option>'; }).join('');
+    }
+
+    function reportBlockContentFields(block) {
+      const content = block.content || {};
+      const type = block.blockType || 'text';
+      if (type === 'heading') return '<div class="col-12"><label>標題文字</label><input class="rb-text" value="' + escapeHtml(content.text || block.title || '') + '"></div>';
+      if (type === 'text') return '<div class="col-12"><label>文字內容</label><textarea class="rb-text">' + escapeHtml(content.text || '') + '</textarea></div>';
+      if (type === 'list') return '<div class="col-12"><label>項目清單</label><textarea class="rb-items" placeholder="一行一個項目">' + escapeHtml((content.items || []).join(String.fromCharCode(10))) + '</textarea></div>';
+      if (type === 'image') return '<div class="col-8"><label>圖片網址</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '"></div><div class="col-4"><label>替代文字</label><input class="rb-alt" value="' + escapeHtml(content.alt || '') + '"></div>';
+      if (type === 'score_chart') return '<div class="col-6"><label>圖表類型</label><select class="rb-chart"><option value="radar"' + (content.chartType !== 'bar' ? ' selected' : '') + '>雷達圖</option><option value="bar"' + (content.chartType === 'bar' ? ' selected' : '') + '>長條圖</option></select></div>';
+      if (type === 'score_table') return '<div class="col-12"><p class="mini">分數表會依目前測驗面向自動產生。</p></div>';
+      if (type === 'button' || type === 'link') return '<div class="col-4"><label>文字</label><input class="rb-label" value="' + escapeHtml(content.label || block.title || '') + '"></div><div class="col-8"><label>網址</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '"></div>';
+      if (type === 'booking_cta') return '<div class="col-6"><label>按鈕文字</label><input class="rb-label" value="' + escapeHtml(content.label || '預約一對一諮詢') + '"></div>';
+      return '<div class="col-12"><p class="mini">此區塊會依分數區間自動顯示後台設定內容。</p></div>';
+    }
+
+    function reportBlockForm(block) {
+      const key = block.blockKey || ('block-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
+      const type = block.blockType || 'text';
+      return '<details class="item report-block-row" data-key="' + escapeHtml(key) + '" open>' +
+        '<summary><span>' + escapeHtml(block.title || '未命名區塊') + '</span><span>' + escapeHtml(type) + '</span><span>' + (block.isVisible === false ? '隱藏' : '顯示') + '</span></summary>' +
+        '<div class="details-body"><div class="row">' +
+          '<div class="col-4"><label>區塊標題</label><input class="rb-title" value="' + escapeHtml(block.title || '') + '"></div>' +
+          '<div class="col-3"><label>區塊類型</label><select class="rb-type" onchange="changeReportBlockType(this)">' + reportBlockTypeOptions(type) + '</select></div>' +
+          '<div class="col-2"><label>顯示</label><select class="rb-visible"><option value="true"' + (block.isVisible !== false ? ' selected' : '') + '>顯示</option><option value="false"' + (block.isVisible === false ? ' selected' : '') + '>隱藏</option></select></div>' +
+          '<div class="col-3"><label>排序</label><div class="block-tools"><button class="secondary" type="button" onclick="moveReportBlock(this,-1)">上移</button><button class="secondary" type="button" onclick="moveReportBlock(this,1)">下移</button><button class="danger" type="button" onclick="removeReportBlock(this)">刪除</button></div></div>' +
+          '<div class="rb-content col-12"><div class="row">' + reportBlockContentFields(block) + '</div></div>' +
+        '</div></div>' +
+      '</details>';
+    }
+
+    function renderReportEditor(res) {
+      const versions = (res.versions || []).map(function (v) { return '<option value="' + escapeHtml(v.version_code) + '"' + (v.version_code === res.versionCode ? ' selected' : '') + '>' + escapeHtml(v.name || v.version_code) + '</option>'; }).join('') || '<option value="A">A</option>';
+      const versionSelect = document.getElementById('reportVersion');
+      if (versionSelect) versionSelect.innerHTML = versions;
+      const settings = res.settings || {};
+      const blocks = (res.blocks || []);
+      document.getElementById('reportEditorBody').innerHTML =
+        '<div class="report-editor-grid">' +
+          '<div>' +
+            '<div class="item"><div class="row">' +
+              '<div class="col-6"><label>報告標題</label><input id="reportTitle" value="' + escapeHtml(settings.title || '你的檢測報告') + '"></div>' +
+              '<div class="col-6"><label>副標題</label><input id="reportSubtitle" value="' + escapeHtml(settings.subtitle || '') + '"></div>' +
+              '<div class="col-3"><label>顯示圖表</label><select id="reportShowChart"><option value="true"' + (settings.show_chart !== false ? ' selected' : '') + '>顯示</option><option value="false"' + (settings.show_chart === false ? ' selected' : '') + '>隱藏</option></select></div>' +
+              '<div class="col-3"><label>分數卡</label><select id="reportShowCards"><option value="true"' + (settings.show_score_cards !== false ? ' selected' : '') + '>顯示</option><option value="false"' + (settings.show_score_cards === false ? ' selected' : '') + '>隱藏</option></select></div>' +
+              '<div class="col-3"><label>分數表</label><select id="reportShowTable"><option value="true"' + (settings.show_score_table !== false ? ' selected' : '') + '>顯示</option><option value="false"' + (settings.show_score_table === false ? ' selected' : '') + '>隱藏</option></select></div>' +
+              '<div class="col-3"><label>CTA 文字</label><input id="reportCtaLabel" value="' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '"></div>' +
+            '</div></div>' +
+            '<div class="actions"><button type="button" onclick="addReportBlock()">新增區塊</button><button class="secondary" type="button" onclick="refreshReportPreview()">更新預覽</button><button class="green" type="button" onclick="saveReportEditor()">儲存報告</button></div>' +
+            '<div class="list" id="reportBlocks" style="margin-top:12px;">' + blocks.map(reportBlockForm).join('') + '</div>' +
+          '</div>' +
+          '<div class="panel" style="margin:0;"><div class="row"><div class="col-7"><h2>預覽</h2></div><div class="col-5"><select id="reportPreviewMode" onchange="refreshReportPreview()"><option value="desktop">電腦版</option><option value="mobile">手機版</option></select></div></div><div id="reportPreview" class="preview-frame"></div></div>' +
+        '</div>';
+      refreshReportPreview();
+    }
+
+    function changeReportBlockType(select) {
+      const row = select.closest('.report-block-row');
+      const block = collectReportBlock(row, 0);
+      block.blockType = select.value;
+      row.outerHTML = reportBlockForm(block);
+      refreshReportPreview();
+    }
+
+    function addReportBlock() {
+      document.getElementById('reportBlocks').insertAdjacentHTML('beforeend', reportBlockForm({ blockType: 'text', title: '新增文字區塊', content: { text: '' }, isVisible: true }));
+      refreshReportPreview();
+    }
+
+    function removeReportBlock(button) {
+      button.closest('.report-block-row').remove();
+      refreshReportPreview();
+    }
+
+    function moveReportBlock(button, direction) {
+      const row = button.closest('.report-block-row');
+      if (direction < 0 && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+      if (direction > 0 && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+      refreshReportPreview();
+    }
+
+    function collectReportBlock(row, index) {
+      const type = row.querySelector('.rb-type').value;
+      const content = {};
+      if (type === 'heading' || type === 'text') content.text = row.querySelector('.rb-text')?.value || '';
+      if (type === 'list') content.items = (row.querySelector('.rb-items')?.value || '').replace(/\r/g, '').split('\n').map(function (item) { return item.trim(); }).filter(Boolean);
+      if (type === 'image') { content.url = row.querySelector('.rb-url')?.value || ''; content.alt = row.querySelector('.rb-alt')?.value || ''; }
+      if (type === 'score_chart') content.chartType = row.querySelector('.rb-chart')?.value || 'radar';
+      if (type === 'button' || type === 'link') { content.label = row.querySelector('.rb-label')?.value || ''; content.url = row.querySelector('.rb-url')?.value || ''; }
+      if (type === 'booking_cta') content.label = row.querySelector('.rb-label')?.value || '預約一對一諮詢';
+      return {
+        blockKey: row.dataset.key,
+        blockType: type,
+        title: row.querySelector('.rb-title').value.trim(),
+        content: content,
+        sortOrder: (index + 1) * 10,
+        isVisible: row.querySelector('.rb-visible').value !== 'false'
+      };
+    }
+
+    function collectReportEditorPayload() {
+      return {
+        projectCode: field('reportProject'),
+        versionCode: field('reportVersion') || 'A',
+        settings: {
+          title: field('reportTitle'),
+          subtitle: field('reportSubtitle'),
+          showChart: field('reportShowChart') !== 'false',
+          showScoreCards: field('reportShowCards') !== 'false',
+          showScoreTable: field('reportShowTable') !== 'false',
+          bookingCtaLabel: field('reportCtaLabel') || '預約一對一諮詢'
+        },
+        blocks: Array.from(document.querySelectorAll('.report-block-row')).map(collectReportBlock)
+      };
+    }
+
+    function previewRadar() {
+      return '<svg class="preview-radar" viewBox="0 0 320 320"><polygon points="160,50 255,215 65,215" fill="none" stroke="#d7dee8"></polygon><line x1="160" y1="160" x2="160" y2="50" stroke="#e5eaf1"></line><line x1="160" y1="160" x2="255" y2="215" stroke="#e5eaf1"></line><line x1="160" y1="160" x2="65" y2="215" stroke="#e5eaf1"></line><polygon points="160,82 224,197 92,203" fill="rgba(26,115,232,.22)" stroke="#1a73e8" stroke-width="3"></polygon><text x="160" y="34" text-anchor="middle" font-size="12" font-weight="700">需求清晰度</text><text x="270" y="228" text-anchor="start" font-size="12" font-weight="700">預約急迫度</text><text x="50" y="228" text-anchor="end" font-size="12" font-weight="700">執行準備度</text></svg>';
+    }
+
+    function refreshReportPreview() {
+      const target = document.getElementById('reportPreview');
+      if (!target) return;
+      const payload = collectReportEditorPayload();
+      target.classList.toggle('mobile', field('reportPreviewMode') === 'mobile');
+      const blockHtml = payload.blocks.filter(function (block) { return block.isVisible; }).map(function (block) {
+        const c = block.content || {};
+        if (block.blockType === 'heading') return '<h2>' + escapeHtml(c.text || block.title) + '</h2>';
+        if (block.blockType === 'text') return '<p>' + escapeHtml(c.text || '').split('\n').join('<br>') + '</p>';
+        if (block.blockType === 'list') return '<ul>' + (c.items || []).map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>';
+        if (block.blockType === 'image') return c.url ? '<img class="report-image" src="' + escapeHtml(c.url) + '" alt="' + escapeHtml(c.alt || '') + '">' : '<p class="mini">圖片區塊尚未設定網址</p>';
+        if (block.blockType === 'score_chart') return '<h3>' + escapeHtml(block.title || '多面向分數圖') + '</h3>' + previewRadar();
+        if (block.blockType === 'score_table') return '<h3>分數表</h3><table><tbody><tr><td>需求清晰度</td><td>7 / 10</td></tr><tr><td>預約急迫度</td><td>6 / 10</td></tr><tr><td>執行準備度</td><td>8 / 10</td></tr></tbody></table>';
+        if (block.blockType === 'button' || block.blockType === 'link') return '<p><a class="button secondary">' + escapeHtml(c.label || block.title || '了解更多') + '</a></p>';
+        if (block.blockType === 'booking_cta') return '<p><a class="preview-cta">' + escapeHtml(c.label || payload.settings.bookingCtaLabel || '預約一對一諮詢') + '</a></p>';
+        return '<p class="mini">分數區間內容會依作答結果自動顯示。</p>';
+      }).join('');
+      target.innerHTML = '<div class="preview-card"><h1>' + escapeHtml(payload.settings.title || '你的檢測報告') + '</h1><p>' + escapeHtml(payload.settings.subtitle || '') + '</p></div><div class="preview-card"><div class="preview-grid"><div class="preview-score"><strong>需求清晰度</strong><p>7 / 10</p></div><div class="preview-score"><strong>預約急迫度</strong><p>6 / 10</p></div></div></div><div class="preview-card">' + blockHtml + '</div>';
+    }
+
+    function saveReportEditor() {
+      api('saveQuizReportEditor', collectReportEditorPayload()).then(function (res) {
+        alert(res.message || '已儲存');
+        loadReportEditorData();
       }).catch(function (err) { alert(err.message); });
     }
 
