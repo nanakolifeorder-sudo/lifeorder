@@ -843,8 +843,8 @@
 
     function renderAnswerRows(answers) {
       if (!answers || !answers.length) return '<p class="mini">沒有作答明細。</p>';
-      return '<table><thead><tr><th>題號</th><th>題目</th><th>答案</th><th>加分</th></tr></thead><tbody>' + answers.map(function (answer) {
-        return '<tr><td>' + escapeHtml(answer.questionNo) + '</td><td>' + escapeHtml(answer.questionTitle || '') + '</td><td>' + escapeHtml(answer.answerText || '') + '</td><td><code>' + escapeHtml(JSON.stringify(answer.scoreDelta || {})) + '</code></td></tr>';
+      return '<table><thead><tr><th>題號</th><th>題目</th><th>答案</th></tr></thead><tbody>' + answers.map(function (answer) {
+        return '<tr><td>' + escapeHtml(answer.questionNo) + '</td><td>' + escapeHtml(answer.questionTitle || '') + '</td><td>' + escapeHtml(answer.answerText || '') + '</td></tr>';
       }).join('') + '</tbody></table>';
     }
 
@@ -2439,6 +2439,7 @@
   </script>
 </body>
 </html>
+
 
 
 
