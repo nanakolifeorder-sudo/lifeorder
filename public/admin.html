@@ -463,6 +463,8 @@
     let currentView = 'crm';
     let crmMode = 'upcoming';
     let crmProject = 'ALL';
+    let crmTagFilter = 'ALL';
+    let crmSearch = '';
     let emailProject = 'ALL';
     let emailModule = 'booking';
     let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
@@ -753,15 +755,21 @@
       }, { upcoming: 0, past: 0, cancelled: 0, waitlist: 0, unbooked: 0 });
       const rows = all
         .filter(function (item) { return appointmentBucket(item) === crmMode; })
+        .filter(crmMatchesFilters)
         .sort(function (a, b) { return crmMode === 'upcoming' ? (a.timeObj || 0) - (b.timeObj || 0) : (b.timeObj || 0) - (a.timeObj || 0); });
       const projectOptions = ['<option value="ALL">所有專案</option>'].concat((res.allProjects || []).map(function (p) {
         return '<option value="' + escapeHtml(p.code) + '"' + (crmProject === p.code ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>';
       })).join('');
+      const tagOptions = ['<option value="ALL">所有標籤</option>'].concat((res.crmTags || []).map(function (tag) {
+        return '<option value="' + escapeHtml(tag) + '"' + (crmTagFilter === tag ? ' selected' : '') + '>' + escapeHtml(tag) + '</option>';
+      })).join('');
       document.getElementById('view').innerHTML =
         '<div class="panel">' +
           '<div class="row">' +
-            '<div class="col-8"><h2>客戶總覽 CRM</h2></div>' +
-            '<div class="col-4"><label>專案篩選</label><select id="crmProject" onchange="loadCrmByProject(this.value)">' + projectOptions + '</select></div>' +
+            '<div class="col-3"><h2>客戶總覽 CRM</h2></div>' +
+            '<div class="col-3"><label>專案篩選</label><select id="crmProject" onchange="loadCrmByProject(this.value)">' + projectOptions + '</select></div>' +
+            '<div class="col-3"><label>標籤篩選</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
+            '<div class="col-3"><label>搜尋</label><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名 / Email / 電話 / 答案" oninput="crmSearch=this.value; renderCrm(cache.crm);"></div>' +
           '</div>' +
           '<div class="stat-grid">' +
             statBox('今天作答', res.crmOverview?.todayQuizResponses || 0) +
@@ -780,6 +788,36 @@
         '<div class="list">' + (rows.length ? rows.map(clientCard).join('') : '<div class="panel"><p>目前沒有資料。</p></div>') + '</div>';
     }
 
+    function crmMatchesFilters(item) {
+      const tags = Array.isArray(item.tags) ? item.tags : [];
+      if (crmTagFilter !== 'ALL' && !tags.includes(crmTagFilter)) return false;
+      const needle = String(crmSearch || '').trim().toLowerCase();
+      if (!needle) return true;
+      return [item.clientName, item.clientEmail, item.clientPhone, item.projectName, item.projectCode, item.answers, item.status]
+        .concat(tags)
+        .some(function (value) { return String(value || '').toLowerCase().includes(needle); });
+    }
+
+    function renderTagPills(tags) {
+      if (!tags || !tags.length) return '';
+      return '<div class="subtabs" style="margin:8px 0 4px;">' + tags.map(function (tag) {
+        return '<span class="badge">' + escapeHtml(tag) + '</span>';
+      }).join('') + '</div>';
+    }
+
+    function splitCrmTags(value) {
+      const seen = new Set();
+      return String(value || '').split(/[,，\n]/).map(function (tag) { return tag.trim(); }).filter(Boolean).filter(function (tag) {
+        const key = tag.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 20);
+    }
+
+    function crmTagOptionsHtml(tags) {
+      return (tags || []).map(function (tag) { return '<option value="' + escapeHtml(tag) + '">'; }).join('');
+    }
     function clientCard(item) {
       const key = String(item.kind || 'row') + '_' + String(item.rowId || item.crmContactId || item.clientEmail || Math.random());
       window.crmCardItems[key] = item;
@@ -804,6 +842,7 @@
           '<span class="badge">' + escapeHtml(item.projectName || item.projectCode || '') + '</span>' +
         '</div>' +
         '<p>' + escapeHtml(item.clientPhone || '') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p>' +
+        renderTagPills(item.tags || []) +
         (item.meetLink ? '<p><a href="' + escapeHtml(item.meetLink) + '" target="_blank">開啟會議連結</a></p>' : '') +
         '<div class="answer-box">' + escapeHtml(item.answers || (item.kind === 'lead' ? '測驗或表單資料可在客戶資料卡查看。' : '沒有問卷內容')) + '</div>' +
         (item.kind === 'appointment' && crmMode === 'past' ? crmEditor(item) : '') +
@@ -864,6 +903,7 @@
         '<div class="card-top"><div><h2>' + escapeHtml(contact.name || '客戶資料卡') + '</h2><p>' + escapeHtml(contact.phone || '') + (contact.email ? ' ｜ ' + escapeHtml(contact.email) : '') + '</p></div><button class="secondary" onclick="detailDialog().close()">關閉</button></div>' +
         '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + statBox('Email 紀錄', summary.emailCount || 0) + statBox('點擊紀錄', summary.clickCount || 0) + '</div>' +
         '<div class="detail-section"><h3>基本資料</h3><p>狀態：' + escapeHtml(summary.lifecycleStage || contact.lifecycle_stage || '') + '｜專案：' + escapeHtml(summary.projectCode || contact.project_code || '') + '</p><p>最新測驗：' + escapeHtml(compactDate(summary.latestQuizAt)) + '｜最新預約：' + escapeHtml(compactDate(summary.latestAppointmentAt)) + '</p></div>' +
+        '<div class="detail-section"><h3>名單分類</h3><div class="row"><div class="col-8"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-4"><button onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存標籤</button></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
         '<div class="detail-section"><h3>測驗紀錄</h3>' + (latest ? '<p>版本：' + escapeHtml(latest.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(latest.submittedAt)) + '</p><div class="actions"><a target="_blank" href="' + escapeHtml(latest.reportUrl || '') + '">開啟報告連結</a></div>' + renderScoreItems(latest.scoreItems || []) : '<p class="mini">沒有測驗紀錄。</p>') + '</div>' +
         '<div class="detail-section"><h3>作答詳情</h3>' + renderAnswerRows(answers) + '</div>' +
         '<div class="detail-section"><h3>報告結果</h3>' + renderHistoryList(latest ? latest.matchedContent || [] : [], '沒有報告區間內容。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '｜' + escapeHtml(item.label || '') + '</strong><p>' + escapeHtml(item.title || '') + '</p><p>' + escapeHtml(item.body || '') + '</p></div>'; }) + '</div>' +
@@ -871,6 +911,22 @@
         '<div class="detail-section"><h3>Email 發送歷程</h3>' + renderHistoryList(res.emailHistory || [], '沒有 Email 紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.subject || '') + '</strong><p>' + escapeHtml(item.status || '') + '｜' + escapeHtml(item.triggerName || '') + '｜' + escapeHtml(compactDate(item.sentAt || item.scheduledAt || item.createdAt)) + '</p></div>'; }) + '</div>' +
         '<div class="detail-section"><h3>點擊歷程</h3>' + renderHistoryList(res.clickEvents || [], '沒有點擊紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>' +
         '<div class="detail-section"><h3>客戶歷程</h3>' + renderHistoryList(res.normalizedTimeline || [], '沒有歷程紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(item.category || '') + '｜' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>';
+    }
+    function saveClientLabels(contactId) {
+      if (!contactId) return;
+      const tags = splitCrmTags(field('crmDetailTags'));
+      const notes = field('crmDetailNotes');
+      api('saveCRMContactLabels', { contactId: contactId, tags: tags, notes: notes }).then(function (res) {
+        delete cache.crm;
+        return Promise.all([
+          api('getCRMContactDetail', { contactId: contactId }),
+          api('getConsultantAppointments', { projectCode: crmProject })
+        ]);
+      }).then(function (results) {
+        cache.crm = results[1];
+        renderCrm(cache.crm);
+        renderClientDetail(results[0]);
+      }).catch(function (err) { alert(err.message); });
     }
     function attendanceOptions(current) {
       const value = ['出席', '未出席'].includes(String(current || '')) ? current : '';
@@ -2504,5 +2560,4 @@
   </script>
 </body>
 </html>
-
 

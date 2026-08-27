@@ -308,6 +308,9 @@ begin
 end
 $$;
 
+alter table crm_contacts add column if not exists tags text[] not null default array[]::text[];
+alter table crm_contacts add column if not exists notes text default '';
+
 alter table projects add column if not exists default_quiz_version_code text not null default 'A';
 alter table quiz_score_dimensions add column if not exists display_max_score numeric(10,2);
 alter table quiz_score_dimensions add column if not exists display_score_format text not null default 'number';
@@ -711,3 +714,4 @@ select a.tenant_slug,
         and e.appointment_id = a.id
         and e.event_type in ('booking_created', 'booking_cancelled')
    );
+
