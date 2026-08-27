@@ -465,6 +465,7 @@
     let crmProject = 'ALL';
     let crmTagFilter = 'ALL';
     let crmSearch = '';
+    let crmSelectedContacts = {};
     let emailProject = 'ALL';
     let emailModule = 'booking';
     let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
@@ -786,7 +787,107 @@
           '</div>' +
           crmImportPanel(res) +
         '</div>' +
+        crmBatchPanel(rows) +
         '<div class="list">' + (rows.length ? rows.map(clientCard).join('') : '<div class="panel"><p>目前沒有資料。</p></div>') + '</div>';
+    }
+
+    function crmBatchPanel(rows) {
+      window.crmVisibleRows = rows || [];
+      const selectable = window.crmVisibleRows.filter(function (row) { return row.crmContactId; });
+      const selectedIds = Object.keys(crmSelectedContacts).filter(function (id) { return crmSelectedContacts[id]; });
+      const statusOptions = [
+        ['', '不變更狀態'],
+        ['lead', '一般名單'],
+        ['quiz_completed', '測驗完成'],
+        ['unbooked', '未預約'],
+        ['booked', '已預約'],
+        ['waitlist', '等候名單'],
+        ['rejected', '已婉拒'],
+        ['cancelled', '已取消'],
+        ['completed', '已完成']
+      ].map(function (item) { return '<option value="' + item[0] + '">' + item[1] + '</option>'; }).join('');
+      return '<div class="panel"><div class="row">' +
+        '<div class="col-2"><button class="secondary" onclick="selectVisibleCrmContacts(true)">全選目前結果</button></div>' +
+        '<div class="col-2"><button class="secondary" onclick="selectVisibleCrmContacts(false)">清除選取</button></div>' +
+        '<div class="col-3"><label>批次新增標籤</label><input id="crmBatchTags" placeholder="例如：高意願, 待追蹤"></div>' +
+        '<div class="col-3"><label>批次狀態</label><select id="crmBatchStatus">' + statusOptions + '</select></div>' +
+        '<div class="col-2"><button onclick="batchUpdateCrmContacts()">批次更新</button></div>' +
+        '<div class="col-12"><button class="secondary" onclick="exportCrmRows()">匯出目前結果 CSV</button><p class="mini">目前結果 ' + selectable.length + ' 筆，可更新 ' + selectedIds.length + ' 筆已選名單。</p></div>' +
+      '</div></div>';
+    }
+
+    function crmSelectionCheckbox(item) {
+      if (!item.crmContactId) return '';
+      const id = String(item.crmContactId);
+      return '<label class="checkline" style="margin:0 10px 0 0;"><input type="checkbox" ' + (crmSelectedContacts[id] ? ' checked' : '') + ' onchange="toggleCrmContactSelection(' + Number(item.crmContactId) + ', this.checked)">選取</label>';
+    }
+
+    function toggleCrmContactSelection(contactId, checked) {
+      if (!contactId) return;
+      if (checked) crmSelectedContacts[String(contactId)] = true;
+      else delete crmSelectedContacts[String(contactId)];
+      renderCrm(cache.crm);
+    }
+
+    function selectVisibleCrmContacts(checked) {
+      (window.crmVisibleRows || []).forEach(function (row) {
+        if (!row.crmContactId) return;
+        if (checked) crmSelectedContacts[String(row.crmContactId)] = true;
+        else delete crmSelectedContacts[String(row.crmContactId)];
+      });
+      renderCrm(cache.crm);
+    }
+
+    function crmStatusLabel(value) {
+      const labels = {
+        lead: '一般名單',
+        quiz_completed: '測驗完成',
+        unbooked: '未預約',
+        booked: '已預約',
+        waitlist: '等候名單',
+        rejected: '已婉拒',
+        cancelled: '已取消',
+        completed: '已完成'
+      };
+      return labels[String(value || '').toLowerCase()] || value || '';
+    }
+
+    function batchUpdateCrmContacts() {
+      const ids = Object.keys(crmSelectedContacts).filter(function (id) { return crmSelectedContacts[id]; }).map(Number);
+      if (!ids.length) { alert('請先選擇名單。'); return; }
+      const tags = splitCrmTags(field('crmBatchTags'));
+      const lifecycleStage = field('crmBatchStatus');
+      if (!tags.length && !lifecycleStage) { alert('請輸入標籤或選擇狀態。'); return; }
+      api('batchUpdateCRMContacts', { contactIds: ids, addTags: tags, lifecycleStage: lifecycleStage }).then(function (res) {
+        alert('批次更新完成：' + (res.summary?.updated || 0) + ' 筆');
+        crmSelectedContacts = {};
+        delete cache.crm;
+        loadCrm();
+      }).catch(function (err) { alert(err.message); });
+    }
+
+    function csvEscape(value) {
+      const text = String(value || '');
+      return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    }
+
+    function exportCrmRows() {
+      const rows = window.crmVisibleRows || [];
+      if (!rows.length) { alert('目前沒有可匯出的結果。'); return; }
+      const header = ['姓名', 'Email', '電話', '專案', '狀態', '標籤', '備註'];
+      const body = rows.map(function (row) {
+        return [row.clientName, row.clientEmail, row.clientPhone, row.projectName || row.projectCode, crmStatusLabel(row.lifecycleStage || row.status), (row.tags || []).join(';'), row.contactNotes || row.answers || ''].map(csvEscape).join(',');
+      });
+      const newline = String.fromCharCode(10);
+      const blob = new Blob(['\ufeff' + header.join(',') + newline + body.join(newline)], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'crm-export-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     }
 
     function crmImportPanel(res) {
@@ -925,7 +1026,7 @@
       const rescheduleBadge = String(item.status || '').includes('已發送改期')
         ? '<span class="badge" style="color:#b06000;background:rgba(246,177,0,.16);">已發送改期邀請</span>'
         : '';
-      const kindBadge = item.kind === 'lead' ? '<span class="badge">未預約</span>' : '';
+      const kindBadge = (item.kind === 'lead' || item.kind === 'contact') ? '<span class="badge">未預約</span>' : '';
       const actionButtons = item.kind === 'appointment' && isUpcoming
         ? '<button class="danger" onclick="cancelAppointment(' + item.rowId + ')">取消會議</button>' +
           '<button class="yellow" onclick="openAdminReschedule(' + item.rowId + ',&quot;' + escapeHtml(item.projectCode || '') + '&quot;)">改期</button>' +
@@ -936,7 +1037,7 @@
           : '');
       return '<div class="' + cls + '">' +
         '<div class="card-top">' +
-          '<div><h3>' + escapeHtml(item.meetTime || (item.kind === 'lead' ? '尚未預約' : '未指定時間')) + '</h3><div><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> ' + kindBadge + ' ' + consultantBadge + ' ' + rescheduleBadge + '</div></div>' +
+          '<div>' + crmSelectionCheckbox(item) + '<h3>' + escapeHtml(item.meetTime || ((item.kind === 'lead' || item.kind === 'contact') ? '尚未預約' : '未指定時間')) + '</h3><div><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> ' + kindBadge + ' ' + consultantBadge + ' ' + rescheduleBadge + '</div></div>' +
           '<span class="badge">' + escapeHtml(item.projectName || item.projectCode || '') + '</span>' +
         '</div>' +
         '<p>' + escapeHtml(item.clientPhone || '') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p>' +
@@ -2658,4 +2759,3 @@
   </script>
 </body>
 </html>
-
