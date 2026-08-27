@@ -49,6 +49,15 @@
       justify-content: space-between;
       gap: 16px;
     }
+    body.admin-ready header {
+      max-width: none;
+      margin: 0;
+      border-width: 0 0 1px;
+      border-radius: 0;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
     h1, h2, h3 { margin: 0; line-height: 1.25; }
     h1 { font-size: 22px; }
     h2 { font-size: 20px; color: var(--blue); margin-bottom: 14px; }
@@ -56,6 +65,40 @@
     p { color: var(--muted); line-height: 1.6; margin: 0 0 12px; }
     a { color: var(--blue); font-weight: 700; }
     main { max-width: 1120px; margin: 0 auto 36px; padding: 0 14px; }
+    main.app-shell {
+      max-width: none;
+      margin: 0;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    main.app-shell.sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
+    .sidebar {
+      position: sticky;
+      top: 86px;
+      min-height: calc(100vh - 104px);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 12px;
+    }
+    .sidebar-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 4px 12px; border-bottom:1px solid var(--line); margin-bottom:10px; }
+    .sidebar-title { font-weight:800; color:var(--ink); line-height:1.35; }
+    .sidebar-toggle { width:36px; height:36px; padding:0; flex:0 0 36px; }
+    .nav-group { margin:12px 0; }
+    .nav-group-title { color:var(--muted); font-size:12px; font-weight:800; letter-spacing:0; padding:0 8px 6px; }
+    .nav-items { display:grid; gap:6px; }
+    .workspace { min-width:0; }
+    main.sidebar-collapsed .sidebar { padding:10px; }
+    main.sidebar-collapsed .sidebar-title,
+    main.sidebar-collapsed .nav-group-title,
+    main.sidebar-collapsed .tab-label { display:none; }
+    main.sidebar-collapsed .sidebar-head { justify-content:center; padding:4px 0 10px; }
+    main.sidebar-collapsed .tab { justify-content:center; padding:10px 0; }
+    .tab-mark { width:28px; height:28px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; background:rgba(26,115,232,.12); color:var(--blue); font-weight:800; flex:0 0 28px; }
     label { display: block; font-weight: 700; margin-bottom: 7px; }
     input, textarea, select {
       width: 100%;
@@ -128,12 +171,23 @@
       gap: 10px;
       margin: 16px 0;
     }
+    .app-shell .tabs { display:block; margin:0; }
     .tab, .chip {
       width: auto;
       background: var(--panel);
       color: var(--ink);
       border: 1px solid var(--line);
       box-shadow: none;
+    }
+    .app-shell .tab {
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      gap:10px;
+      padding:10px;
+      text-align:left;
+      white-space:normal;
     }
     .tab.active, .chip.active {
       color: #fff;
@@ -414,8 +468,15 @@
     .dialog-body { padding: 20px; }
     @media (max-width: 780px) {
       header { margin: 10px; align-items: flex-start; flex-direction: column; }
+      body.admin-ready header { margin:0; }
       .owner-scope { margin: 0 10px 14px; }
       main { padding: 0 10px; }
+      main.app-shell, main.app-shell.sidebar-collapsed { grid-template-columns:1fr; padding:10px; }
+      .sidebar { position:static; min-height:0; }
+      .app-shell .tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+      main.sidebar-collapsed .sidebar-title, main.sidebar-collapsed .nav-group-title, main.sidebar-collapsed .tab-label { display:inline; }
+      main.sidebar-collapsed .sidebar-head { justify-content:space-between; padding:6px 4px 12px; }
+      main.sidebar-collapsed .tab { justify-content:flex-start; padding:10px; }
       .row { grid-template-columns: 1fr; }
       .row > * { grid-column: auto !important; }
       .stat-grid, .permission-grid, .crm-card-meta, .detail-contact-grid { grid-template-columns: 1fr 1fr; }
@@ -463,9 +524,15 @@
     </div>
   </section>
 
-  <main id="app" class="hidden">
-    <div class="tabs" id="tabs"></div>
-    <section id="view"></section>
+  <main id="app" class="hidden app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <div class="sidebar-title">後台功能</div>
+        <button class="secondary sidebar-toggle" title="收合側欄" onclick="toggleSidebar()">☰</button>
+      </div>
+      <div class="tabs" id="tabs"></div>
+    </aside>
+    <section class="workspace" id="view"></section>
   </main>
 
   <script>
@@ -488,6 +555,7 @@
     let crmSelectedContacts = {};
     let emailProject = 'ALL';
     let emailModule = 'booking';
+    let sidebarCollapsed = localStorage.getItem('dm_saas_sidebar_collapsed') === '1';
     let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
     let ownerScope = { tenants: [], projects: [] };
     let scheduleConsultants = [];
@@ -620,8 +688,10 @@
       if (loginWrap) loginWrap.remove();
       const authLoading = document.getElementById('authLoading');
       if (authLoading) authLoading.remove();
+      document.body.classList.add('admin-ready');
       document.getElementById('appHeader').classList.remove('hidden');
       document.getElementById('app').classList.remove('hidden');
+      applySidebarState();
       document.getElementById('userName').textContent = currentUser.name || 'DMtest';
       document.getElementById('tenantLabel').textContent = '使用者：' + tenantDisplayName + '｜權限：' + roleLabel(currentUser.role);
       renderTabs();
@@ -670,24 +740,44 @@
 
     function availableTabs() {
       return [
-        { id: 'crm', label: '客戶總覽 CRM', ok: true },
-        { id: 'schedule', label: '我的排班', ok: true },
-        { id: 'consultants', label: tenantDisplayName + '團隊顧問', ok: isAdmin() },
-        { id: 'projects', label: '專案管理', ok: can('PROJECTS') },
-        { id: 'questions', label: '表單管理', ok: can('FORMS') },
-        { id: 'quizEditor', label: '測驗設定', ok: can('FORMS') },
-        { id: 'reportEditor', label: '報告編輯器', ok: can('FORMS') },
-        { id: 'emails', label: '信件管理', ok: can('EMAILS') },
-        { id: 'analytics', label: '戰情數據', ok: can('ANALYTICS') },
-        { id: 'usage', label: '系統用量', ok: isSystemOwner() },
-        { id: 'users', label: '使用者管理', ok: isSystemOwner() }
+        { id: 'crm', group: '客戶管理', mark: '客', label: '客戶 CRM', ok: true },
+        { id: 'analytics', group: '客戶管理', mark: '數', label: '作答 / 戰情數據', ok: can('ANALYTICS') },
+        { id: 'schedule', group: '預約系統', mark: '排', label: '排班系統', ok: true },
+        { id: 'consultants', group: '預約系統', mark: '顧', label: '顧問管理', ok: isAdmin() },
+        { id: 'questions', group: '預約系統', mark: '表', label: '預約表單', ok: can('FORMS') },
+        { id: 'emails', group: '預約系統', mark: '信', label: '提醒 / 跟進信', ok: can('EMAILS') },
+        { id: 'quizEditor', group: '測驗系統', mark: '題', label: '題目與分數規則', ok: can('FORMS') },
+        { id: 'reportEditor', group: '測驗系統', mark: '報', label: '檢測報告編輯器', ok: can('FORMS') },
+        { id: 'projects', group: '系統設定', mark: '專', label: '專案管理', ok: can('PROJECTS') },
+        { id: 'usage', group: '系統設定', mark: '用', label: '系統用量', ok: isSystemOwner() },
+        { id: 'users', group: '系統設定', mark: '帳', label: '帳號 / 權限管理', ok: isSystemOwner() }
       ].filter(function (tab) { return tab.ok; });
     }
 
     function renderTabs() {
-      document.getElementById('tabs').innerHTML = availableTabs().map(function (tab) {
-        return '<button class="tab" data-view="' + tab.id + '" onclick="showView(&quot;' + tab.id + '&quot;)">' + escapeHtml(tab.label) + '</button>';
+      const groups = [];
+      availableTabs().forEach(function (tab) {
+        let group = groups.find(function (item) { return item.name === tab.group; });
+        if (!group) { group = { name: tab.group, tabs: [] }; groups.push(group); }
+        group.tabs.push(tab);
+      });
+      document.getElementById('tabs').innerHTML = groups.map(function (group) {
+        return '<div class="nav-group"><div class="nav-group-title">' + escapeHtml(group.name) + '</div><div class="nav-items">' +
+          group.tabs.map(function (tab) {
+            return '<button class="tab" title="' + escapeHtml(tab.label) + '" data-view="' + tab.id + '" onclick="showView(&quot;' + tab.id + '&quot;)"><span class="tab-mark">' + escapeHtml(tab.mark) + '</span><span class="tab-label">' + escapeHtml(tab.label) + '</span></button>';
+          }).join('') + '</div></div>';
       }).join('');
+    }
+
+    function applySidebarState() {
+      const app = document.getElementById('app');
+      if (app) app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+    }
+
+    function toggleSidebar() {
+      sidebarCollapsed = !sidebarCollapsed;
+      localStorage.setItem('dm_saas_sidebar_collapsed', sidebarCollapsed ? '1' : '0');
+      applySidebarState();
     }
 
     function showView(name) {
