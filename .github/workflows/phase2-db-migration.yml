@@ -1,6 +1,9 @@
 name: Phase 2 Database Migration
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       run_seed:
@@ -30,11 +33,12 @@ on:
 
 jobs:
   migrate:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-db-phase2]') }}
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
-      TEST_TENANT: ${{ inputs.test_tenant }}
-      TEST_PROJECT: ${{ inputs.test_project }}
+      TEST_TENANT: ${{ inputs.test_tenant || 'dm-test' }}
+      TEST_PROJECT: ${{ inputs.test_project || 'P01' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,9 +65,9 @@ jobs:
         run: npm run db:migrate:phase2
 
       - name: Run MVP demo seed
-        if: ${{ inputs.run_seed == 'true' }}
+        if: ${{ github.event_name == 'push' || inputs.run_seed == 'true' }}
         run: npm run db:seed:phase2
 
       - name: Run Phase 3 smoke test
-        if: ${{ inputs.run_smoke == 'true' }}
+        if: ${{ github.event_name == 'push' || inputs.run_smoke == 'true' }}
         run: npm run smoke:phase3
