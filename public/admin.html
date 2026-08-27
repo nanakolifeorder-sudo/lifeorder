@@ -464,6 +464,7 @@
     let crmMode = 'upcoming';
     let crmProject = 'ALL';
     let emailProject = 'ALL';
+    let emailModule = 'booking';
     let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
     let ownerScope = { tenants: [], projects: [] };
     let scheduleConsultants = [];
@@ -1916,11 +1917,13 @@
       const filterOptions = '<option value="ALL">所有專案</option>' + (res.projects || []).map(function (p) {
         return '<option value="' + escapeHtml(p.code) + '"' + (emailProject === p.code ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>';
       }).join('');
-      const triggerOrder = ['lead_created', 'booking_created', 'booking_rescheduled', 'reschedule_link', 'meeting_before', 'meeting_after', 'booking_cancelled'];
-      const allTriggers = triggerOrder.concat((res.templates || []).map(function (row) { return row.triggerName; }).filter(function (trigger, index, list) {
+      const visibleTemplates = (res.templates || []).filter(function (row) { return templateEmailModule(row) === emailModule; });
+      const visibleQueue = (res.queue || []).filter(function (item) { return queueEmailModule(item) === emailModule; });
+      const triggerOrder = emailTriggersForModule(emailModule).map(function (item) { return item[0]; });
+      const allTriggers = triggerOrder.concat(visibleTemplates.map(function (row) { return row.triggerName; }).filter(function (trigger, index, list) {
         return trigger && !triggerOrder.includes(trigger) && list.indexOf(trigger) === index;
       }));
-      const sortedTemplates = (res.templates || []).slice().sort(function (a, b) {
+      const sortedTemplates = visibleTemplates.slice().sort(function (a, b) {
         const triggerDiff = allTriggers.indexOf(a.triggerName) - allTriggers.indexOf(b.triggerName);
         if (triggerDiff) return triggerDiff;
         const timeDiff = Number(a.timeParam || 0) - Number(b.timeParam || 0);
@@ -1935,9 +1938,9 @@
       const leads = (res.leads || []).slice(0, 20).map(function (lead) {
         return '<tr><td>' + escapeHtml(lead.client_name) + '</td><td>' + escapeHtml(lead.client_email) + '</td><td>' + escapeHtml(lead.project_name) + '</td><td>' + escapeHtml(emailStatusLabel(lead.status)) + '</td></tr>';
       }).join('');
-      const queue = (res.queue || []).slice(0, 20).map(function (item) {
+      const queue = visibleQueue.slice(0, 20).map(function (item) {
         const retry = Number(item.retry_count || 0) ? '（已重試 ' + Number(item.retry_count || 0) + '/' + Number(item.max_attempts || 3) + '）' : '';
-        return '<tr><td>' + escapeHtml(item.client_email) + '</td><td>' + escapeHtml(item.subject) + '</td><td>' + escapeHtml(emailStatusLabel(item.status) + retry) + '</td><td>' + escapeHtml(item.error_message || '') + '</td></tr>';
+        return '<tr><td>' + escapeHtml(item.client_email) + '</td><td>' + escapeHtml(emailTriggerLabel(item.trigger_name)) + '</td><td>' + escapeHtml(item.subject) + '</td><td>' + escapeHtml(emailStatusLabel(item.status) + retry) + '</td><td>' + escapeHtml(item.error_message || '') + '</td></tr>';
       }).join('');
       const alerts = (res.alerts || []).slice(0, 20).map(function (item) {
         return '<tr><td>' + escapeHtml(item.level || '') + '</td><td>' + escapeHtml(item.title || '') + '</td><td>' + escapeHtml(item.message || '') + '</td></tr>';
@@ -1946,14 +1949,65 @@
         return '<tr><td>' + escapeHtml(item.client_email || '') + '</td><td>' + escapeHtml(emailStatusLabel(item.reason || 'unsubscribe')) + '</td><td>' + escapeHtml(item.source || '') + '</td></tr>';
       }).join('');
       document.getElementById('view').innerHTML =
-        '<div class="panel"><div class="row"><div class="col-5"><h2>信件管理</h2></div><div class="col-4"><label>目前專案</label><select onchange="loadEmailsByProject(this.value)">' + filterOptions + '</select></div><div class="col-3"><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div><div class="list" style="margin-top:16px;">' +
-        '<h3>新增信件範本</h3>' + emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, status: 'active', triggerName: 'lead_created', timeParam: 0, stopWhenBooked: true }, projectOptions) +
+        '<div class="panel"><div class="row"><div class="col-5"><h2>' + escapeHtml(emailModuleTitle(emailModule)) + '</h2><p class="mini">' + escapeHtml(emailModuleHelp(emailModule)) + '</p></div><div class="col-4"><label>目前專案</label><select onchange="loadEmailsByProject(this.value)">' + filterOptions + '</select></div><div class="col-3"><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div>' +
+        '<div class="subtabs">' + emailModuleChip('booking', '預約提醒信') + emailModuleChip('quiz', '測驗跟進信') + '</div><div class="list" style="margin-top:16px;">' +
+        '<h3>新增信件範本</h3>' + emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, module: emailModule, status: 'active', triggerName: defaultEmailTrigger(emailModule), timeParam: emailModule === 'quiz' ? 24 : 0, stopWhenBooked: true }, projectOptions) +
         '<h3 style="margin-top:20px;">已建立的自動信件</h3>' + groupedTemplates + '</div></div>' +
         '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
-        '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>' +
+        '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>觸發</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信告警</h2><table><thead><tr><th>等級</th><th>標題</th><th>內容</th></tr></thead><tbody>' + alerts + '</tbody></table></div>' +
         '<div class="panel"><h2>退訂與拒收名單</h2><table><thead><tr><th>Email</th><th>原因</th><th>來源</th></tr></thead><tbody>' + suppressions + '</tbody></table></div>';
-      initializeEmailEditors(res.templates || []);
+      initializeEmailEditors(visibleTemplates);
+    }
+
+    function emailModuleTitle(moduleName) {
+      return moduleName === 'quiz' ? '跟進信管理' : '提醒信管理';
+    }
+
+    function emailModuleHelp(moduleName) {
+      if (moduleName === 'quiz') return '測驗完成、測驗完成但未預約與後續跟進信；客戶預約後會停止未預約跟進。';
+      return '預約成功、改期、取消、會議前提醒與會議後跟進信。';
+    }
+
+    function emailModuleChip(moduleName, label) {
+      return '<button class="chip' + (emailModule === moduleName ? ' active' : '') + '" onclick="emailModule=&quot;' + moduleName + '&quot;; loadEmails();">' + escapeHtml(label) + '</button>';
+    }
+
+    function templateEmailModule(row) {
+      return row.module || (String(row.triggerName || '').startsWith('quiz_') ? 'quiz' : 'booking');
+    }
+
+    function queueEmailModule(row) {
+      return row.module || (String(row.trigger_name || '').startsWith('quiz_') ? 'quiz' : 'booking');
+    }
+
+    function emailTriggersForModule(moduleName) {
+      if (moduleName === 'quiz') {
+        return [
+          ['quiz_completed', '測驗完成'],
+          ['quiz_completed_unbooked', '測驗完成但未預約'],
+          ['quiz_followup', '測驗跟進']
+        ];
+      }
+      return [
+        ['lead_created', '名單建立'],
+        ['booking_created', '預約成功'],
+        ['booking_rescheduled', '預約改期'],
+        ['reschedule_link', '發送自選改期連結'],
+        ['meeting_before', '會議前提醒'],
+        ['meeting_after', '會議後跟進'],
+        ['booking_cancelled', '取消預約']
+      ];
+    }
+
+    function defaultEmailTrigger(moduleName) {
+      return moduleName === 'quiz' ? 'quiz_completed_unbooked' : 'lead_created';
+    }
+
+    function emailTriggerOptions(current, moduleName) {
+      return emailTriggersForModule(moduleName).map(function (item) {
+        return triggerOption(item[0], item[1], current);
+      }).join('');
     }
 
     function emailTriggerLabel(trigger) {
@@ -1964,7 +2018,10 @@
         reschedule_link: '自選改期連結',
         meeting_before: '會議前提醒',
         meeting_after: '會議後跟進',
-        booking_cancelled: '取消預約後'
+        booking_cancelled: '取消預約後',
+        quiz_completed: '測驗完成後',
+        quiz_completed_unbooked: '測驗完成但未預約',
+        quiz_followup: '測驗跟進'
       };
       return labels[trigger] || trigger || '其他信件';
     }
@@ -1990,20 +2047,13 @@
 
     function emailTemplateForm(row, projectOptions) {
       const isNew = !row.rowId;
-      return '<details class="item email-row" data-id="' + (row.rowId || 'new') + '"' + (isNew ? ' open' : '') + '>' +
+      const moduleName = templateEmailModule(row);
+      return '<details class="item email-row" data-id="' + (row.rowId || 'new') + '" data-module="' + escapeHtml(moduleName) + '"' + (isNew ? ' open' : '') + '>' +
         '<summary><span>' + escapeHtml(row.name || '新增信件') + '</span><span>' + escapeHtml(emailTriggerLabel(row.triggerName)) + '</span><span>' + Number(row.timeParam || 0) + ' 小時</span></summary>' +
         '<div class="details-body"><div class="row">' +
           '<div class="col-2"><label>專案</label><select class="e-project">' + projectOptions.replace('value="' + row.projectCode + '"', 'value="' + row.projectCode + '" selected') + '</select></div>' +
           '<div class="col-3"><label>信件名稱</label><input class="e-name" value="' + escapeHtml(row.name || '') + '"></div>' +
-          '<div class="col-2"><label>觸發</label><select class="e-trigger">' +
-            triggerOption('lead_created', '名單建立', row.triggerName) +
-          triggerOption('booking_created', '預約成功', row.triggerName) +
-            triggerOption('booking_rescheduled', '預約改期', row.triggerName) +
-            triggerOption('reschedule_link', '發送自選改期連結', row.triggerName) +
-            triggerOption('meeting_before', '會議前提醒', row.triggerName) +
-            triggerOption('meeting_after', '會議後跟進', row.triggerName) +
-            triggerOption('booking_cancelled', '取消預約', row.triggerName) +
-          '</select></div>' +
+          '<div class="col-2"><label>觸發</label><select class="e-trigger">' + emailTriggerOptions(row.triggerName, moduleName) + '</select></div>' +
           '<div class="col-2"><label>小時</label><input class="e-time" type="number" value="' + escapeHtml(row.timeParam || 0) + '"></div>' +
           '<div class="col-3"><label>寄件名稱</label><input class="e-sender" value="' + escapeHtml(row.senderName || tenantDisplayName) + '"></div>' +
           '<div class="col-5"><label>主旨</label><input class="e-subject" value="' + escapeHtml(row.subject || '') + '"></div>' +
@@ -2021,15 +2071,7 @@
               '<input class="e-image-input hidden" type="file" accept="image/png,image/jpeg,image/webp" onchange="insertEmailImage(this)">' +
             '</div>' +
             '<div class="variable-bar"><span class="mini">插入變數：</span>' +
-              variableButton('客戶姓名', '{{name}}') +
-              variableButton('Email', '{{email}}') +
-              variableButton('電話', '{{phone}}') +
-              variableButton('專案名稱', '{{project}}') +
-              variableButton('預約時間', '{{time}}') +
-              variableButton('會議連結', '{{meetLink}}') +
-              variableButton('顧問姓名', '{{consultant}}') +
-              variableButton('改期專屬連結', '{{rescheduleLink}}') +
-              variableButton('退訂連結', '{{unsubscribeLink}}') +
+              emailVariableButtons(moduleName) +
             '</div>' +
             '<div class="e-body rich-editor" contenteditable="true" role="textbox" aria-multiline="true" onkeyup="rememberEmailSelection(this)" onmouseup="rememberEmailSelection(this)" onfocus="rememberEmailSelection(this)"></div>' +
           '</div>' +
@@ -2044,6 +2086,28 @@
 
     function variableButton(label, value) {
       return '<button title="插入 ' + escapeHtml(label) + '" onmousedown="event.preventDefault();insertEmailVariable(this,&quot;' + escapeHtml(value) + '&quot;)">' + escapeHtml(label) + '</button>';
+    }
+
+    function emailVariableButtons(moduleName) {
+      const shared = [
+        ['客戶姓名', '{{name}}'],
+        ['Email', '{{email}}'],
+        ['電話', '{{phone}}'],
+        ['專案名稱', '{{project}}']
+      ];
+      const booking = [
+        ['預約時間', '{{time}}'],
+        ['會議連結', '{{meetLink}}'],
+        ['顧問姓名', '{{consultant}}'],
+        ['改期專屬連結', '{{rescheduleLink}}']
+      ];
+      const quiz = [
+        ['檢測報告連結', '{{quizResultUrl}}']
+      ];
+      const tail = [['退訂連結', '{{unsubscribeLink}}']];
+      return shared.concat(moduleName === 'quiz' ? quiz : booking, tail).map(function (item) {
+        return variableButton(item[0], item[1]);
+      }).join('');
     }
 
     function safeEditorHtml(value) {
@@ -2195,7 +2259,8 @@
         subject: row.querySelector('.e-subject').value,
         body: row.querySelector('.e-body').innerHTML,
         status: row.querySelector('.e-status').value,
-        stopWhenBooked: row.querySelector('.e-stop').value !== 'false'
+        stopWhenBooked: row.querySelector('.e-stop').value !== 'false',
+        module: row.dataset.module || emailModule
       }).then(function () {
         alert('已儲存');
         loadEmails();
@@ -2439,7 +2504,5 @@
   </script>
 </body>
 </html>
-
-
 
 
