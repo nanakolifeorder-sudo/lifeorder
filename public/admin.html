@@ -723,7 +723,7 @@
     function appointmentBucket(item) {
       const status = String(item.status || '').toLowerCase();
       if (item.kind === 'waitlist') return 'waitlist';
-      if (item.kind === 'lead') return 'unbooked';
+      if (item.kind === 'lead' || item.kind === 'contact') return 'unbooked';
       if (item.kind === 'rejected' || status.includes('取消') || status.includes('婉拒') || status.includes('cancel')) return 'cancelled';
       if (item.kind === 'appointment' && item.timeObj && item.timeObj < Date.now()) return 'past';
       return 'upcoming';
@@ -748,7 +748,7 @@
 
     function renderCrm(res) {
       window.crmCardItems = {};
-      const all = [].concat(res.data || [], res.leads || [], res.rejected || [], res.waitlist || []);
+      const all = [].concat(res.data || [], res.leads || [], res.contacts || [], res.rejected || [], res.waitlist || []);
       const counts = all.reduce(function (acc, item) {
         acc[appointmentBucket(item)] += 1;
         return acc;
@@ -784,10 +784,108 @@
             statusChip('cancelled', '取消與婉拒', counts.cancelled) +
             statusChip('waitlist', '等候名單', counts.waitlist) +
           '</div>' +
+          crmImportPanel(res) +
         '</div>' +
         '<div class="list">' + (rows.length ? rows.map(clientCard).join('') : '<div class="panel"><p>目前沒有資料。</p></div>') + '</div>';
     }
 
+    function crmImportPanel(res) {
+      const projectOptions = (res.allProjects || []).map(function (p) {
+        return '<option value="' + escapeHtml(p.code) + '"' + ((crmProject !== 'ALL' && crmProject === p.code) ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>';
+      }).join('');
+      return '<details class="item" style="margin-top:14px;"><summary><span>匯入 CRM 名單</span><span>CSV / TSV / 試算表貼上</span></summary>' +
+        '<div class="details-body"><div class="row">' +
+          '<div class="col-4"><label>預設專案</label><select id="crmImportProject">' + projectOptions + '</select></div>' +
+          '<div class="col-4"><label>選擇檔案</label><input id="crmImportFile" type="file" accept=".csv,.tsv,.txt" onchange="loadCrmImportFile(this)"></div>' +
+          '<div class="col-4"><button onclick="importCrmContacts()">匯入名單</button></div>' +
+          '<div class="col-12"><label>貼上資料</label><textarea id="crmImportText" placeholder="姓名,Email,電話,來源,標籤,備註&#10;王小明,test@example.com,0900000000,Google表單,980診斷;高意願,第一次匯入"></textarea><p class="mini">支援欄位：姓名、Email、電話、來源、標籤、備註、專案代碼。標籤可用分號或逗號分隔。</p></div>' +
+          '<div class="col-12"><p id="crmImportResult" class="mini"></p></div>' +
+        '</div></div></details>';
+    }
+
+    function parseDelimitedRows(text) {
+      const source = String(text || '').replace(/^\ufeff/, '').trim();
+      if (!source) return [];
+      const delimiter = source.includes('\t') ? '\t' : ',';
+      const rows = [];
+      let row = [];
+      let cell = '';
+      let quoted = false;
+      for (let i = 0; i < source.length; i += 1) {
+        const ch = source[i];
+        const next = source[i + 1];
+        if (ch === '"') {
+          if (quoted && next === '"') { cell += '"'; i += 1; }
+          else quoted = !quoted;
+        } else if (ch === delimiter && !quoted) {
+          row.push(cell.trim()); cell = '';
+        } else if ((ch === '\n' || ch === '\r') && !quoted) {
+          if (ch === '\r' && next === '\n') i += 1;
+          row.push(cell.trim());
+          if (row.some(Boolean)) rows.push(row);
+          row = []; cell = '';
+        } else {
+          cell += ch;
+        }
+      }
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      return rows;
+    }
+
+    function crmImportCell(row, headers, names) {
+      for (const name of names) {
+        const index = headers.findIndex(function (header) { return header.toLowerCase() === String(name).toLowerCase(); });
+        if (index >= 0) return row[index] || '';
+      }
+      return '';
+    }
+
+    function parseCrmImportText(text) {
+      const rows = parseDelimitedRows(text);
+      if (rows.length < 2) return [];
+      const headers = rows[0].map(function (header) { return String(header || '').trim(); });
+      return rows.slice(1).map(function (row) {
+        return {
+          name: crmImportCell(row, headers, ['姓名', 'name', 'clientName', '客戶姓名']),
+          email: crmImportCell(row, headers, ['Email', 'email', '電子郵件', '信箱']),
+          phone: crmImportCell(row, headers, ['電話', 'phone', 'clientPhone', '手機']),
+          source: crmImportCell(row, headers, ['來源', 'source']),
+          tags: splitCrmTags(crmImportCell(row, headers, ['標籤', 'tags', 'tag']).replace(/[;；]/g, ',')),
+          notes: crmImportCell(row, headers, ['備註', 'notes', 'note']),
+          projectCode: crmImportCell(row, headers, ['專案代碼', 'projectCode', 'project', '專案'])
+        };
+      }).filter(function (row) { return row.email; });
+    }
+
+    function loadCrmImportFile(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () { document.getElementById('crmImportText').value = reader.result || ''; };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    function importCrmContacts() {
+      const rows = parseCrmImportText(field('crmImportText'));
+      const target = document.getElementById('crmImportResult');
+      if (!rows.length) {
+        target.textContent = '沒有可匯入資料，請確認第一列是欄位名稱且包含 Email。';
+        return;
+      }
+      target.textContent = '匯入中...';
+      api('importCRMContacts', { projectCode: field('crmImportProject'), rows: rows }).then(function (res) {
+        const summary = res.summary || {};
+        target.textContent = '匯入完成：成功 ' + (summary.imported || 0) + ' 筆，略過 ' + (summary.skipped || 0) + ' 筆。' + ((summary.errors || []).length ? ' ' + summary.errors.slice(0, 3).join('；') : '');
+        delete cache.crm;
+        return api('getConsultantAppointments', { projectCode: crmProject });
+      }).then(function (res) {
+        cache.crm = res;
+        renderCrm(res);
+      }).catch(function (err) {
+        target.textContent = err.message || String(err);
+      });
+    }
     function crmMatchesFilters(item) {
       const tags = Array.isArray(item.tags) ? item.tags : [];
       if (crmTagFilter !== 'ALL' && !tags.includes(crmTagFilter)) return false;
