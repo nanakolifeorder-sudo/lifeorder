@@ -1528,6 +1528,14 @@
       return types.map(function (item) { return '<option value="' + item[0] + '"' + (current === item[0] ? ' selected' : '') + '>' + item[1] + '</option>'; }).join('');
     }
 
+    function reportAppendFields(content) {
+      const selected = Array.isArray(content.appendFields) ? content.appendFields : ['tenant', 'p', 'qrid'];
+      const options = [['tenant', 'tenant'], ['p', '專案 p'], ['qrid', '測驗 qrid'], ['name', '姓名'], ['email', 'Email']];
+      return '<div class="col-12"><label>附加參數</label><div class="project-checks">' + options.map(function (item) {
+        return '<label class="checkline"><input class="rb-param" type="checkbox" value="' + item[0] + '"' + (selected.includes(item[0]) ? ' checked' : '') + '> ' + item[1] + '</label>';
+      }).join('') + '</div><p class="mini">只有開啟「附加資料參數」時會加到網址後面。name / email 會把客戶資料帶到外部頁，需確認外部頁用途。</p></div>';
+    }
+
     function reportBlockContentFields(block) {
       const content = block.content || {};
       const type = block.blockType || 'text';
@@ -1537,8 +1545,8 @@
       if (type === 'image') return '<div class="col-8"><label>圖片網址</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '"></div><div class="col-4"><label>替代文字</label><input class="rb-alt" value="' + escapeHtml(content.alt || '') + '"></div>';
       if (type === 'score_chart') return '<div class="col-6"><label>圖表類型</label><select class="rb-chart"><option value="radar"' + (content.chartType !== 'bar' ? ' selected' : '') + '>雷達圖</option><option value="bar"' + (content.chartType === 'bar' ? ' selected' : '') + '>長條圖</option></select></div>';
       if (type === 'score_table') return '<div class="col-12"><p class="mini">分數表會依目前測驗面向自動產生。</p></div>';
-      if (type === 'button' || type === 'link') return '<div class="col-4"><label>文字</label><input class="rb-label" value="' + escapeHtml(content.label || block.title || '') + '"></div><div class="col-8"><label>網址</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '"></div>';
-      if (type === 'booking_cta') return '<div class="col-6"><label>按鈕文字</label><input class="rb-label" value="' + escapeHtml(content.label || '預約一對一諮詢') + '"></div>';
+      if (type === 'button' || type === 'link') return '<div class="col-4"><label>文字</label><input class="rb-label" value="' + escapeHtml(content.label || block.title || '') + '"></div><div class="col-5"><label>網址</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '"></div><div class="col-3"><label>附加資料參數</label><select class="rb-append"><option value="false"' + (content.appendParams ? '' : ' selected') + '>否</option><option value="true"' + (content.appendParams ? ' selected' : '') + '>是</option></select></div>' + reportAppendFields(content);
+      if (type === 'booking_cta') return '<div class="col-3"><label>按鈕文字</label><input class="rb-label" value="' + escapeHtml(content.label || '預約一對一諮詢') + '"></div><div class="col-3"><label>連結模式</label><select class="rb-url-mode"><option value="system"' + (content.urlMode === 'custom' ? '' : ' selected') + '>系統預約頁</option><option value="custom"' + (content.urlMode === 'custom' ? ' selected' : '') + '>自訂網址</option></select></div><div class="col-4"><label>自訂 CTA URL</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '" placeholder="https://..."></div><div class="col-2"><label>附加資料參數</label><select class="rb-append"><option value="false"' + (content.appendParams ? '' : ' selected') + '>否</option><option value="true"' + (content.appendParams ? ' selected' : '') + '>是</option></select></div>' + reportAppendFields(content);
       return '<div class="col-12"><p class="mini">此區塊會依分數區間自動顯示後台設定內容。</p></div>';
     }
 
@@ -1614,8 +1622,19 @@
       if (type === 'list') content.items = (row.querySelector('.rb-items')?.value || '').replace(/\r/g, '').split('\n').map(function (item) { return item.trim(); }).filter(Boolean);
       if (type === 'image') { content.url = row.querySelector('.rb-url')?.value || ''; content.alt = row.querySelector('.rb-alt')?.value || ''; }
       if (type === 'score_chart') content.chartType = row.querySelector('.rb-chart')?.value || 'radar';
-      if (type === 'button' || type === 'link') { content.label = row.querySelector('.rb-label')?.value || ''; content.url = row.querySelector('.rb-url')?.value || ''; }
-      if (type === 'booking_cta') content.label = row.querySelector('.rb-label')?.value || '預約一對一諮詢';
+      if (type === 'button' || type === 'link') {
+        content.label = row.querySelector('.rb-label')?.value || '';
+        content.url = row.querySelector('.rb-url')?.value || '';
+        content.appendParams = row.querySelector('.rb-append')?.value === 'true';
+        content.appendFields = Array.from(row.querySelectorAll('.rb-param:checked')).map(function (input) { return input.value; });
+      }
+      if (type === 'booking_cta') {
+        content.label = row.querySelector('.rb-label')?.value || '預約一對一諮詢';
+        content.urlMode = row.querySelector('.rb-url-mode')?.value || 'system';
+        content.url = row.querySelector('.rb-url')?.value || '';
+        content.appendParams = row.querySelector('.rb-append')?.value === 'true';
+        content.appendFields = Array.from(row.querySelectorAll('.rb-param:checked')).map(function (input) { return input.value; });
+      }
       return {
         blockKey: row.dataset.key,
         blockType: type,
@@ -1659,8 +1678,8 @@
         if (block.blockType === 'image') return c.url ? '<img class="report-image" src="' + escapeHtml(c.url) + '" alt="' + escapeHtml(c.alt || '') + '">' : '<p class="mini">圖片區塊尚未設定網址</p>';
         if (block.blockType === 'score_chart') return '<h3>' + escapeHtml(block.title || '多面向分數圖') + '</h3>' + previewRadar();
         if (block.blockType === 'score_table') return '<h3>分數表</h3><table><tbody><tr><td>需求清晰度</td><td>7 / 10</td></tr><tr><td>預約急迫度</td><td>6 / 10</td></tr><tr><td>執行準備度</td><td>8 / 10</td></tr></tbody></table>';
-        if (block.blockType === 'button' || block.blockType === 'link') return '<p><a class="button secondary">' + escapeHtml(c.label || block.title || '了解更多') + '</a></p>';
-        if (block.blockType === 'booking_cta') return '<p><a class="preview-cta">' + escapeHtml(c.label || payload.settings.bookingCtaLabel || '預約一對一諮詢') + '</a></p>';
+        if (block.blockType === 'button' || block.blockType === 'link') return '<p><a class="button secondary">' + escapeHtml(c.label || block.title || '了解更多') + '</a></p><p class="mini">' + escapeHtml(c.url || '') + (c.appendParams ? '｜會附加追蹤參數' : '') + '</p>';
+        if (block.blockType === 'booking_cta') return '<p><a class="preview-cta">' + escapeHtml(c.label || payload.settings.bookingCtaLabel || '預約一對一諮詢') + '</a></p><p class="mini">' + (c.urlMode === 'custom' ? escapeHtml(c.url || '尚未設定自訂網址') : '系統預約頁') + (c.appendParams ? '｜會附加追蹤參數' : '') + '</p>';
         return '<p class="mini">分數區間內容會依作答結果自動顯示。</p>';
       }).join('');
       target.innerHTML = '<div class="preview-card"><h1>' + escapeHtml(payload.settings.title || '你的檢測報告') + '</h1><p>' + escapeHtml(payload.settings.subtitle || '') + '</p></div><div class="preview-card"><div class="preview-grid"><div class="preview-score"><strong>需求清晰度</strong><p>7 / 10</p></div><div class="preview-score"><strong>預約急迫度</strong><p>6 / 10</p></div></div></div><div class="preview-card">' + blockHtml + '</div>';

@@ -87,9 +87,50 @@
       }).then(function (res) { return res.json(); });
     }
 
-    function bookingUrl(labelOnly) {
-      const url = '/booking?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '&qrid=' + encodeURIComponent(qrid);
-      return labelOnly ? url : url;
+    function bookingUrl() {
+      return '/booking?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '&qrid=' + encodeURIComponent(qrid);
+    }
+
+    function appendReportParams(url, content) {
+      const fields = Array.isArray(content.appendFields) && content.appendFields.length
+        ? content.appendFields
+        : ['tenant', 'p', 'qrid'];
+      if (!content.appendParams) return url;
+      try {
+        const result = new URL(url, location.origin);
+        const report = window.__reportResult || {};
+        const values = {
+          tenant: tenant,
+          p: projectCode,
+          qrid: qrid,
+          name: report.clientName || '',
+          email: report.clientEmail || ''
+        };
+        fields.forEach(function (key) {
+          if (values[key]) result.searchParams.set(key, values[key]);
+        });
+        return result.pathname.startsWith('/') && result.origin === location.origin ? result.pathname + result.search + result.hash : result.href;
+      } catch (_error) {
+        return url;
+      }
+    }
+
+    function reportLinkAttrs(block, href, label) {
+      return ' href="' + escapeHtml(href || '#') + '" data-block-key="' + escapeHtml(block.blockKey || '') + '" data-block-type="' + escapeHtml(block.blockType || '') + '" data-link-label="' + escapeHtml(label || block.title || '') + '" onclick="return followReportLink(event,this)"';
+    }
+
+    function followReportLink(event, link) {
+      event.preventDefault();
+      const href = link.href;
+      api('trackReportClick', {
+        blockKey: link.dataset.blockKey || '',
+        blockType: link.dataset.blockType || 'link',
+        label: link.dataset.linkLabel || link.textContent || '',
+        targetUrl: href
+      }).catch(function () {}).finally(function () {
+        location.href = href;
+      });
+      return false;
     }
 
     function scoreItems(summary) {
@@ -185,8 +226,16 @@
         if (block.blockType === 'text') return '<p>' + escapeHtml(content.text || '').replace(/\n/g, '<br>') + '</p>';
         if (block.blockType === 'list') return '<ul>' + (content.items || []).map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>';
         if (block.blockType === 'image') return '<img class="report-image" src="' + escapeHtml(content.url || '') + '" alt="' + escapeHtml(content.alt || '') + '">';
-        if (block.blockType === 'button' || block.blockType === 'link') return '<p><a class="button secondary" href="' + escapeHtml(content.url || '#') + '">' + escapeHtml(content.label || block.title || '了解更多') + '</a></p>';
-        if (block.blockType === 'booking_cta') return '<p><a class="button" href="' + bookingUrl() + '">' + escapeHtml(content.label || '預約一對一諮詢') + '</a></p>';
+        if (block.blockType === 'button' || block.blockType === 'link') {
+          const label = content.label || block.title || '了解更多';
+          const href = appendReportParams(content.url || '#', content);
+          return '<p><a class="button secondary"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
+        }
+        if (block.blockType === 'booking_cta') {
+          const label = content.label || '預約一對一諮詢';
+          const href = content.urlMode === 'custom' && content.url ? appendReportParams(content.url, content) : bookingUrl();
+          return '<p><a class="button"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
+        }
         return '';
       }).join('');
     }
@@ -198,13 +247,14 @@
       }
       api('getQuizResult', {}).then(function (res) {
         if (!res.success) throw new Error(res.message || '找不到測驗結果。');
+        window.__reportResult = res;
         const snapshot = res.reportSnapshot || {};
         const settings = snapshot.result_settings || {};
         const summary = res.scoreSummary || snapshot.score_summary || {};
         document.getElementById('title').textContent = settings.title || '你的檢測報告';
         document.getElementById('subtitle').textContent = settings.subtitle || (res.clientName ? res.clientName + '，以下是你的檢測結果。' : '以下是你的檢測結果。');
         document.getElementById('meta').textContent = '版本 ' + (res.versionCode || '') + '｜' + new Date(res.submittedAt).toLocaleString('zh-TW', { hour12:false });
-        document.getElementById('topActions').innerHTML = '<a class="button" href="' + bookingUrl() + '">' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '</a><a class="button secondary" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '">重新檢測</a>';
+        document.getElementById('topActions').innerHTML = '<a class="button" href="' + bookingUrl() + '" data-block-key="top-booking" data-block-type="booking_cta" data-link-label="' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '" onclick="return followReportLink(event,this)">' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '</a><a class="button secondary" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '">重新檢測</a>';
         document.getElementById('topActions').classList.remove('hidden');
         window.__scoreSummary = summary;
         const reportBlocks = (snapshot.blocks || []).slice();
