@@ -1,22 +1,26 @@
 {
-    "name":  "dm-booking-saas",
-    "version":  "1.0.0",
-    "private":  true,
-    "description":  "Centralized multi-tenant booking system for Vercel.",
-    "scripts":  {
-                    "check":  "node --check api/index.js \u0026\u0026 node --check api/cron.js \u0026\u0026 node --check api/oauth-callback.js \u0026\u0026 node --check api/microsoft-oauth-callback.js \u0026\u0026 node --check lib/service.js \u0026\u0026 node --check lib/google.js \u0026\u0026 node --check lib/microsoft.js \u0026\u0026 node --check lib/http.js \u0026\u0026 node scripts/verify-static.js",
-                    "start":  "vercel dev",
-                    "check:static":  "node scripts/verify-static.js"
-                },
-    "dependencies":  {
-                         "bcryptjs":  "^2.4.3",
-                         "jsonwebtoken":  "^9.0.2",
-                         "pg":  "^8.12.0"
-                     },
-    "devDependencies":  {
-                            "vercel":  "^34.3.0"
-                        },
-    "engines":  {
-                    "node":  "\u003e=20"
-                }
+  "name": "dm-booking-saas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Centralized multi-tenant booking system for Vercel.",
+  "scripts": {
+    "check": "node --check api/index.js && node --check lib/service.js && node --check lib/quiz-crm.js && node --check scripts/run-sql-file.js && node --check scripts/phase3-smoke-test.js && node --check scripts/phase3-preflight.js && node scripts/verify-static.js",
+    "start": "vercel dev",
+    "check:static": "node scripts/verify-static.js",
+    "db:migrate:phase2": "node scripts/run-sql-file.js sql/integration-phase-2-quiz-crm-schema.sql",
+    "db:seed:phase2": "node scripts/run-sql-file.js sql/integration-phase-2-demo-seed.sql",
+    "smoke:phase3": "node scripts/phase3-smoke-test.js",
+    "preflight:phase3": "node scripts/phase3-preflight.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "vercel": "^34.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }

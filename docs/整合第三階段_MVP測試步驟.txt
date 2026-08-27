@@ -1,0 +1,221 @@
+整合第三階段：測驗前台 / 報告頁 MVP 測試步驟
+日期：2026-08-27
+
+一、目前可測範圍
+
+本階段可測的是第一條前台漏斗：
+1. 開啟測驗頁。
+2. 讀取 P01 / A 版本題目。
+3. 填寫姓名、Email、電話與測驗答案。
+4. 送出後寫入 CRM contact、lead、quiz response、answer details。
+5. 產生檢測報告頁。
+6. 報告頁顯示多面向分數與命中的分數區間內容。
+7. 點擊「預約一對一諮詢」回到現有 booking 流程。
+8. 預約完成後 appointment 回連 quiz_response_id。
+
+本階段還不是完整後台：
+- 尚未製作左側收合功能列。
+- 尚未製作測驗題目管理 UI。
+- 尚未製作報告區塊式編輯器 UI。
+- 尚未製作 CRM 客戶資料卡 UI。
+
+
+二、部署前必須先套 Supabase SQL
+
+請在 Supabase SQL Editor 依序執行：
+
+1. 主 schema / migration
+sql/integration-phase-2-quiz-crm-schema.sql
+
+2. MVP 示範資料
+sql/integration-phase-2-demo-seed.sql
+
+注意：
+- 第二支 seed 依賴第一支 migration 的新資料表。
+- seed 會針對所有 code = P01 的 projects 建立 A 版示範測驗。
+- seed 會把 projects.quiz_enabled 設為 true，default_quiz_version_code 設為 A。
+
+
+三、SQL 執行後應出現的核心資料
+
+可用以下查詢檢查：
+
+select * from quiz_versions where project_code = 'P01';
+select * from quiz_stages where project_code = 'P01' order by sort_order;
+select * from quiz_questions where project_code = 'P01' order by question_no;
+select * from quiz_score_dimensions where project_code = 'P01' order by sort_order;
+select * from quiz_score_ranges where project_code = 'P01' order by dimension_key, sort_order;
+select * from quiz_report_blocks where project_code = 'P01' order by sort_order;
+
+預期：
+- quiz_versions 至少有 A 版。
+- quiz_stages 有 2 個階段。
+- quiz_questions 有 4 題。
+- quiz_score_dimensions 有 2 個面向。
+- quiz_score_ranges 每個面向有 low / high 兩個區間。
+- quiz_report_blocks 有 intro 與 booking CTA。
+
+
+四、部署後可開的連結
+
+測驗頁：
+/quiz?tenant=dm-test&p=P01
+
+報告頁會在送出測驗後自動跳轉，格式如下：
+/report?tenant=dm-test&p=P01&qrid=測驗結果UUID
+
+報告頁預約 CTA 會導到：
+/booking?tenant=dm-test&p=P01&qrid=測驗結果UUID
+
+注意：
+- qrid 是 quiz result id。
+- 既有 booking 的 rid 仍保留給自選改期 token 使用。
+- 不要用 rid 傳測驗結果，避免和改期功能衝突。
+
+
+五、手動測試流程
+
+1. 開啟 /quiz?tenant=dm-test&p=P01。
+2. 確認頁面顯示 P01 專案名稱與版本 A。
+3. 填姓名、Email、電話。
+4. 第一階段選兩題單選。
+5. 第二階段選複選，並填寫補充文字。
+6. 點送出檢測。
+7. 預期跳到 /report?tenant=dm-test&p=P01&qrid=...。
+8. 報告頁應顯示：
+   - 分數總覽
+   - 命中的診斷內容
+   - 預約一對一諮詢按鈕
+9. 點預約一對一諮詢。
+10. 預期跳到 /booking?tenant=dm-test&p=P01&qrid=...。
+11. 完成現有預約流程。
+12. 預約成功後檢查資料庫。
+
+
+六、資料庫驗證查詢
+
+測驗送出後：
+
+select id, public_id, tenant_slug, project_code, version_code, crm_contact_id, lead_id, client_name, client_email, score_summary, submitted_at
+from quiz_responses
+order by id desc
+limit 5;
+
+select *
+from quiz_response_answers
+where quiz_response_id = 最近一筆quiz_responses.id
+order by question_no;
+
+select id, tenant_slug, project_code, name, email, lifecycle_stage, latest_quiz_response_id, latest_appointment_id
+from crm_contacts
+order by updated_at desc
+limit 5;
+
+select event_type, title, quiz_response_id, appointment_id, email_queue_id, occurred_at
+from crm_timeline_events
+order by occurred_at desc
+limit 20;
+
+預約完成後：
+
+select id, crm_contact_id, lead_id, quiz_response_id, client_name, client_email, status, start_at
+from appointments
+order by id desc
+limit 5;
+
+select id, public_id, appointment_id, crm_contact_id, lead_id
+from quiz_responses
+order by id desc
+limit 5;
+
+預期：
+- quiz_responses.appointment_id 會回填最新 appointment id。
+- appointments.quiz_response_id 會等於報告頁帶入的測驗結果。
+- crm_timeline_events 會有 quiz_completed、booking_created、email_queued / email_sent 等事件。
+
+
+七、Email 跟進驗證
+
+如果尚未建立 quiz email templates，測驗送出不會排信，這是正常的。
+
+要測測驗跟進信，可新增 email_templates：
+- module = quiz
+- trigger_name = quiz_completed
+- trigger_name = quiz_followup
+- trigger_name = quiz_completed_unbooked
+- stop_when_booked = true
+
+預期：
+- 測驗完成後會進 email_queue。
+- 若客戶之後完成預約，queued 且 cancellation_policy = stop_when_booked 的測驗跟進信會被取消。
+
+
+八、目前已知限制
+
+1. 本機沒有 node_modules，無法直接用 vercel dev 跑完整 API。
+2. 本機沒有 psql，尚未實際連 Supabase 執行 migration。
+3. /quiz 與 /report 是 MVP 前台頁，還不是後台可編輯版本。
+4. 報告頁目前能渲染 heading、text、list、image、button、link、booking_cta 與分數區間內容，完整區塊編輯器 UI 之後再做。
+5. 分數區間不重疊由 SQL exclusion constraint 防守，若 Supabase 專案不允許 btree_gist extension，需改成後端儲存時檢查。
+
+
+九、通過標準
+
+本階段視為完成的條件：
+1. Supabase 成功套用兩支 SQL。
+2. /quiz 可讀到示範題目。
+3. submitQuiz 成功寫入 quiz_responses / quiz_response_answers / crm_contacts。
+4. /report 可用 qrid 顯示報告。
+5. 報告頁 CTA 可進 /booking。
+6. booking 完成後 appointment 與 quiz_response 可互相關聯。
+7. 既有 booking / admin / unsubscribe 靜態語法檢查通過。
+十、可用 npm 指令
+
+已新增以下指令，讓 migration、seed、smoke test 可以固定執行：
+
+npm run preflight:phase3
+npm run db:migrate:phase2
+npm run db:seed:phase2
+npm run smoke:phase3
+npm run check
+
+執行前需要：
+- 專案已安裝 node_modules。
+- .env 內有 DATABASE_URL。
+- 若不是測 dm-test / P01，可用 TEST_TENANT 與 TEST_PROJECT 覆寫 smoke test 目標。
+
+建議執行順序：
+1. npm install
+2. npm run preflight:phase3
+3. npm run db:migrate:phase2
+4. npm run db:seed:phase2
+5. npm run smoke:phase3
+6. npm run check
+
+smoke:phase3 會做三件事：
+1. 呼叫 getQuizConfig 確認題目讀得到。
+2. 送出一筆測驗作答。
+3. 用 qrid 讀取報告結果，並印出 Report URL。
+十一、GitHub Actions 資料庫執行方式
+
+若本機沒有 npm、psql 或 .env，可改用 GitHub Actions 執行資料庫階段。
+
+已新增 workflow：
+.github/workflows/phase2-db-migration.yml
+
+執行前需要 GitHub repository secrets 已有：
+SUPABASE_DATABASE_URL
+
+手動執行方式：
+1. 到 GitHub repo。
+2. 進入 Actions。
+3. 選 Phase 2 Database Migration。
+4. 按 Run workflow。
+5. run_seed 預設 true。
+6. run_smoke 預設 true。
+7. test_tenant 預設 dm-test。
+8. test_project 預設 P01。
+9. 執行成功後，到 Vercel 開 /quiz?tenant=dm-test&p=P01 測前台漏斗。
+
+這個 workflow 只會在手動按 Run workflow 時執行，不會因為 push 自動改資料庫。
+

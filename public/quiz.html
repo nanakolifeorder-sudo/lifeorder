@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>檢測測驗</title>
+  <style>
+    :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --ink:#202124; --muted:#5f6368; --line:#dadce0; --soft:#f8fafc; --bg:#f5f7fb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Arial,'Noto Sans TC',sans-serif; line-height:1.65; }
+    main { max-width:900px; margin:0 auto; padding:28px 16px 56px; }
+    .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:24px; box-shadow:0 8px 28px rgba(60,64,67,.08); }
+    .top { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
+    h1 { font-size:28px; margin:0 0 6px; color:var(--blue); }
+    h2 { font-size:20px; margin:0 0 12px; }
+    p { color:var(--muted); margin:0 0 10px; }
+    .badge { display:inline-flex; align-items:center; min-height:28px; padding:4px 10px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:13px; white-space:nowrap; }
+    .progress { height:8px; background:#eef2f7; border-radius:999px; overflow:hidden; margin:18px 0 22px; }
+    .bar { width:0; height:100%; background:var(--blue); transition:width .18s ease; }
+    label { display:block; font-weight:700; margin:14px 0 6px; }
+    input, textarea { width:100%; border:1px solid var(--line); border-radius:6px; padding:12px; font:inherit; background:#fff; }
+    textarea { min-height:96px; resize:vertical; }
+    .field { margin:0 0 16px; }
+    .choice { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:6px; margin:8px 0; font-weight:400; cursor:pointer; }
+    .choice input { width:auto; margin-top:5px; }
+    .choice:has(input:checked) { border-color:var(--blue); background:#eef4ff; }
+    .actions { display:flex; justify-content:space-between; gap:12px; margin-top:22px; }
+    button, .button { border:0; border-radius:6px; background:var(--blue); color:#fff; font:inherit; font-weight:700; padding:12px 16px; cursor:pointer; text-decoration:none; display:inline-flex; justify-content:center; align-items:center; min-height:44px; }
+    button.secondary { background:#fff; color:var(--blue); border:1px solid var(--line); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .hidden { display:none !important; }
+    .error { color:var(--red); font-weight:700; }
+    .success { color:var(--green); font-weight:700; }
+    .stage-title { padding-bottom:12px; border-bottom:1px solid var(--line); margin-bottom:12px; }
+    @media (max-width:640px) { main{padding:16px 12px 40px}.panel{padding:18px}.top{display:block}.badge{margin-top:8px}.actions{flex-direction:column-reverse}button,.button{width:100%} }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <div class="top">
+        <div>
+          <h1 id="title">檢測測驗</h1>
+          <p id="subtitle">正在讀取題目...</p>
+        </div>
+        <span class="badge" id="versionBadge">版本</span>
+      </div>
+
+      <div id="loading">載入中...</div>
+
+      <form id="quizForm" class="hidden">
+        <section id="identityPanel">
+          <h2>基本資料</h2>
+          <div class="field"><label for="clientName">姓名 *</label><input id="clientName" autocomplete="name" required></div>
+          <div class="field"><label for="clientEmail">Email *</label><input id="clientEmail" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
+        </section>
+
+        <div class="progress"><div class="bar" id="bar"></div></div>
+        <section id="questionPanel"></section>
+        <div class="actions">
+          <button type="button" class="secondary" id="prevBtn">上一階段</button>
+          <button type="button" id="nextBtn">下一階段</button>
+          <button type="submit" id="submitBtn" class="hidden">送出檢測</button>
+        </div>
+      </form>
+
+      <section id="donePanel" class="hidden"></section>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const isLocalPreview = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const tenant = (params.get('tenant') || params.get('t') || (isLocalPreview ? 'dm-test' : '')).toLowerCase();
+    const projectCode = (params.get('p') || 'P01').toUpperCase();
+    const versionCode = params.get('v') || params.get('version') || '';
+    const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
+    let config = null;
+    let stages = [];
+    let currentStage = 0;
+
+    function api(action, payload) {
+      return fetch(apiBase + '?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ projectCode, versionCode }, payload || {}))
+      }).then(function (res) { return res.json(); });
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
+    function groupStages() {
+      const byKey = new Map();
+      (config.stages || []).forEach(function (stage) { byKey.set(stage.stage_key || stage.stageKey, Object.assign({}, stage, { questions: [] })); });
+      (config.questions || []).forEach(function (question) {
+        const key = question.stageKey || question.stage_key || '1';
+        if (!byKey.has(key)) byKey.set(key, { stage_key: key, title: '第 ' + key + ' 階段', description: '', questions: [] });
+        byKey.get(key).questions.push(question);
+      });
+      stages = Array.from(byKey.values()).filter(function (stage) { return stage.questions.length; });
+    }
+
+    function inputName(question) { return 'q_' + question.id; }
+
+    function renderQuestion(question) {
+      const required = question.isRequired !== false;
+      let html = '<div class="field" data-question-id="' + question.id + '"><label>' + escapeHtml(question.title) + (required ? ' *' : '') + '</label>';
+      if (question.helpText) html += '<p>' + escapeHtml(question.helpText) + '</p>';
+      if (question.type === 'single' || question.type === 'multiple') {
+        const type = question.type === 'single' ? 'radio' : 'checkbox';
+        (question.options || []).forEach(function (option) {
+          html += '<label class="choice"><input type="' + type + '" name="' + inputName(question) + '" value="' + escapeHtml(option.key) + '"><span>' + escapeHtml(option.label) + '</span></label>';
+        });
+      } else {
+        const tag = question.type === 'long_text' ? 'textarea' : 'input';
+        html += tag === 'textarea' ? '<textarea name="' + inputName(question) + '"></textarea>' : '<input name="' + inputName(question) + '">';
+      }
+      return html + '</div>';
+    }
+
+    function renderStage() {
+      const stage = stages[currentStage];
+      document.getElementById('identityPanel').classList.toggle('hidden', currentStage !== 0);
+      document.getElementById('bar').style.width = stages.length ? Math.round(((currentStage + 1) / stages.length) * 100) + '%' : '0%';
+      document.getElementById('questionPanel').innerHTML = '<div class="stage-title"><h2>' + escapeHtml(stage.title || ('第 ' + (currentStage + 1) + ' 階段')) + '</h2><p>' + escapeHtml(stage.description || '') + '</p></div>' + stage.questions.map(renderQuestion).join('');
+      document.getElementById('prevBtn').disabled = currentStage === 0;
+      document.getElementById('nextBtn').classList.toggle('hidden', currentStage >= stages.length - 1);
+      document.getElementById('submitBtn').classList.toggle('hidden', currentStage < stages.length - 1);
+    }
+
+    function validateStage() {
+      const stage = stages[currentStage];
+      for (const question of stage.questions) {
+        if (question.isRequired === false) continue;
+        const nodes = Array.from(document.querySelectorAll('[name="' + inputName(question) + '"]'));
+        const filled = nodes.some(function (node) { return (node.type === 'radio' || node.type === 'checkbox') ? node.checked : node.value.trim(); });
+        if (!filled) throw new Error('請填寫：「' + question.title + '」。');
+      }
+    }
+
+    function collectAnswers() {
+      const answers = {};
+      (config.questions || []).forEach(function (question) {
+        const nodes = Array.from(document.querySelectorAll('[name="' + inputName(question) + '"]'));
+        if (!nodes.length) return;
+        if (question.type === 'multiple') {
+          answers[String(question.id)] = nodes.filter(function (node) { return node.checked; }).map(function (node) { return node.value; });
+        } else if (question.type === 'single') {
+          const selected = nodes.find(function (node) { return node.checked; });
+          answers[String(question.id)] = selected ? selected.value : '';
+        } else {
+          answers[String(question.id)] = nodes[0].value || '';
+        }
+      });
+      return answers;
+    }
+
+    document.getElementById('prevBtn').addEventListener('click', function () { if (currentStage > 0) { currentStage -= 1; renderStage(); } });
+    document.getElementById('nextBtn').addEventListener('click', function () {
+      try { validateStage(); currentStage += 1; renderStage(); } catch (error) { alert(error.message); }
+    });
+    document.getElementById('quizForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      try { validateStage(); } catch (error) { alert(error.message); return; }
+      const button = document.getElementById('submitBtn');
+      button.disabled = true;
+      button.textContent = '正在產生報告...';
+      api('submitQuiz', {
+        name: document.getElementById('clientName').value.trim(),
+        email: document.getElementById('clientEmail').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim(),
+        answers: collectAnswers()
+      }).then(function (res) {
+        if (!res.success) throw new Error(res.message || '送出失敗');
+        location.href = '/report?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '&qrid=' + encodeURIComponent(res.resultId);
+      }).catch(function (error) {
+        button.disabled = false;
+        button.textContent = '送出檢測';
+        alert(error.message || '送出失敗');
+      });
+    });
+
+    function boot() {
+      if (!tenant) { document.getElementById('loading').innerHTML = '<span class="error">安裝碼缺少 tenant。</span>'; return; }
+      api('getQuizConfig', {}).then(function (res) {
+        if (!res.success) throw new Error(res.message || '尚未設定測驗。');
+        config = res;
+        document.getElementById('title').textContent = (res.projectName || '檢測') + '｜檢測測驗';
+        document.getElementById('subtitle').textContent = res.resultSettings?.subtitle || '請依照目前狀況作答，完成後會產生檢測報告。';
+        document.getElementById('versionBadge').textContent = '版本 ' + (res.versionCode || 'A');
+        groupStages();
+        if (!stages.length) throw new Error('此版本尚未建立題目。');
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('quizForm').classList.remove('hidden');
+        renderStage();
+      }).catch(function (error) {
+        document.getElementById('loading').innerHTML = '<span class="error">' + escapeHtml(error.message || '載入失敗') + '</span>';
+      });
+    }
+    boot();
+  </script>
+</body>
+</html>

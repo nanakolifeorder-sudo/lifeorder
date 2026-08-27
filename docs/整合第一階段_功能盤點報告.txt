@@ -1,0 +1,368 @@
+預約系統 + 多客戶測驗系統整合第一階段：功能盤點報告
+日期：2026-08-27
+
+一、整合目標
+
+目標不是單純把兩份程式碼合併，而是把「預約系統」升級成一套可獨立交付給客戶的完整漏斗系統。
+
+整合後系統應包含：
+1. 預約系統：仿 Calendly 的預約、排班、顧問、Calendar / Meet / Gmail、自動提醒。
+2. 測驗系統：測驗型漏斗、題目管理、分數/分類、檢測報告、測驗作答 CRM、測驗後跟進信。
+3. 共用 CRM：同一個客戶 Lead 需同時看得到基本資料、測驗作答、分數結果、預約狀態、顧問歸屬、信件紀錄、CRM 備註。
+4. 可獨立交付：可複製成客戶自己的 GitHub / Vercel / Supabase / Google OAuth 系統。
+
+二、目前預約系統盤點
+
+來源：C:\Users\User\Documents\預約系統升級版\.deploy-repo
+
+主要檔案：
+- public/admin.html：後台 UI。
+- public/booking.html：客戶預約頁。
+- public/embed.js：Systeme / 外部頁嵌入。
+- api/index.js：主要 API 入口。
+- api/cron.js：信件佇列排程處理。
+- api/oauth-callback.js：Google OAuth callback。
+- api/microsoft-oauth-callback.js：Microsoft OAuth callback，目前先隱藏未啟用。
+- lib/service.js：主要業務邏輯。
+- lib/google.js：Google Calendar / Gmail / Meet。
+- lib/microsoft.js：Microsoft Calendar / Teams 預備程式。
+- sql/schema.sql：Supabase schema。
+- sql/upgrade-security-email-backup.sql：安全與信件補強 migration。
+
+已具備功能：
+1. SaaS 租戶隔離
+- tenants
+- projects
+- consultants
+- tenant_slug 隔離
+- 最高管理員 / 使用者管理員 / 顧問三層權限
+
+2. 預約功能
+- booking 頁面
+- 先選日期、再選時間
+- 可設定可預約區間
+- 可設定最早可預約日 / 最遠開放天數
+- 排班規則
+- Google Calendar busy 檢查
+- 建立 Google Calendar event
+- 建立 Google Meet
+- 防止同顧問同時段重複預約
+- 等候名單
+- 拒絕 / 淘汰名單
+
+3. CRM 功能
+- 客戶總覽 CRM
+- 即將到來
+- 已過期 / 完成
+- 取消與婉拒
+- 等候名單
+- 取消會議
+- 改期
+- 轉派顧問
+- 發送自選改期
+- 發送時段選擇
+- 會後紀錄欄位初步存在
+
+4. 顧問 / 排班
+- 顧問管理
+- 顧問登入帳號
+- 顧問權限
+- 可看專案
+- 顧問 Google OAuth
+- 顧問 Calendar ID
+- 視訊工具目前正式顯示 Google Meet
+
+5. 專案管理
+- 多專案
+- 每個專案有 code / name / status
+- Booking 基礎網址管理
+- 可新增自訂 booking base URL
+- 可選主要網址
+- 專案預約連結複製
+- 發送邀請連結
+- 可選是否先填諮詢前表單
+
+6. 表單管理
+- 預約前表單題目
+- 單選 / 多選 / 文字
+- 選項逐列編輯
+- 淘汰詞 / 拒絕邏輯
+
+7. 信件管理
+- 信件模板
+- 觸發：名單建立、預約成功、預約改期、自選改期、會議前、會議後、取消預約
+- 延遲小時
+- 預約後停止名單追蹤
+- Gmail 寄信
+- email_queue
+- 退訂 / 拒收名單
+- 寄信失敗重試
+- 管理員告警
+- 文字編輯器：粗體、斜體、底線、連結、顏色、圖片、變數
+
+8. 系統健康 / 正式化
+- public 首頁
+- 隱私權政策
+- 服務條款
+- 資料刪除說明
+- 退訂頁
+- 登入暴力防護
+- Webhook secret / HMAC 驗證
+- GitHub Actions Supabase 備份 workflow
+
+三、目前測驗系統盤點
+
+來源：C:\Users\User\Documents\預約系統升級版\待整 - 多客戶測驗系統
+另一份相同來源：C:\Users\User\Documents\多客戶測驗系統
+
+主要檔案：
+- GAS_01_Code.gs.txt：GAS 後端。
+- GAS_02_Index.html.txt：GAS 後台 UI。
+- GAS_03_DM01_DM02測試驗收清單.txt：驗收清單。
+- GAS_04_執行順序與貼上說明.txt：部署說明。
+- gas_code_v2.txt / gas_index_v2.txt：v2 版本。
+- systeme_01_註冊測驗頁_HTML.txt：Systeme 註冊測驗頁。
+- systeme_02_檢測報告頁_HTML.txt：Systeme 檢測報告頁。
+- systeme_03_一對一預約元件_HTML.txt：Systeme 一對一預約元件。
+- systeme_04_預約成功頁_HTML.txt：Systeme 預約成功頁。
+- 多客戶測驗系統 (1).xlsx：原 Sheets 資料來源。
+
+Sheet / 資料模型：
+1. 客戶設定
+- 客戶ID、客戶名稱、品牌名稱、專案名稱、預設版本、測驗頁網址、報告頁網址、預約成功頁網址
+
+2. CRM
+- 客戶ID、結果ID、預約ID、時間戳記、姓名、Email、電話、預約時間、版本
+- 分數1 到 分數6
+- 原始答案
+- 狀態、預約狀態、預約備註
+- 會議平台、會議連結、Google事件ID
+- 講座活動、講座活動報名時間
+- 完整分數JSON、出席狀態、文字輸入紀錄
+
+3. 題目設定
+- 客戶ID、版本、階段、題號、題型、題目、選項A-F、分數設定、必填、狀態
+
+4. 檢測結果項目
+- 項目數量、項目名稱1-6、最高分、圖表類型、隨機題目、狀態
+
+5. 檢測結果設定
+- 報告模式、標題、副標、是否顯示圖表、是否顯示分數卡片、分數判斷方式
+- 低分 / 中分 / 高分說明、CTA 文字
+
+6. 檢測報告內容設定
+- 內容類型、對應項目、最低分、最高分、結果標題、結果副標、風險說明、行動建議、圖片網址、排序
+
+7. 一對一排班
+- 規則ID、類型、星期、指定日期、開始時間、結束時間
+- 預約間隔分鐘、會前緩衝、會後緩衝
+- 開放開始天數、開放結束天數、時區
+- 姓名 / Email / 電話 / 備註欄位顯示與必填
+
+8. 顧問管理
+- 顧問ID、顧問名稱、顧問Email、Google日曆ID、Zoom連結、預設使用工具、Zoom API 欄位、教學手冊連結
+
+9. 使用者帳號
+- 使用者ID、Email、密碼鹽、密碼雜湊、角色、客戶ID、顯示名稱、狀態、最後登入時間
+
+10. 頁面設定
+- 測驗頁、報告頁、預約頁、預約成功頁、systeme網址、嵌入模式
+
+11. 預約表單設定
+- 題型、題目、選項A-F、淘汰設定、必填、狀態
+
+12. Email設定 / Email寄送佇列
+- 信件類型、發送時機、延遲數值、延遲單位、啟用、寄件人名稱、主旨、內容
+- queue 狀態、錯誤訊息、預計寄送時間、寄送時間
+
+已具備功能：
+1. 多客戶隔離
+- DM01 / DM02 測試客戶
+- 同一 Email 可在不同 client_id 作答而不互相覆蓋
+- 後台最高管理員可切換客戶
+
+2. 測驗前台
+- 註冊測驗頁
+- 姓名 / Email / 電話
+- 分階段題目
+- 單選 / 複選 / 簡答 / 長答
+- 進度條
+- 送出後產生 result_id
+- 跳轉檢測報告頁
+
+3. 測驗評分
+- 分數1-6
+- 選項加權
+- 結果項目名稱
+- 最大分數
+- 低 / 中 / 高分判斷
+- 自動診斷版
+- 風險說明 / 行動建議
+
+4. 檢測報告頁
+- 用 rid 讀取結果
+- 不從網址讀分數
+- 顯示圖表
+- 顯示分數卡片
+- 顯示主要風險 / 診斷內容
+- 顯示預約 CTA
+
+5. 測驗 CRM
+- 檢測名單 CRM
+- 作答詳情
+- 作答內容美化顯示
+- 題目與選項對照
+- 分數摘要
+- 預約狀態
+- 匯出 CSV
+- 日期 / 狀態篩選
+
+6. 測驗後預約
+- 從報告頁導向預約頁
+- 預約頁可從 rid 帶入姓名 / Email / 電話
+- 預約前篩選題目
+- 淘汰設定
+- 可預約時段
+- Google Calendar / Meet
+- 預約成功頁
+- 改期、取消、寄自選改期、會後紀錄
+
+7. Email
+- 檢測完成通知
+- 檢測跟進
+- 預約通知
+- 預約提醒
+- 預約跟進
+- Gmail OAuth 寄信
+- Email queue
+- 預約後停止 queued follow-up
+
+四、兩套系統重複功能與合併判斷
+
+1. 客戶 / 租戶隔離
+- 預約系統：tenant_slug + Supabase，較適合作為正式 SaaS / 獨立交付基底。
+- 測驗系統：client_id + Google Sheets，概念正確但效能與維護性較弱。
+- 合併策略：保留預約系統 Supabase 架構，吸收測驗系統 client_id 模型為 tenant/project/version。
+
+2. CRM
+- 預約系統 CRM 強在預約流程、顧問操作、改期取消轉派。
+- 測驗系統 CRM 強在作答資料、分數、報告、測驗狀態。
+- 合併策略：建立 unified leads / crm_records，讓同一客戶同時有 quiz_response 與 appointment。
+
+3. 表單 / 題目
+- 預約系統目前表單偏諮詢前篩選。
+- 測驗系統題目是完整測驗漏斗，有版本、階段、分數、結果報告。
+- 合併策略：分成「預約表單」與「測驗題目」兩個模組，但底層可共用 question/options 結構。
+
+4. 信件
+- 預約系統信件編輯器較新，有 HTML editor、圖片、退訂、重試。
+- 測驗系統信件目的更完整，包含測驗完成與測驗跟進。
+- 合併策略：保留預約系統 email_templates / email_queue，新增 trigger：quiz_completed、quiz_followup、quiz_completed_unbooked。
+
+5. 預約
+- 預約系統已比測驗系統更完整，應作為主體。
+- 測驗系統的預約前篩選、從 rid 帶入資料、報告頁 CTA 需要搬入。
+
+6. 後台 UI
+- 預約系統視覺較符合目前方向。
+- 測驗系統左側 nav 較符合功能量變大後的操作方式。
+- 合併策略：使用預約系統的視覺語言，改成測驗系統式左側收合導航。
+
+五、新版建議後台資訊架構
+
+登入後預設畫面：客戶管理 > 客戶 CRM。
+
+左側功能列：
+
+1. 系統設定
+- 專案管理
+- 帳號管理
+- 權限管理
+- 網域 / 安裝碼設定
+- Google OAuth 狀態
+- 信件額度 / 寄信狀態
+- 系統告警
+- 備份 / 匯出
+
+2. 客戶管理
+- 客戶 CRM
+- 已預約行程管理
+- 等候名單
+- 拒絕 / 淘汰名單
+- 作答數據
+- 客戶歷程紀錄
+
+3. 預約系統
+- 預約表單
+- 排班系統
+- 顧問管理
+- 提醒信管理
+- 預約規則設定
+- 開放預約區間
+- 會議工具設定
+
+4. 測驗系統
+- 題目管理
+- 分數 / 分類規則
+- 檢測報告設定
+- 測驗結果頁設定
+- 跟進信管理
+- 測驗漏斗設定
+
+六、建議整合策略
+
+採用「預約系統升級」路線：
+1. 保留現有 Vercel / Supabase / GitHub 架構。
+2. 把測驗系統的資料模型和功能逐步搬進 Supabase。
+3. 把 admin.html 從上方 tabs 改為左側收合導航。
+4. 先整合資料模型，再搬 UI。
+5. 完成後產出客戶獨立交付包。
+
+不建議直接把 GAS 測驗系統整包貼進目前專案，原因：
+1. GAS / Sheets 架構與目前 Supabase 架構不同。
+2. 直接混合會造成兩套登入、兩套 CRM、兩套 Email queue。
+3. 後續做客戶獨立交付會更難維護。
+
+七、下一階段建議
+
+第二階段應先做資料庫設計，不急著改 UI。
+
+需要新增 / 調整的核心資料表：
+1. quiz_questions
+2. quiz_question_options
+3. quiz_result_items
+4. quiz_result_settings
+5. quiz_report_blocks
+6. quiz_responses
+7. quiz_response_answers
+8. crm_events / lead_timeline
+9. page_settings
+10. email_templates trigger 擴充
+11. projects 增加 default_version / funnel urls / report settings
+
+第一版整合 MVP 建議範圍：
+1. 左側導航骨架。
+2. 登入後預設進客戶 CRM。
+3. 測驗題目管理。
+4. 測驗前台送出並寫入 CRM。
+5. 檢測報告頁。
+6. 測驗結果 CRM 可查看完整作答。
+7. 測驗完成但未預約的跟進信。
+8. 從報告頁導到現有 booking 流程。
+
+八、關於客戶獨立交付 B 方案
+
+正確理解如下：
+1. 先在目前你的帳號 / repo 中把整合版做完。
+2. 完工並測試穩定後，把它整理成可複製交付包。
+3. 客戶若要獨立擁有，就用客戶自己的帳號建立：
+   - GitHub repo
+   - Vercel project
+   - Supabase project
+   - Google Cloud OAuth project
+4. 再把同一套程式碼 copy / fork / import 到客戶帳號。
+5. 重新設定客戶自己的 env、OAuth redirect URI、資料庫 schema、初始管理員。
+6. 後續若要更新客戶獨立版，需要用版本同步或人工 merge，不會像 SaaS A 方案那樣自動所有客戶一起更新。
+
+結論：
+整合應以「預約系統」作為正式技術基底，將「測驗系統」的漏斗、作答、分數、報告、測驗 CRM 和跟進信功能移植進來。完成後再做 B 方案的客戶獨立複製流程。

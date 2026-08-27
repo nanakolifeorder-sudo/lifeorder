@@ -1,0 +1,69 @@
+name: Phase 2 Database Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_seed:
+        description: "Also run MVP demo seed after migration"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      run_smoke:
+        description: "Run quiz/report smoke test after SQL"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      test_tenant:
+        description: "Tenant slug for smoke test"
+        required: true
+        default: "dm-test"
+      test_project:
+        description: "Project code for smoke test"
+        required: true
+        default: "P01"
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+      TEST_TENANT: ${{ inputs.test_tenant }}
+      TEST_PROJECT: ${{ inputs.test_project }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Verify database URL secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Missing GitHub secret SUPABASE_DATABASE_URL" >&2
+            exit 1
+          fi
+
+      - name: Static checks
+        run: npm run check
+
+      - name: Run Phase 2 migration
+        run: npm run db:migrate:phase2
+
+      - name: Run MVP demo seed
+        if: ${{ inputs.run_seed == 'true' }}
+        run: npm run db:seed:phase2
+
+      - name: Run Phase 3 smoke test
+        if: ${{ inputs.run_smoke == 'true' }}
+        run: npm run smoke:phase3

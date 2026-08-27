@@ -260,6 +260,7 @@
     const tenant = (params.get('tenant') || params.get('t') || (isLocalPreview ? 'dm-test' : '')).toLowerCase();
     const projectCode = (params.get('p') || 'P01').toUpperCase();
     const rescheduleToken = params.get('rid') || '';
+    const quizResultId = params.get('qrid') || params.get('quizResultId') || ''; 
     const invitationToken = params.get('invite') || '';
     const skipForm = params.get('skipForm') === 'true';
     const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
@@ -469,7 +470,8 @@
         name: document.getElementById('clientName').value.trim(),
         email: document.getElementById('clientEmail').value.trim(),
         phone: document.getElementById('clientPhone').value.trim(),
-        invitationToken: invitationToken || ''
+        invitationToken: invitationToken || '',
+        quizResultId: quizResultId || ''
       };
 
       try {
@@ -616,3 +618,4 @@
   </script>
 </body>
 </html>
+

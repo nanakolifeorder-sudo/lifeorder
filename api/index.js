@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const payload = req.method === 'GET' ? {} : await readJson(req);
+    const payload = req.method === 'GET' ? Object.assign({}, req.query || {}) : await readJson(req);
     const action = req.query.action || payload.action;
     if (!action) throw new Error('缺少 action。');
 
@@ -24,3 +24,4 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+

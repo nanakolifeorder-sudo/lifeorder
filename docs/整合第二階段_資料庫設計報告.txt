@@ -1,0 +1,1100 @@
+預約系統 + 多客戶測驗系統整合第二階段：資料庫設計報告
+日期：2026-08-27
+
+一、第二階段目標
+
+本階段只做資料庫與資料模型設計，不直接大改 UI。
+
+整合原則：
+1. 以目前「預約系統升級版」的 Supabase / Postgres 架構作為正式技術基底。
+2. 保留既有預約、排班、顧問、CRM 操作、改期、取消、轉派、自選改期與提醒信管理。
+3. 將「待整 - 多客戶測驗系統」的測驗漏斗、題目版本、題目階段、作答、分數、報告內容、測驗跟進信整合進同一套 Supabase 資料模型。
+4. 預約表單與測驗題目在 UI 與資料語意上分開。
+5. 多客戶 / tenant 底層保留，但客戶版 UI 預設隱藏多客戶管理；工程師 / 最高權限後台入口等到實作入口時再向使用者確認網址命名。
+
+
+二、現有 Supabase schema 盤點
+
+目前主要 schema 來源：
+- sql/schema.sql
+- sql/upgrade-security-email-backup.sql
+- sql/upgrade-booking-base-urls.sql
+
+目前後端主要使用：
+- lib/db.js：使用 node-postgres pg Pool 透過 DATABASE_URL 直連 Postgres。
+- lib/service.js：集中處理租戶、預約、顧問、CRM、Email queue、OAuth 等業務流程。
+- lib/auth.js：登入與權限判斷，目前帳號資料仍放在 consultants 表。
+
+目前沒有看到 Supabase client / RLS policy 實作，權限隔離主要由後端 query 的 tenant_slug 條件與 JWT session 控制。第二階段設計先維持這個模式，避免一次同時改 auth / RLS / UI，之後可以另開安全強化階段補 RLS。
+
+現有資料表：
+
+1. tenants
+- 主鍵：slug
+- 用途：租戶 / 客戶底層隔離。
+- 重要欄位：name、owner_name、owner_email、owner_password_hash、app_base_url、booking_base_urls、webhook_secret、created_at。
+- 整合判斷：保留。未來工程師 / 最高權限後台仍以 tenants 作為跨客戶管理入口。
+
+2. projects
+- 主鍵：id
+- 唯一鍵：(tenant_slug, code)
+- 用途：租戶底下的專案 / 漏斗。
+- 重要欄位：code、name、status、main_url、fallback_url、booking_notice、reject_type、reject_value。
+- 整合判斷：保留並擴充。測驗版本、測驗頁、報告頁、iframe 安裝碼、預設版本都應掛在 project 層級。
+
+3. consultants
+- 主鍵：id
+- 唯一鍵：(tenant_slug, login_email)
+- 用途：顧問資料、登入帳號、權限、Google / Microsoft OAuth token、行事曆與會議工具設定。
+- 重要欄位：calendar_id、google_email、google_refresh_token、microsoft_email、microsoft_refresh_token、permissions、project_codes、meet_tool、time_zone、interval_minutes、buffer_before、buffer_after、min_days、max_days。
+- 整合判斷：保留。測驗系統的使用者管理 UI 不搬，但底層帳號 / 權限仍沿用 consultants。
+
+4. availability_rules
+- 主鍵：id
+- 用途：顧問 weekly / specific 可預約時段。
+- 整合判斷：保留。測驗系統的一對一排班不搬。
+
+5. questions
+- 主鍵：id
+- 用途：目前的預約前表單題目。
+- 重要欄位：project_code、sort_order、title、type、options jsonb、reject_word、is_required。
+- 整合判斷：保留為「預約表單」。不改名以降低既有功能風險，但文件與 UI 命名要明確稱為 booking_form_questions 或 預約表單題目。
+
+6. appointments
+- 主鍵：id
+- 用途：預約紀錄。
+- 重要欄位：project_code、consultant_id、event_id、meet_link、start_at、end_at、client_name、client_email、client_phone、answers、status、attendance、deal_status、plan、notes。
+- 重要索引：uq_active_appointment_slot，避免同租戶同顧問同時間重複有效預約。
+- 整合判斷：保留並擴充 lead_id / crm_contact_id / quiz_response_id，使報告頁預約能回連到測驗作答。
+
+7. rejected_clients
+- 主鍵：id
+- 用途：預約前表單淘汰 / 婉拒名單。
+- 整合判斷：保留，短期繼續支援既有 UI；中期應匯入 CRM 統一資料模型與 timeline。
+
+8. waitlist_clients
+- 主鍵：id
+- 用途：無可預約時段或未能直接預約者。
+- 整合判斷：保留，短期支援既有等候名單與發送時段選擇；中期應回寫 CRM 統一資料模型與 timeline。
+
+9. page_views
+- 主鍵：id
+- 用途：預約頁瀏覽統計。
+- 整合判斷：保留，可擴充 page_type 以支援 quiz / report / booking 分頁瀏覽。
+
+10. email_templates
+- 主鍵：id
+- 用途：信件模板。
+- 重要欄位：project_code、name、trigger_name、time_param、subject、body、status、sender_name、stop_when_booked。
+- 現有 trigger：lead_created、booking_created、booking_rescheduled、reschedule_link、meeting_before、meeting_after、booking_cancelled，以及程式中已預留 rejected_created、waitlist_created。
+- 整合判斷：保留並擴充 trigger 類型、purpose/module 與 delay unit。UI 上拆成「提醒信管理」與「跟進信管理」，底層仍共用同表。
+
+11. leads
+- 主鍵：id
+- 唯一鍵：(tenant_slug, project_code, client_email)
+- 用途：目前的未預約名單 / CRM 名單追蹤。
+- 重要欄位：client_name、client_email、client_phone、answers、status、booked_appointment_id。
+- 整合判斷：擴充成 CRM 統一主表的短期基底，但不建議再把所有測驗作答 JSON 塞進 answers。測驗應有 quiz_responses / quiz_response_answers；leads 只放人的最新狀態與最近關聯。
+
+12. email_queue
+- 主鍵：id
+- 用途：寄信佇列。
+- 重要欄位：lead_id、appointment_id、template_id、trigger_name、client_name、client_email、subject、body、scheduled_at、sent_at、cancelled_at、status、retry_count、max_attempts、last_attempt_at。
+- 現有寄送邏輯：runDueEmails 抓 queued + scheduled_at <= now()，claim 成 sending，檢查退訂，若 stop_when_booked 且 trigger_name = lead_created，查 appointments 有有效預約則取消。
+- 整合判斷：保留並擴充 quiz_response_id / crm_event_id / purpose，stop_when_booked 需支援 quiz_followup 類觸發。
+
+13. email_suppressions
+- 主鍵：id
+- 唯一鍵：(tenant_slug, client_email)
+- 用途：退訂 / 拒收名單。
+- 整合判斷：保留。
+
+14. admin_alerts
+- 主鍵：id
+- 用途：系統告警。
+- 整合判斷：保留。測驗跟進信、報告生成、分數規則錯誤可寫入告警。
+
+15. login_attempts
+- 主鍵：id
+- 用途：登入暴力防護。
+- 整合判斷：保留。
+
+
+三、測驗系統需要新增的資料表設計
+
+新增資料表建議採 namespace 前綴 quiz_，避免與目前 booking questions 混淆。
+
+1. quiz_versions
+
+用途：
+- 管理同一 project 底下的測驗版本。
+- 支援 A/B test，不切不同 project。
+- project 可設定 default_quiz_version_code。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text not null
+- name text not null default ''
+- description text default ''
+- traffic_weight integer not null default 100
+- status text not null default '啟用'
+- published_at timestamptz
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (tenant_slug, project_code, version_code)
+
+設計原因：
+- 測驗系統原本以「版本」欄位散落在題目、報告、結果設定中。獨立成表後，後台可顯示版本列表，也能控制啟用 / 停用 / 發布。
+
+2. quiz_stages
+
+用途：
+- 管理測驗題目分層 / 階段。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text not null
+- stage_key text not null
+- title text not null default ''
+- description text default ''
+- sort_order integer not null default 0
+- status text not null default '啟用'
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (tenant_slug, project_code, version_code, stage_key)
+
+設計原因：
+- 原本「階段」是題目上的數字欄位。獨立成表可支援階段標題、說明、排序與前台進度顯示。
+
+3. quiz_questions
+
+用途：
+- 測驗題目主表。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text not null
+- stage_key text not null default '1'
+- question_no integer not null default 0
+- title text not null
+- help_text text default ''
+- type text not null default 'single'
+- is_required boolean not null default true
+- status text not null default '啟用'
+- sort_order integer not null default 0
+- scoring_mode text not null default 'option_weights'
+- settings jsonb not null default '{}'::jsonb
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (tenant_slug, project_code, version_code, question_no)
+
+type 建議值：
+- single：單選
+- multiple：複選
+- short_text：簡答
+- long_text：長答
+
+settings 用途：
+- 前台呈現、選項排列、是否隨機、欄位提示文字等非核心欄位。
+
+4. quiz_question_options
+
+用途：
+- 題目選項與多面向分數權重。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- question_id bigint not null references quiz_questions(id) on delete cascade
+- option_key text not null
+- label text not null
+- description text default ''
+- score_weights jsonb not null default '{}'::jsonb
+- sort_order integer not null default 0
+- status text not null default '啟用'
+- created_at timestamptz not null default now()
+- unique (question_id, option_key)
+
+score_weights 格式：
+{
+  "hydration": 2,
+  "texture": 1,
+  "fatigue": 0
+}
+
+設計原因：
+- 測驗系統原本用 A-F 欄位與「分數設定」JSON。新設計改為一列一選項，支援超過 6 個選項，也能直接映射多面向分數。
+
+5. quiz_score_dimensions
+
+用途：
+- 定義多面向分數項目。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text not null
+- dimension_key text not null
+- name text not null
+- description text default ''
+- max_score numeric(10,2)
+- chart_type text not null default 'bar'
+- sort_order integer not null default 0
+- status text not null default '啟用'
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (tenant_slug, project_code, version_code, dimension_key)
+
+設計原因：
+- 取代原本「檢測結果項目」的項目1-6欄位。
+- 如果只需要總分，就建立一個 dimension，例如 total。
+
+6. quiz_score_ranges
+
+用途：
+- 定義每個分數面向的分數區間與對應報告內容。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text not null
+- dimension_key text not null
+- range_key text not null
+- label text not null default ''
+- min_score numeric(10,2) not null
+- max_score numeric(10,2) not null
+- title text not null default ''
+- subtitle text default ''
+- body text default ''
+- image_url text default ''
+- cta_label text default ''
+- cta_url text default ''
+- sort_order integer not null default 0
+- status text not null default '啟用'
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+
+必要限制：
+- check (min_score <= max_score)
+- 同一 tenant_slug + project_code + version_code + dimension_key 下，啟用區間不可重疊。
+
+Postgres 不重疊建議做法：
+- 啟用 btree_gist extension。
+- 使用 numrange(min_score, max_score, '[]') exclusion constraint。
+- 或若暫時避免 extension，先在後端儲存時 transaction 內檢查 overlap。
+
+建議 constraint：
+create extension if not exists btree_gist;
+
+alter table quiz_score_ranges
+  add constraint quiz_score_ranges_no_overlap
+  exclude using gist (
+    tenant_slug with =,
+    project_code with =,
+    version_code with =,
+    dimension_key with =,
+    numrange(min_score, max_score, '[]') with &&
+  )
+  where (status <> '停用');
+
+注意：
+- 如果業務希望 0-5 與 5-10 可共用邊界，需改成 '[)' 並明確規定上限不含。依目前使用者描述「0-5、6-10」，建議採整數分數與閉區間，後端檢查 5 和 6 不重疊。
+
+7. quiz_result_settings
+
+用途：
+- 測驗結果 / 報告頁整體設定。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text not null
+- report_mode text not null default 'score_ranges'
+- title text not null default ''
+- subtitle text default ''
+- show_chart boolean not null default true
+- show_score_cards boolean not null default true
+- show_score_table boolean not null default true
+- primary_dimension_key text default ''
+- booking_cta_label text default '預約諮詢'
+- booking_cta_url text default ''
+- settings jsonb not null default '{}'::jsonb
+- status text not null default '啟用'
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (tenant_slug, project_code, version_code)
+
+設計原因：
+- 取代原本低 / 中 / 高固定門檻。
+- 報告內容由 quiz_score_ranges 與 quiz_report_blocks 決定。
+
+8. quiz_report_blocks
+
+用途：
+- 檢測報告頁區塊式編輯器資料模型。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text not null
+- block_key text not null
+- parent_block_id bigint references quiz_report_blocks(id) on delete cascade
+- block_type text not null
+- title text default ''
+- content jsonb not null default '{}'::jsonb
+- visibility_rule jsonb not null default '{}'::jsonb
+- sort_order integer not null default 0
+- is_visible boolean not null default true
+- status text not null default '啟用'
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (tenant_slug, project_code, version_code, block_key)
+
+支援 block_type：
+- heading
+- text
+- list
+- image
+- score_chart
+- score_table
+- button
+- link
+- booking_cta
+- score_range_content
+
+content 範例：
+heading:
+{
+  "level": 1,
+  "text": "你的檢測結果"
+}
+
+image:
+{
+  "url": "https://...",
+  "alt": "",
+  "caption": ""
+}
+
+button:
+{
+  "label": "預約諮詢",
+  "url": "{{bookingUrl}}",
+  "style": "primary"
+}
+
+score_range_content:
+{
+  "dimension_key": "hydration",
+  "render": "matched_range"
+}
+
+visibility_rule 範例：
+{
+  "mode": "always"
+}
+
+{
+  "mode": "score_range",
+  "dimension_key": "hydration",
+  "range_key": "low"
+}
+
+設計原因：
+- 符合「區塊式編輯器，不做自由拖拉定位」。
+- 上移 / 下移只改 sort_order。
+- 顯示 / 隱藏只改 is_visible。
+- 電腦版 / 手機版預覽不需要另存 HTML，只用同一份 blocks 渲染不同 viewport。
+
+9. crm_contacts
+
+用途：
+- CRM 統一人物主表。
+- 將同一租戶、同一專案、同一 Email 的人統一成一張客戶資料卡。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- name text not null default ''
+- email text not null
+- phone text default ''
+- status text not null default 'active'
+- lifecycle_stage text not null default 'lead'
+- latest_quiz_response_id bigint
+- latest_appointment_id bigint
+- assigned_consultant_id bigint references consultants(id) on delete set null
+- source text default ''
+- tags text[] not null default array[]::text[]
+- notes text default ''
+- metadata jsonb not null default '{}'::jsonb
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (tenant_slug, project_code, email)
+
+lifecycle_stage 建議值：
+- lead：一般名單
+- quiz_completed：已完成測驗
+- unbooked：完成測驗但未預約
+- booked：已預約
+- waitlist：等候名單
+- rejected：拒絕 / 淘汰
+- cancelled：取消
+- completed：已完成會議
+
+設計原因：
+- 現有 leads 可以視為舊版 crm_contacts，但 leads 同時承擔 email followup 與簡易 CRM。新增 crm_contacts 可避免破壞既有流程，先雙寫，再逐步讓 CRM 改讀 crm_contacts。
+
+10. quiz_responses
+
+用途：
+- 每次測驗提交紀錄。
+
+建議欄位：
+- id bigserial primary key
+- public_id uuid not null default gen_random_uuid()
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text not null
+- crm_contact_id bigint references crm_contacts(id) on delete set null
+- lead_id bigint references leads(id) on delete set null
+- appointment_id bigint references appointments(id) on delete set null
+- client_name text not null default ''
+- client_email text not null
+- client_phone text default ''
+- raw_answers jsonb not null default '{}'::jsonb
+- score_summary jsonb not null default '{}'::jsonb
+- report_snapshot jsonb not null default '{}'::jsonb
+- status text not null default 'completed'
+- submitted_at timestamptz not null default now()
+- created_at timestamptz not null default now()
+- unique (tenant_slug, public_id)
+
+score_summary 範例：
+{
+  "scores": {
+    "hydration": 7,
+    "texture": 4
+  },
+  "max_scores": {
+    "hydration": 10,
+    "texture": 10
+  },
+  "matched_ranges": {
+    "hydration": "high",
+    "texture": "mid"
+  }
+}
+
+report_snapshot 用途：
+- 保存提交當下命中的報告內容、區間與版本，避免後台改報告後舊客戶看到完全不同結果。
+- 若要允許舊結果套用最新版，可由 UI 提供重新產生報告，不建議預設自動覆蓋。
+
+11. quiz_response_answers
+
+用途：
+- 每題作答明細，支援 CRM 資料卡查看題目 / 選項 / 客戶答案 / 單題得分。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- quiz_response_id bigint not null references quiz_responses(id) on delete cascade
+- question_id bigint references quiz_questions(id) on delete set null
+- question_no integer not null default 0
+- stage_key text default ''
+- question_title text not null default ''
+- question_type text not null default ''
+- selected_option_ids bigint[] not null default array[]::bigint[]
+- selected_option_keys text[] not null default array[]::text[]
+- answer_text text default ''
+- answer_json jsonb not null default '{}'::jsonb
+- score_delta jsonb not null default '{}'::jsonb
+- created_at timestamptz not null default now()
+
+設計原因：
+- raw_answers 適合前台重建原始送出資料，但 CRM 顯示與統計需要正規化的逐題表。
+- 保存 question_title / question_type 是為了題目日後修改時，舊作答仍看得到當時題目文字。
+
+12. crm_timeline_events
+
+用途：
+- 客戶歷程紀錄，整合 Email 發送、測驗完成、預約、改期、取消、轉派、備註等事件。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- crm_contact_id bigint references crm_contacts(id) on delete cascade
+- lead_id bigint references leads(id) on delete set null
+- quiz_response_id bigint references quiz_responses(id) on delete set null
+- appointment_id bigint references appointments(id) on delete set null
+- email_queue_id bigint references email_queue(id) on delete set null
+- actor_consultant_id bigint references consultants(id) on delete set null
+- event_type text not null
+- title text not null
+- body text default ''
+- metadata jsonb not null default '{}'::jsonb
+- occurred_at timestamptz not null default now()
+- created_at timestamptz not null default now()
+
+event_type 建議值：
+- lead_created
+- quiz_completed
+- quiz_report_viewed
+- booking_created
+- booking_rescheduled
+- booking_cancelled
+- consultant_transferred
+- waitlist_created
+- rejected_created
+- email_queued
+- email_sent
+- email_failed
+- email_cancelled
+- note_added
+- status_changed
+
+設計原因：
+- 使用者要求 CRM 客戶資料卡包含 Email 發送歷程與客戶歷程。
+- 不應只把系統事件 append 到 appointments.notes，否則未預約客戶沒有一致歷程。
+
+13. page_settings
+
+用途：
+- 管理測驗頁、報告頁、預約頁、預約成功頁、嵌入模式與外部頁 URL。
+
+建議欄位：
+- id bigserial primary key
+- tenant_slug text not null references tenants(slug) on delete cascade
+- project_code text not null
+- version_code text default ''
+- page_type text not null
+- page_name text not null default ''
+- public_url text default ''
+- systeme_url text default ''
+- embed_mode text not null default 'iframe'
+- settings jsonb not null default '{}'::jsonb
+- status text not null default '啟用'
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (tenant_slug, project_code, version_code, page_type)
+
+page_type 建議值：
+- quiz
+- report
+- booking
+- booking_success
+
+設計原因：
+- 測驗系統原有頁面設定可保留概念，但新版只保留 iframe 安裝碼。
+- project 層級仍可保留常用 URL 欄位，page_settings 負責更細的版本與頁面設定。
+
+
+四、預約系統既有資料表擴充建議
+
+1. projects 擴充
+
+新增欄位：
+- default_quiz_version_code text not null default 'A'
+- quiz_enabled boolean not null default false
+- quiz_page_slug text default 'quiz'
+- report_page_slug text default 'report'
+- booking_success_page_slug text default 'booking-success'
+- iframe_embed_settings jsonb not null default '{}'::jsonb
+- funnel_settings jsonb not null default '{}'::jsonb
+- updated_at timestamptz not null default now()
+
+用途：
+- 指定測驗預設版本。
+- 控制此 project 是否啟用測驗漏斗。
+- 保留 iframe 安裝碼相關設定。
+- funnel_settings 可放測驗完成後導向、報告頁 CTA、預約按鈕策略等非核心設定。
+
+2. leads 擴充
+
+新增欄位：
+- crm_contact_id bigint references crm_contacts(id) on delete set null
+- latest_quiz_response_id bigint references quiz_responses(id) on delete set null
+- source text default ''
+- lifecycle_stage text not null default 'lead'
+- metadata jsonb not null default '{}'::jsonb
+
+用途：
+- 短期相容現有 email flow。
+- 讓 trackLead / systemeWebhook / submitQuiz 都能連回 crm_contacts。
+
+注意：
+- leads 現有 unique (tenant_slug, project_code, client_email) 保留。
+- 測驗作答允許同一 email 多次提交，因此不應讓 quiz_responses 受 leads unique 限制。
+
+3. appointments 擴充
+
+新增欄位：
+- crm_contact_id bigint references crm_contacts(id) on delete set null
+- lead_id bigint references leads(id) on delete set null
+- quiz_response_id bigint references quiz_responses(id) on delete set null
+- meeting_tool text default ''
+- meeting_url text default ''
+- booking_source text default ''
+- updated_at timestamptz not null default now()
+
+用途：
+- 從報告頁預約時，appointment 能直接關聯 quiz_response。
+- CRM 資料卡可以從 contact 查到全部預約紀錄。
+- Zoom 情境下，meeting_tool = 'Zoom'，meeting_url / meet_link 放 Zoom 連結；Google Calendar event description 放 Zoom 連結。
+
+兼容：
+- meet_link 目前已存在，短期可繼續作為會議連結顯示欄位。
+- meeting_tool / meeting_url 是語意更清楚的後續欄位。
+
+4. email_templates 擴充
+
+新增欄位：
+- module text not null default 'booking'
+- delay_unit text not null default 'hours'
+- audience_rule jsonb not null default '{}'::jsonb
+- metadata jsonb not null default '{}'::jsonb
+- updated_at timestamptz not null default now()
+
+module 建議值：
+- booking：預約系統 > 提醒信管理
+- quiz：測驗系統 > 跟進信管理
+- system：系統通知
+
+新增 trigger_name 建議：
+- quiz_completed：測驗完成立即或延遲通知
+- quiz_followup：測驗完成後跟進
+- quiz_completed_unbooked：測驗完成但未預約
+- quiz_report_viewed：報告頁查看後
+- quiz_booking_cta_clicked：報告頁預約 CTA 點擊後
+
+delay_unit：
+- minutes
+- hours
+- days
+
+注意：
+- UI 上分開管理，底層共用 email_templates。
+- 預約提醒信只顯示 module = booking。
+- 測驗跟進信只顯示 module = quiz。
+
+5. email_queue 擴充
+
+新增欄位：
+- crm_contact_id bigint references crm_contacts(id) on delete set null
+- quiz_response_id bigint references quiz_responses(id) on delete set null
+- module text not null default 'booking'
+- cancellation_policy text not null default 'none'
+- metadata jsonb not null default '{}'::jsonb
+
+cancellation_policy 建議值：
+- none：不自動取消
+- stop_when_booked：只要同 project 同 email 已有有效預約就取消
+- stop_when_quiz_completed：同一跟進流程已有新測驗完成就取消
+- stop_when_unsubscribed：退訂即取消，這個目前已有 email_suppressions 檢查，可保留為語意欄位
+
+注意：
+- 現有 stop_when_booked boolean 可保留，並在程式中映射成 cancellation_policy = stop_when_booked。
+- runDueEmails 不應只檢查 trigger_name = lead_created。測驗 follow-up 也要支援「預約後停止」。
+
+6. page_views 擴充
+
+新增欄位：
+- crm_contact_id bigint references crm_contacts(id) on delete set null
+- quiz_response_id bigint references quiz_responses(id) on delete set null
+- page_type text not null default 'booking'
+- metadata jsonb not null default '{}'::jsonb
+
+用途：
+- 支援今天多少人作答、報告頁查看、預約 CTA 點擊等漏斗統計。
+
+7. tenants 擴充（非第二階段必做）
+
+暫不建議此階段新增工程師後台入口欄位，因為使用者要求到設定入口網址時要先詢問命名。
+
+可先預留但不實作：
+- system_owner_settings jsonb
+
+
+五、CRM 統一資料模型
+
+建議採「crm_contacts 主檔 + 關聯事件/紀錄表」。
+
+1. crm_contacts 是客戶資料卡入口
+
+查詢一位客戶時：
+- 基本資料：crm_contacts
+- 測驗紀錄：quiz_responses where crm_contact_id = ?
+- 作答詳情：quiz_response_answers where quiz_response_id in (...)
+- 多面向分數：quiz_responses.score_summary
+- 報告結果：quiz_responses.report_snapshot + quiz_score_ranges
+- 預約紀錄：appointments where crm_contact_id = ? 或同 tenant/project/email fallback
+- 顧問歸屬：crm_contacts.assigned_consultant_id + appointments.consultant_id
+- Email 發送歷程：email_queue where crm_contact_id = ? 或 crm_timeline_events event_type like email_%
+- 備註 / 狀態：crm_contacts.notes/status/lifecycle_stage + crm_timeline_events
+- 操作按鈕：仍呼叫既有預約 action，但 payload 帶 crm_contact_id / quiz_response_id
+
+2. leads 的定位
+
+短期：
+- leads 繼續支援既有 trackLead / systemeWebhook / email follow-up。
+- 新增測驗提交時，同步 upsert leads，避免現有 Email 與 CRM 畫面斷掉。
+
+中期：
+- CRM 主畫面改讀 crm_contacts。
+- leads 可變成「行銷名單狀態」或逐步降級為相容表。
+
+3. 同一客戶的合併規則
+
+主要合併鍵：
+- tenant_slug + project_code + lower(email)
+
+補充：
+- phone 可作為人工合併提示，不建議自動用電話合併，避免共用電話或格式問題。
+- 同 email 可在不同 project 各自存在，符合多專案 / 多漏斗隔離。
+- 同一 project 可有多次 quiz_responses，但 crm_contacts.latest_quiz_response_id 指向最近一次。
+
+4. 客戶 CRM 首頁統計
+
+今天多少人作答：
+- count(*) from quiz_responses
+- where tenant_slug = ? and submitted_at >= today_start and submitted_at < tomorrow_start
+
+今天多少人預約：
+- count(*) from appointments
+- where tenant_slug = ? and created_at >= today_start and created_at < tomorrow_start
+
+未預約名單：
+- crm_contacts where lifecycle_stage in ('lead', 'quiz_completed', 'unbooked')
+- 或 latest_quiz_response_id is not null and latest_appointment_id is null
+
+即將到來行程：
+- appointments where start_at >= now() and status not in cancelled statuses
+
+主介面名單清單：
+- 以 crm_contacts 為主表，left join latest quiz / latest appointment 摘要。
+
+
+六、Email trigger / queue 支援測驗跟進
+
+1. 底層共用
+
+保留：
+- email_templates
+- email_queue
+- email_suppressions
+- runDueEmails
+- Gmail sender：目前 getSenderConsultant 會找 tenant admin / owner 的 Google refresh token，符合「系統信件使用使用者管理員 Gmail」方向。
+
+擴充：
+- email_templates.module = quiz
+- email_queue.module = quiz
+- email_queue.quiz_response_id
+- email_queue.crm_contact_id
+- email_queue.cancellation_policy
+
+2. 測驗完成流程
+
+submitQuiz 建議流程：
+1. 驗證 tenant/project/version/status。
+2. upsert crm_contacts。
+3. insert quiz_responses。
+4. insert quiz_response_answers。
+5. 計算 score_summary。
+6. 建立 report_snapshot。
+7. update crm_contacts.latest_quiz_response_id、lifecycle_stage = quiz_completed 或 unbooked。
+8. upsert leads，status = pending 或 quiz_completed。
+9. insert crm_timeline_events event_type = quiz_completed。
+10. queueTriggeredEmails(trigger = quiz_completed)。
+11. queueTriggeredEmails(trigger = quiz_followup / quiz_completed_unbooked)，且 cancellation_policy = stop_when_booked。
+
+3. 預約完成後停止未預約跟進
+
+submitBooking 建議新增：
+1. 若 payload 帶 quizResponseId / resultId，查 quiz_responses.public_id。
+2. appointment 寫入 quiz_response_id、crm_contact_id、lead_id。
+3. update quiz_responses.appointment_id。
+4. update crm_contacts.latest_appointment_id、lifecycle_stage = booked。
+5. update leads.status = booked。
+6. cancelQueuedFollowups：
+   - 同 tenant_slug
+   - 同 project_code
+   - 同 lower(client_email)
+   - status = queued
+   - cancellation_policy = stop_when_booked 或 stop_when_booked = true
+   - module in ('quiz', 'booking')，但 booking 的 meeting_before / meeting_after 不應取消
+7. insert crm_timeline_events event_type = booking_created。
+
+4. runDueEmails 調整方向
+
+目前邏輯只在 item.stop_when_booked && trigger_name === 'lead_created' 時檢查已預約。
+
+建議改為：
+- 若 item.stop_when_booked = true 或 item.cancellation_policy = 'stop_when_booked'：
+  - 查 appointments 中同 tenant/project/email 有 status 非取消的有效預約。
+  - 若有，取消該 queue。
+- 寄送成功後：
+  - update email_queue status = sent。
+  - insert crm_timeline_events event_type = email_sent。
+- 寄送失敗後：
+  - retry 或 failed。
+  - insert crm_timeline_events event_type = email_failed。
+
+5. Email 變數擴充
+
+現有變數：
+- name / email / phone / project / time / meetLink / consultant / rescheduleLink / unsubscribeLink
+
+測驗新增建議：
+- quizResultUrl
+- reportUrl
+- scoreSummary
+- topDimension
+- topDimensionName
+- bookingUrl
+- latestScore.{dimension_key}
+- rangeTitle.{dimension_key}
+
+實作時不建議一開始做任意深層模板語法。MVP 可先支援固定變數與 scoreSummary 文字。
+
+
+七、報告編輯器區塊資料模型
+
+核心資料表：
+- quiz_result_settings：報告整體設定。
+- quiz_score_dimensions：分數面向。
+- quiz_score_ranges：分數區間與區間內容。
+- quiz_report_blocks：報告頁區塊。
+- quiz_responses.report_snapshot：作答當下報告快照。
+
+1. 編輯器儲存方式
+
+後台編輯一個版本的報告頁時：
+- quiz_result_settings 存全局設定。
+- quiz_report_blocks 存區塊列表。
+- 區塊上移 / 下移只更新 sort_order。
+- 區塊顯示 / 隱藏只更新 is_visible。
+- 區塊刪除可硬刪，或 status = deleted。建議 MVP 硬刪即可，正式版可改軟刪。
+
+2. 分數區間內容
+
+使用者要求：
+- 不採低 / 中 / 高固定門檻。
+- 每個面向可設定多個不重疊分數區間。
+- 每個分數區間內容可設定文案與圖片。
+- 區間區塊可新增、刪除、排序。
+
+建議：
+- quiz_score_ranges 負責區間與內容。
+- quiz_report_blocks 的 score_range_content 區塊負責在報告頁某個位置渲染「目前作答命中的區間內容」。
+- 若要在同一報告放多個面向的診斷，建立多個 score_range_content block，各自指定 dimension_key。
+
+3. 預覽
+
+預覽資料不需要另建表。
+
+後台預覽可用：
+- mode = desktop / mobile 僅為前端狀態。
+- preview_score_summary 由前端暫存，或後端提供 sample response。
+
+若後續需要保存範例，可新增：
+- quiz_report_preview_samples
+
+第二階段 MVP 不必新增。
+
+4. 報告快照策略
+
+quiz_responses.report_snapshot 建議包含：
+- version_code
+- score_summary
+- matched_ranges
+- rendered_blocks 或 matched_content
+- generated_at
+
+原因：
+- 客戶測完後收到信件連結，若管理員之後修改報告區間，舊客戶不應默默看到完全不同診斷。
+- 若業務希望所有舊結果套用新文案，可提供「重新產生報告」操作。
+
+
+八、索引與約束建議
+
+新增索引：
+
+1. quiz_versions
+- unique (tenant_slug, project_code, version_code)
+- index (tenant_slug, project_code, status)
+
+2. quiz_stages
+- unique (tenant_slug, project_code, version_code, stage_key)
+- index (tenant_slug, project_code, version_code, sort_order)
+
+3. quiz_questions
+- unique (tenant_slug, project_code, version_code, question_no)
+- index (tenant_slug, project_code, version_code, stage_key, sort_order)
+- index (tenant_slug, project_code, version_code, status)
+
+4. quiz_question_options
+- unique (question_id, option_key)
+- index (question_id, sort_order)
+
+5. quiz_score_dimensions
+- unique (tenant_slug, project_code, version_code, dimension_key)
+- index (tenant_slug, project_code, version_code, sort_order)
+
+6. quiz_score_ranges
+- index (tenant_slug, project_code, version_code, dimension_key, sort_order)
+- check (min_score <= max_score)
+- overlap 防護：exclusion constraint 或後端 transaction 檢查。
+
+7. quiz_responses
+- unique (tenant_slug, public_id)
+- index (tenant_slug, project_code, submitted_at desc)
+- index (tenant_slug, project_code, lower(client_email), submitted_at desc)
+- index (crm_contact_id, submitted_at desc)
+
+8. quiz_response_answers
+- index (quiz_response_id, question_no)
+- index (tenant_slug, question_id)
+
+9. crm_contacts
+- unique (tenant_slug, project_code, email)
+- index (tenant_slug, project_code, lifecycle_stage, updated_at desc)
+- index (tenant_slug, assigned_consultant_id, updated_at desc)
+
+10. crm_timeline_events
+- index (crm_contact_id, occurred_at desc)
+- index (tenant_slug, project_code, event_type, occurred_at desc)
+- index (quiz_response_id)
+- index (appointment_id)
+- index (email_queue_id)
+
+11. email_queue 擴充後
+- index (tenant_slug, project_code, crm_contact_id, created_at desc)
+- index (tenant_slug, project_code, quiz_response_id)
+- index (status, scheduled_at, retry_count) 既有保留
+
+
+九、建議 migration 順序
+
+第一批：不破壞既有功能的新增表
+1. create quiz_versions
+2. create quiz_stages
+3. create quiz_questions
+4. create quiz_question_options
+5. create quiz_score_dimensions
+6. create quiz_score_ranges
+7. create quiz_result_settings
+8. create quiz_report_blocks
+9. create crm_contacts
+10. create quiz_responses
+11. create quiz_response_answers
+12. create crm_timeline_events
+13. create page_settings
+
+第二批：既有表 add column
+1. projects add default_quiz_version_code / quiz_enabled / page slug / iframe settings / funnel_settings / updated_at
+2. leads add crm_contact_id / latest_quiz_response_id / source / lifecycle_stage / metadata
+3. appointments add crm_contact_id / lead_id / quiz_response_id / meeting_tool / meeting_url / booking_source / updated_at
+4. email_templates add module / delay_unit / audience_rule / metadata / updated_at
+5. email_queue add crm_contact_id / quiz_response_id / module / cancellation_policy / metadata
+6. page_views add crm_contact_id / quiz_response_id / page_type / metadata
+
+第三批：資料回填
+1. 從 leads 建立 crm_contacts。
+2. 從 appointments 建立或更新 crm_contacts，latest_appointment_id 指向最近 appointment。
+3. rejected_clients / waitlist_clients 寫入 crm_contacts lifecycle_stage。
+4. email_queue 以 lead_id 或 tenant/project/email 回填 crm_contact_id。
+5. 對既有 email_templates 設定 module = booking、delay_unit = hours。
+
+第四批：後端雙寫
+1. trackLead / systemeWebhook：寫 leads + crm_contacts + crm_timeline_events。
+2. submitBooking：寫 appointments + leads + crm_contacts + crm_timeline_events；若有 quiz_response_id 則回連 quiz_responses。
+3. logRejected / logMissed：寫既有表 + crm_contacts + crm_timeline_events。
+4. runDueEmails：寄送成功 / 失敗 / 取消都寫 crm_timeline_events。
+
+第五批：測驗 API
+1. getQuizConfig：讀 quiz_versions / quiz_stages / quiz_questions / options。
+2. submitQuiz：寫 crm_contacts / quiz_responses / answers / email queue。
+3. getQuizResult：用 quiz_responses.public_id 讀報告快照。
+4. getCRMContactDetail：整合 contact / quiz / booking / email / timeline。
+
+第六批：UI 再接上
+1. 左側收合功能列。
+2. 客戶管理 > 客戶 CRM 預設入口。
+3. 測驗系統 > 題目管理。
+4. 測驗系統 > 分數 / 分類規則。
+5. 測驗系統 > 檢測報告設定。
+6. 測驗系統 > 跟進信管理。
+
+
+十、不建議搬入或不建議現在做的項目
+
+1. 不搬測驗系統的多客戶 / 使用者管理 UI。
+- 現有 tenants / consultants / permissions 足夠支撐底層。
+- 工程師後台入口命名需等實作前詢問使用者。
+
+2. 不搬測驗系統的一對一排班與顧問管理。
+- 現有 consultants / availability_rules / appointments 已較完整。
+
+3. 不搬預約前篩選表單到測驗題目。
+- questions 表保留為預約表單。
+- quiz_questions 是測驗題目。
+
+4. 不採低 / 中 / 高固定門檻。
+- 改用 quiz_score_ranges，任意多區間，但不可重疊。
+
+5. 不採內容 ID / 專案 ID 手動管理方式。
+- 使用 bigserial id / uuid public_id / version_code / block_key。
+- block_key 可由系統產生，不要求客戶手動維護。
+
+6. 第二階段不做 UI 大改。
+- 本報告確認後，再進入 migration 與後端雙寫。
+
+
+十一、風險與待確認事項
+
+1. 分數區間邊界規則
+- 建議採整數閉區間，例如 0-5、6-10。
+- 若未來有小數分數，需明確規定 max 是否包含。技術上建議使用半開區間 [min, max)，但對一般使用者較不直覺。
+
+2. 舊報告是否固定快照
+- 建議預設固定快照。
+- 若要讓舊結果套用新版報告，需要額外「重新產生報告」功能。
+
+3. leads 是否最終保留
+- 建議短期保留，避免影響 email queue 與既有 CRM。
+- 中期可以讓 crm_contacts 成為主資料模型，leads 成為相容層。
+
+4. RLS / Supabase Auth
+- 目前是 Node pg 直連 DATABASE_URL，非 Supabase Auth + RLS。
+- 第二階段先不改，避免擴大風險。
+- 正式商用多租戶若要強化資料隔離，應另開安全階段設計 RLS 或後端 service role 邊界。
+
+5. Zoom 欄位
+- 目前 consultants.meet_tool 可放工具名稱，但 Zoom OAuth / 固定 Zoom 連結欄位尚未完整正式化。
+- 第二階段資料模型可先讓 appointments.meeting_tool / meeting_url 支援 Zoom 連結，但 Zoom API 串接可晚於測驗資料模型。
+
+
+十二、建議的第二階段實作交付物
+
+使用者確認本報告後，建議下一步交付：
+1. 新增 sql/integration-phase-2-quiz-crm-schema.sql。
+2. 加入所有新增資料表與 add column migration。
+3. 寫入必要 indexes / constraints。
+4. 加入資料回填 SQL。
+5. 後端先新增資料存取 helper，但不改 UI。
+6. 補 submitQuiz / getQuizConfig / getQuizResult 的 API 骨架。
+7. 確認既有預約流程回歸測試仍通過。
+
+結論：
+第二階段資料庫設計應以「crm_contacts + quiz_responses + quiz_response_answers + quiz_score_dimensions + quiz_score_ranges + quiz_report_blocks + crm_timeline_events」作為測驗與 CRM 整合核心。既有預約系統資料表不重建，只做關聯欄位擴充與雙寫，讓測驗漏斗能逐步接入，同時保留目前已穩定的預約、顧問、排班、CRM 操作與 Email queue。
