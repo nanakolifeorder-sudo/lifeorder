@@ -23,8 +23,8 @@ set title = excluded.title,
     status = excluded.status,
     updated_at = now();
 
-insert into quiz_score_dimensions(tenant_slug, project_code, version_code, dimension_key, name, description, max_score, chart_type, sort_order, status)
-select p.tenant_slug, p.code, 'A', seed.dimension_key, seed.name, seed.description, 10, 'radar', seed.sort_order, '啟用'
+insert into quiz_score_dimensions(tenant_slug, project_code, version_code, dimension_key, name, description, max_score, display_max_score, display_score_format, rounding_mode, chart_type, sort_order, status)
+select p.tenant_slug, p.code, 'A', seed.dimension_key, seed.name, seed.description, 10, 100, 'number', 'round', 'radar', seed.sort_order, '啟用'
   from projects p
  cross join (values
    ('clarity', '需求清晰度', '客戶是否已清楚知道自己想解決什麼問題。', 10),
@@ -36,6 +36,9 @@ on conflict (tenant_slug, project_code, version_code, dimension_key) do update
 set name = excluded.name,
     description = excluded.description,
     max_score = excluded.max_score,
+    display_max_score = excluded.display_max_score,
+    display_score_format = excluded.display_score_format,
+    rounding_mode = excluded.rounding_mode,
     chart_type = excluded.chart_type,
     sort_order = excluded.sort_order,
     status = excluded.status,

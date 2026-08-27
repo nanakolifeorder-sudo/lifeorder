@@ -76,6 +76,9 @@ create table if not exists quiz_score_dimensions (
   name text not null,
   description text default '',
   max_score numeric(10,2),
+  display_max_score numeric(10,2),
+  display_score_format text not null default 'number',
+  rounding_mode text not null default 'round',
   chart_type text not null default 'bar',
   sort_order integer not null default 0,
   status text not null default '啟用',
@@ -83,6 +86,9 @@ create table if not exists quiz_score_dimensions (
   updated_at timestamptz not null default now(),
   unique (tenant_slug, project_code, version_code, dimension_key),
   check (max_score is null or max_score >= 0),
+  check (display_max_score is null or display_max_score >= 0),
+  check (display_score_format in ('number', 'percent', 'decimal')),
+  check (rounding_mode in ('round', 'floor', 'ceil', 'none')),
   check (chart_type in ('bar', 'radar', 'line', 'none'))
 );
 
@@ -303,6 +309,9 @@ end
 $$;
 
 alter table projects add column if not exists default_quiz_version_code text not null default 'A';
+alter table quiz_score_dimensions add column if not exists display_max_score numeric(10,2);
+alter table quiz_score_dimensions add column if not exists display_score_format text not null default 'number';
+alter table quiz_score_dimensions add column if not exists rounding_mode text not null default 'round';
 alter table projects add column if not exists quiz_enabled boolean not null default false;
 alter table projects add column if not exists quiz_page_slug text default 'quiz';
 alter table projects add column if not exists report_page_slug text default 'report';
