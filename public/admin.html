@@ -370,6 +370,10 @@
     .copy-field button { flex: 0 0 auto; }
     .option-editor { display: grid; gap: 7px; }
     .question-row .row { align-items: start; }
+    .module-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 0; }
+    .module-tabs .chip { margin:0; }
+    .module-section { display:none; }
+    .module-section.active { display:block; }
     .report-editor-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr); gap:16px; align-items:start; }
     .report-block-row summary { grid-template-columns: 1fr 140px 120px; }
     .preview-frame { border:1px solid var(--line); border-radius:8px; background:var(--panel-2); padding:16px; min-height:420px; }
@@ -555,6 +559,7 @@
     let crmSelectedContacts = {};
     let emailProject = 'ALL';
     let emailModule = 'booking';
+    let quizEditorTab = 'settings';
     let sidebarCollapsed = localStorage.getItem('dm_saas_sidebar_collapsed') === '1';
     let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
     let ownerScope = { tenants: [], projects: [] };
@@ -2031,13 +2036,40 @@
       api('getQuizAdminEditor', { projectCode: projectCode, versionCode: versionCode }).then(renderQuizEditor).catch(showError);
     }
 
+    function quizEditorTabButton(id, label) {
+      return '<button class="chip quiz-editor-tab' + (quizEditorTab === id ? ' active' : '') + '" data-tab="' + escapeHtml(id) + '" type="button" onclick="setQuizEditorTab(&quot;' + id + '&quot;)">' + escapeHtml(label) + '</button>';
+    }
+
+    function setQuizEditorTab(id) {
+      quizEditorTab = id || 'settings';
+      document.querySelectorAll('.quiz-editor-tab').forEach(function (tab) {
+        tab.classList.toggle('active', tab.dataset.tab === quizEditorTab);
+      });
+      document.querySelectorAll('.module-section').forEach(function (section) {
+        section.classList.toggle('active', section.dataset.section === quizEditorTab);
+      });
+    }
+
     function renderQuizEditor(res) {
       window.quizEditorData = res;
       const currentVersion = quizVersionFromData(res);
       const projectRows = isSystemOwner() && ownerProject !== 'ALL' ? (res.projects || []).filter(function (p) { return p.code === ownerProject; }) : (res.projects || []);
       const projectOptions = projectRows.map(function (p) { return '<option value="' + escapeHtml(p.code) + '"' + (p.code === res.projectCode ? ' selected' : '') + '>' + escapeHtml(p.name || p.code) + '</option>'; }).join('');
       const versionOptions = (res.versions || []).map(function (v) { return '<option value="' + escapeHtml(v.version_code) + '"' + (v.version_code === res.versionCode ? ' selected' : '') + '>' + escapeHtml(v.version_code + '｜' + (v.name || '未命名')) + '</option>'; }).join('') || '<option value="A">A｜預設版本</option>';
-      document.getElementById('view').innerHTML = '<div class="panel"><h2>測驗設定</h2><div class="row"><div class="col-4"><label>專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>載入版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'A') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div><div class="col-12"><label>版本說明</label><textarea id="quizVersionDescription">' + escapeHtml(currentVersion.description || '') + '</textarea></div></div><div class="actions"><button onclick="saveQuizEditor()">儲存測驗設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'P01') + '&version=' + encodeURIComponent(res.versionCode || 'A') + '">開啟前台測驗</a></div></div><div class="panel"><h2>題目階段</h2><div class="list" id="quizStages">' + (res.stages || []).map(quizStageRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizStage()">新增階段</button></div></div><div class="panel"><h2>分數面向</h2><p>內部滿分用來計算比例；顯示滿分可設 100，報告頁會自動換算。</p><div class="list" id="quizDimensions">' + (res.dimensions || []).map(quizDimensionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizDimension()">新增面向</button></div></div><div class="panel"><h2>分數區間</h2><p>同一個面向的區間不能重疊，例如 0-5、6-10。</p><div class="list" id="quizRanges">' + (res.ranges || []).map(quizRangeRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizRange()">新增區間</button></div></div><div class="panel"><h2>題目與選項加分</h2><div class="list" id="quizQuestions">' + (res.questions || []).map(quizQuestionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizQuestion()">新增題目</button></div></div>';
+      const tabBar = '<div class="module-tabs">' +
+        quizEditorTabButton('settings', '測驗設定') +
+        quizEditorTabButton('stages', '題目階段') +
+        quizEditorTabButton('dimensions', '分數面向') +
+        quizEditorTabButton('ranges', '分數區間') +
+        quizEditorTabButton('questions', '題目與加分選項') +
+      '</div>';
+      document.getElementById('view').innerHTML = '<div class="panel"><h2>測驗設定</h2><div class="row"><div class="col-4"><label>專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>載入版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'A') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button onclick="saveQuizEditor()">儲存測驗設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'P01') + '&version=' + encodeURIComponent(res.versionCode || 'A') + '">開啟前台測驗</a></div></div>' +
+        '<div class="panel module-section" data-section="settings"><h2>測驗設定</h2><label>版本說明</label><textarea id="quizVersionDescription">' + escapeHtml(currentVersion.description || '') + '</textarea></div>' +
+        '<div class="panel module-section" data-section="stages"><h2>題目階段</h2><div class="list" id="quizStages">' + (res.stages || []).map(quizStageRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizStage()">新增階段</button></div></div>' +
+        '<div class="panel module-section" data-section="dimensions"><h2>分數面向</h2><p>內部滿分用來計算比例；顯示滿分可設 100，報告頁會自動換算。</p><div class="list" id="quizDimensions">' + (res.dimensions || []).map(quizDimensionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizDimension()">新增面向</button></div></div>' +
+        '<div class="panel module-section" data-section="ranges"><h2>分數區間</h2><p>同一個面向的區間不能重疊，例如 0-5、6-10。</p><div class="list" id="quizRanges">' + (res.ranges || []).map(quizRangeRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizRange()">新增區間</button></div></div>' +
+        '<div class="panel module-section" data-section="questions"><h2>題目與選項加分</h2><div class="list" id="quizQuestions">' + (res.questions || []).map(quizQuestionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizQuestion()">新增題目</button></div></div>';
+      setQuizEditorTab(quizEditorTab);
     }
 
     function quizStageRow(stage) {
@@ -2045,11 +2077,11 @@
     }
 
     function quizDimensionRow(dim) {
-      return '<div class="item qe-dim"><div class="row"><div class="col-2"><label>面向代碼</label><input class="qe-dim-key" value="' + escapeHtml(dim.dimensionKey || '') + '"></div><div class="col-3"><label>面向名稱</label><input class="qe-dim-name" value="' + escapeHtml(dim.name || '') + '"></div><div class="col-2"><label>內部滿分</label><input class="qe-dim-max" type="number" step="0.01" value="' + escapeHtml(dim.maxScore || 10) + '"></div><div class="col-2"><label>顯示滿分</label><input class="qe-dim-display-max" type="number" step="0.01" value="' + escapeHtml(dim.displayMaxScore || '') + '"></div><div class="col-3"><label>圖表</label><select class="qe-dim-chart">' + selectedOption('radar', dim.chartType || 'radar', '雷達 / 多邊形') + selectedOption('bar', dim.chartType, '長條') + selectedOption('none', dim.chartType, '不顯示') + '</select></div><div class="col-4"><label>格式</label><select class="qe-dim-format">' + selectedOption('number', dim.displayScoreFormat || 'number', '數字') + selectedOption('percent', dim.displayScoreFormat, '百分比') + selectedOption('decimal', dim.displayScoreFormat, '小數') + '</select></div><div class="col-4"><label>取整</label><select class="qe-dim-rounding">' + selectedOption('round', dim.roundingMode || 'round', '四捨五入') + selectedOption('floor', dim.roundingMode, '無條件捨去') + selectedOption('ceil', dim.roundingMode, '無條件進位') + selectedOption('none', dim.roundingMode, '保留小數') + '</select></div><div class="col-4"><label>排序</label><input class="qe-dim-sort" type="number" value="' + escapeHtml(dim.sortOrder || 0) + '"></div><div class="col-12"><label>面向說明</label><textarea class="qe-dim-description">' + escapeHtml(dim.description || '') + '</textarea></div></div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-dim&quot;).remove()">刪除</button></div></div>';
+      return '<div class="item qe-dim"><input type="hidden" class="qe-dim-key" value="' + escapeHtml(dim.dimensionKey || '') + '"><div class="row"><div class="col-4"><label>面向名稱</label><input class="qe-dim-name" value="' + escapeHtml(dim.name || '') + '"></div><div class="col-2"><label>內部滿分</label><input class="qe-dim-max" type="number" step="0.01" value="' + escapeHtml(dim.maxScore || 10) + '"></div><div class="col-2"><label>顯示滿分</label><input class="qe-dim-display-max" type="number" step="0.01" value="' + escapeHtml(dim.displayMaxScore || '') + '"></div><div class="col-4"><label>圖表</label><select class="qe-dim-chart">' + selectedOption('radar', dim.chartType || 'radar', '雷達 / 多邊形') + selectedOption('bar', dim.chartType, '長條') + selectedOption('none', dim.chartType, '不顯示') + '</select></div><div class="col-4"><label>格式</label><select class="qe-dim-format">' + selectedOption('number', dim.displayScoreFormat || 'number', '數字') + selectedOption('percent', dim.displayScoreFormat, '百分比') + selectedOption('decimal', dim.displayScoreFormat, '小數') + '</select></div><div class="col-4"><label>取整</label><select class="qe-dim-rounding">' + selectedOption('round', dim.roundingMode || 'round', '四捨五入') + selectedOption('floor', dim.roundingMode, '無條件捨去') + selectedOption('ceil', dim.roundingMode, '無條件進位') + selectedOption('none', dim.roundingMode, '保留小數') + '</select></div><div class="col-4"><label>排序</label><input class="qe-dim-sort" type="number" value="' + escapeHtml(dim.sortOrder || 0) + '"></div><div class="col-12"><label>面向說明</label><textarea class="qe-dim-description">' + escapeHtml(dim.description || '') + '</textarea></div></div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-dim&quot;).remove()">刪除</button></div></div>';
     }
 
     function quizRangeRow(range) {
-      return '<div class="item qe-range"><div class="row"><div class="col-3"><label>面向</label><select class="qe-range-dim">' + quizDimensionOptions(range.dimensionKey) + '</select></div><div class="col-2"><label>區間代碼</label><input class="qe-range-key" value="' + escapeHtml(range.rangeKey || '') + '"></div><div class="col-2"><label>最低分</label><input class="qe-range-min" type="number" step="0.01" value="' + escapeHtml(range.minScore || 0) + '"></div><div class="col-2"><label>最高分</label><input class="qe-range-max" type="number" step="0.01" value="' + escapeHtml(range.maxScore || 0) + '"></div><div class="col-3"><label>標籤</label><input class="qe-range-label" value="' + escapeHtml(range.label || '') + '"></div><div class="col-6"><label>標題</label><input class="qe-range-title" value="' + escapeHtml(range.title || '') + '"></div><div class="col-6"><label>副標</label><input class="qe-range-subtitle" value="' + escapeHtml(range.subtitle || '') + '"></div><div class="col-8"><label>內容</label><textarea class="qe-range-body">' + escapeHtml(range.body || '') + '</textarea></div><div class="col-4"><label>圖片網址</label><input class="qe-range-image" value="' + escapeHtml(range.imageUrl || '') + '"></div></div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-range&quot;).remove()">刪除</button></div></div>';
+      return '<div class="item qe-range"><input type="hidden" class="qe-range-key" value="' + escapeHtml(range.rangeKey || '') + '"><div class="row"><div class="col-3"><label>面向</label><select class="qe-range-dim">' + quizDimensionOptions(range.dimensionKey) + '</select></div><div class="col-2"><label>最低分</label><input class="qe-range-min" type="number" step="0.01" value="' + escapeHtml(range.minScore || 0) + '"></div><div class="col-2"><label>最高分</label><input class="qe-range-max" type="number" step="0.01" value="' + escapeHtml(range.maxScore || 0) + '"></div><div class="col-5"><label>區間標籤</label><input class="qe-range-label" value="' + escapeHtml(range.label || '') + '" placeholder="例如：方向清楚、需要補強"></div><div class="col-6"><label>標題</label><input class="qe-range-title" value="' + escapeHtml(range.title || '') + '"></div><div class="col-6"><label>副標</label><input class="qe-range-subtitle" value="' + escapeHtml(range.subtitle || '') + '"></div><div class="col-8"><label>內容</label><textarea class="qe-range-body">' + escapeHtml(range.body || '') + '</textarea></div><div class="col-4"><label>圖片網址</label><input class="qe-range-image" value="' + escapeHtml(range.imageUrl || '') + '"></div></div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-range&quot;).remove()">刪除</button></div></div>';
     }
 
     function quizQuestionRow(question) {
