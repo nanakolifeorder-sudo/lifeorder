@@ -163,10 +163,25 @@
       border-radius: 8px;
       padding: 16px;
     }
-    .client-card { border-left: 6px solid var(--blue); }
-    .client-card.lead { border-left-color: var(--green); }
+    .client-card { border-left: 6px solid var(--blue); display: grid; gap: 12px; }
+    .client-card.lead, .client-card.contact { border-left-color: var(--green); }
     .name-link { border:0; background:transparent; color:var(--blue); padding:0; white-space:normal; text-align:left; font:inherit; font-weight:800; }
+    .crm-card-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .crm-card-title h3 { margin:0; color:var(--ink); }
+    .crm-card-meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+    .crm-meta-item { border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--panel); min-width:0; }
+    .crm-meta-item .mini { margin-bottom:4px; }
+    .crm-meta-item strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .crm-answer-list { display:grid; gap:6px; }
+    .crm-answer-line { color:var(--muted); line-height:1.5; }
+    .crm-answer-line strong { color:var(--ink); }
     .detail-section { border-top:1px solid var(--line); padding-top:14px; margin-top:14px; }
+    .detail-hero { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:start; }
+    .detail-identity { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .detail-contact-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .detail-pill-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .section-title-row { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+    .section-title-row h3 { margin:0; }
     .client-card.waitlist { border-left-color: var(--yellow); }
     .client-card.rejected, .client-card.cancelled { border-left-color: var(--red); }
     .card-top {
@@ -400,7 +415,7 @@
       main { padding: 0 10px; }
       .row { grid-template-columns: 1fr; }
       .row > * { grid-column: auto !important; }
-      .stat-grid, .permission-grid { grid-template-columns: 1fr 1fr; }
+      .stat-grid, .permission-grid, .crm-card-meta, .detail-contact-grid { grid-template-columns: 1fr 1fr; }
       .project-checks, .question-row .option-editor { grid-template-columns: 1fr; }
       .card-top { flex-direction: column; }
       table { display: block; overflow-x: auto; }
@@ -1032,6 +1047,23 @@
     function crmTagOptionsHtml(tags) {
       return (tags || []).map(function (tag) { return '<option value="' + escapeHtml(tag) + '">'; }).join('');
     }
+
+    function crmAnswerPreview(item) {
+      const text = String(item.answers || '').trim();
+      if (!text) return (item.kind === 'lead' ? '測驗或表單資料可在客戶資料卡查看。' : '沒有問卷內容');
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const entries = Object.entries(parsed).slice(0, 4);
+          return entries.map(function (entry) {
+            const value = Array.isArray(entry[1]) ? entry[1].join('、') : entry[1];
+            return '<div class="crm-answer-line"><strong>題目 ' + escapeHtml(entry[0]) + '</strong>：' + escapeHtml(value) + '</div>';
+          }).join('');
+        }
+      } catch (_err) {}
+      return escapeHtml(text).split('\n').slice(0, 4).join('<br>');
+    }
+
     function clientCard(item) {
       const key = String(item.kind || 'row') + '_' + String(item.rowId || item.crmContactId || item.clientEmail || Math.random());
       window.crmCardItems[key] = item;
@@ -1052,15 +1084,26 @@
         : (item.kind === 'waitlist'
           ? '<button class="secondary" onclick="sendWaitlistInvite(' + item.rowId + ')">發送時段選擇</button>'
           : '');
+      const primaryTime = item.meetTime || ((item.kind === 'lead' || item.kind === 'contact') ? '尚未預約' : '未指定時間');
+      const projectLabel = item.projectName || item.projectCode || '未指定專案';
+      const ownerLabel = item.consultant ? teamConsultantName(item.consultant) : '尚未指派';
       return '<div class="' + cls + '">' +
         '<div class="card-top">' +
-          '<div>' + crmSelectionCheckbox(item) + '<h3>' + escapeHtml(item.meetTime || ((item.kind === 'lead' || item.kind === 'contact') ? '尚未預約' : '未指定時間')) + '</h3><div><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> ' + kindBadge + ' ' + stageBadge + ' ' + consultantBadge + ' ' + rescheduleBadge + '</div></div>' +
-          '<span class="badge">' + escapeHtml(item.projectName || item.projectCode || '') + '</span>' +
+          '<div>' +
+            '<div class="crm-card-title">' + crmSelectionCheckbox(item) + '<button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> ' + stageBadge + ' ' + rescheduleBadge + '</div>' +
+            '<p class="mini">' + escapeHtml(item.clientPhone || '無電話') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p>' +
+          '</div>' +
+          '<span class="badge">' + escapeHtml(projectLabel) + '</span>' +
         '</div>' +
-        '<p>' + escapeHtml(item.clientPhone || '') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p>' +
+        '<div class="crm-card-meta">' +
+          '<div class="crm-meta-item"><div class="mini">預約狀態</div><strong>' + escapeHtml(primaryTime) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">負責顧問</div><strong>' + escapeHtml(ownerLabel) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">來源專案</div><strong>' + escapeHtml(projectLabel) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">流程</div><strong>' + escapeHtml(crmPipelineLabel(stageValue || 'lead')) + '</strong></div>' +
+        '</div>' +
         renderTagPills(item.tags || []) +
+        '<div class="answer-box"><div class="mini">表單 / 測驗摘要</div><div class="crm-answer-list">' + crmAnswerPreview(item) + '</div></div>' +
         (item.meetLink ? '<p><a href="' + escapeHtml(item.meetLink) + '" target="_blank">開啟會議連結</a></p>' : '') +
-        '<div class="answer-box">' + escapeHtml(item.answers || (item.kind === 'lead' ? '測驗或表單資料可在客戶資料卡查看。' : '沒有問卷內容')) + '</div>' +
         (item.kind === 'appointment' && crmMode === 'past' ? crmEditor(item) : '') +
         '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">查看客戶資料卡</button>' + actionButtons + '</div>' +
       '</div>';
@@ -1109,24 +1152,42 @@
       return '<div class="list">' + items.map(rowFn).join('') + '</div>';
     }
 
+    function crmDetailMeta(label, value) {
+      return '<div class="crm-meta-item"><div class="mini">' + escapeHtml(label) + '</div><strong>' + escapeHtml(value || '無資料') + '</strong></div>';
+    }
+
+    function sectionTitle(title, note) {
+      return '<div class="section-title-row"><h3>' + escapeHtml(title) + '</h3>' + (note ? '<span class="mini">' + escapeHtml(note) + '</span>' : '') + '</div>';
+    }
+
     function renderClientDetail(res) {
       const dialog = detailDialog();
       const contact = res.contact || {};
       const summary = res.crmSummary || {};
       const latest = res.latestQuiz || null;
       const answers = latest ? (res.answersByResponse || {})[String(latest.id)] || [] : [];
+      const lifecycleLabel = crmPipelineLabel(summary.lifecycleStage || contact.lifecycle_stage || 'lead');
+      const projectLabel = summary.projectCode || contact.project_code || '未指定';
+      const tagPills = renderTagPills(contact.tags || []);
       dialog.querySelector('.dialog-body').innerHTML =
-        '<div class="card-top"><div><h2>' + escapeHtml(contact.name || '客戶資料卡') + '</h2><p>' + escapeHtml(contact.phone || '') + (contact.email ? ' ｜ ' + escapeHtml(contact.email) : '') + '</p></div><button class="secondary" onclick="detailDialog().close()">關閉</button></div>' +
+        '<div class="detail-hero">' +
+          '<div>' +
+            '<div class="detail-identity"><h2>' + escapeHtml(contact.name || '客戶資料卡') + '</h2><span class="badge">' + escapeHtml(lifecycleLabel) + '</span><span class="badge">' + escapeHtml(projectLabel) + '</span></div>' +
+            '<div class="detail-contact-grid">' + crmDetailMeta('電話', contact.phone || '') + crmDetailMeta('Email', contact.email || '') + crmDetailMeta('最新狀態', lifecycleLabel) + '</div>' +
+            tagPills +
+          '</div>' +
+          '<button class="secondary" onclick="detailDialog().close()">關閉</button>' +
+        '</div>' +
         '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + statBox('Email 紀錄', summary.emailCount || 0) + statBox('點擊紀錄', summary.clickCount || 0) + '</div>' +
-        '<div class="detail-section"><h3>基本資料</h3><p>狀態：' + escapeHtml(crmPipelineLabel(summary.lifecycleStage || contact.lifecycle_stage || '')) + '｜專案：' + escapeHtml(summary.projectCode || contact.project_code || '') + '</p><p>最新測驗：' + escapeHtml(compactDate(summary.latestQuizAt)) + '｜最新預約：' + escapeHtml(compactDate(summary.latestAppointmentAt)) + '</p></div>' +
-        '<div class="detail-section"><h3>名單分類</h3><div class="row"><div class="col-5"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-3"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-4"><button onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存分類</button></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
-        '<div class="detail-section"><h3>測驗紀錄</h3>' + (latest ? '<p>版本：' + escapeHtml(latest.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(latest.submittedAt)) + '</p><div class="actions"><a target="_blank" href="' + escapeHtml(latest.reportUrl || '') + '">開啟報告連結</a></div>' + renderScoreItems(latest.scoreItems || []) : '<p class="mini">沒有測驗紀錄。</p>') + '</div>' +
-        '<div class="detail-section"><h3>作答詳情</h3>' + renderAnswerRows(answers) + '</div>' +
-        '<div class="detail-section"><h3>報告結果</h3>' + renderHistoryList(latest ? latest.matchedContent || [] : [], '沒有報告區間內容。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '｜' + escapeHtml(item.label || '') + '</strong><p>' + escapeHtml(item.title || '') + '</p><p>' + escapeHtml(item.body || '') + '</p></div>'; }) + '</div>' +
-        '<div class="detail-section"><h3>預約紀錄</h3>' + renderHistoryList(res.appointmentHistory || [], '沒有預約紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(compactDate(item.startAt)) + '</strong><p>' + escapeHtml(item.status || '') + '｜' + escapeHtml(item.consultantName || '') + '</p>' + (item.meetLink ? '<p><a target="_blank" href="' + escapeHtml(item.meetLink) + '">會議連結</a></p>' : '') + '</div>'; }) + '</div>' +
-        '<div class="detail-section"><h3>Email 發送歷程</h3>' + renderHistoryList(res.emailHistory || [], '沒有 Email 紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.subject || '') + '</strong><p>' + escapeHtml(item.status || '') + '｜' + escapeHtml(item.triggerName || '') + '｜' + escapeHtml(compactDate(item.sentAt || item.scheduledAt || item.createdAt)) + '</p></div>'; }) + '</div>' +
-        '<div class="detail-section"><h3>點擊歷程</h3>' + renderHistoryList(res.clickEvents || [], '沒有點擊紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>' +
-        '<div class="detail-section"><h3>客戶歷程</h3>' + renderHistoryList(res.normalizedTimeline || [], '沒有歷程紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(item.category || '') + '｜' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>';
+        '<div class="detail-section">' + sectionTitle('基本資料', '最近互動') + '<div class="crm-card-meta">' + crmDetailMeta('專案', projectLabel) + crmDetailMeta('最新測驗', compactDate(summary.latestQuizAt)) + crmDetailMeta('最新預約', compactDate(summary.latestAppointmentAt)) + crmDetailMeta('CRM 狀態', lifecycleLabel) + '</div></div>' +
+        '<div class="detail-section">' + sectionTitle('名單分類', '標籤用來做歸類，流程狀態用來追蹤進度') + '<div class="row"><div class="col-5"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-3"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-4"><button onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存分類</button></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
+        '<div class="detail-section">' + sectionTitle('測驗紀錄', '') + (latest ? '<p>版本：' + escapeHtml(latest.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(latest.submittedAt)) + '</p><div class="actions"><a target="_blank" href="' + escapeHtml(latest.reportUrl || '') + '">開啟報告連結</a></div>' + renderScoreItems(latest.scoreItems || []) : '<p class="mini">沒有測驗紀錄。</p>') + '</div>' +
+        '<div class="detail-section">' + sectionTitle('作答詳情', '') + renderAnswerRows(answers) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('報告結果', '') + renderHistoryList(latest ? latest.matchedContent || [] : [], '沒有報告區間內容。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '｜' + escapeHtml(item.label || '') + '</strong><p>' + escapeHtml(item.title || '') + '</p><p>' + escapeHtml(item.body || '') + '</p></div>'; }) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('預約紀錄', '') + renderHistoryList(res.appointmentHistory || [], '沒有預約紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(compactDate(item.startAt)) + '</strong><p>' + escapeHtml(item.status || '') + '｜' + escapeHtml(item.consultantName || '') + '</p>' + (item.meetLink ? '<p><a target="_blank" href="' + escapeHtml(item.meetLink) + '">會議連結</a></p>' : '') + '</div>'; }) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('Email 發送歷程', '') + renderHistoryList(res.emailHistory || [], '沒有 Email 紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.subject || '') + '</strong><p>' + escapeHtml(item.status || '') + '｜' + escapeHtml(item.triggerName || '') + '｜' + escapeHtml(compactDate(item.sentAt || item.scheduledAt || item.createdAt)) + '</p></div>'; }) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('點擊歷程', '') + renderHistoryList(res.clickEvents || [], '沒有點擊紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('客戶歷程', '') + renderHistoryList(res.normalizedTimeline || [], '沒有歷程紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(item.category || '') + '｜' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>';
     }
     function saveClientLabels(contactId) {
       if (!contactId) return;
