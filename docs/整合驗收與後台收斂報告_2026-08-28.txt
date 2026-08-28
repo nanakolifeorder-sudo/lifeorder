@@ -88,3 +88,30 @@ internal_test booking 只應用在 tenant = dm-test：
 /quiz 作答 -> /report 報告 -> CTA 點擊追蹤 -> CRM 資料卡歷程。
 
 完整測驗到預約到 CRM 的 production 主鏈路已跑通。剩下正式上線前必補的是 Gmail / Calendar OAuth 實際授權，以及後台 UI 的細部驗收調整。
+七、本階段 OAuth / Email / 後台 UI 收斂紀錄
+
+執行時間：2026-08-28
+
+1. Google OAuth 正式串接狀態
+- 程式端已具備 Google OAuth URL、callback、refresh token 儲存、Calendar busy 查詢、Calendar event 建立、Google Meet 產生與 Gmail send scope。
+- dm-test 目前所有顧問與管理員 google_refresh_token 都是空值，因此還不能完成「真實 Gmail 寄出」與「真實 Google Calendar event / Meet 建立」。
+- 後台已提供「連結 Google Calendar / Meet / Gmail」按鈕；正式驗收需要管理員或顧問本人登入後點擊授權。
+- Zoom 目前仍只保留規格與選項方向，尚未進入 Zoom OAuth/API 串接階段。
+
+2. 正式寄信驗收狀態
+- P01 內部測試模板已建立：測驗完成通知、未預約跟進、預約成功通知、會議前提醒。
+- production E2E 已驗證 queue 流程：測驗後排測驗信，預約後取消未預約跟進信，再排預約相關信件。
+- booking email queue 已帶 appointment_id 與 quiz_response_id。
+- Gmail 實寄尚未驗收，原因是 dm-test 尚無已授權 Google sender。
+
+3. 後台 UI 收斂
+- 左側功能列寬度、收合寬度、群組間距、按鈕圖示尺寸縮小。
+- CRM 篩選文案改為「標籤」、「名單狀態」、「搜尋名單」。
+- CRM 統計文案改為「今日作答」、「今日預約」、「近期預約」。
+- CRM 名單狀態 chip 改為「近期預約」、「待追蹤名單」、「已完成/過期」、「取消/婉拒」。
+- CRM 批次操作文案改為「全選目前結果」、「取消選取」、「替已選名單加標籤」、「替已選名單改狀態」、「套用到已選名單」。
+- 客戶卡片欄位文案改為「下一步」、「負責人」、「專案」、「名單狀態」；資料卡按鈕改為「打開資料卡」。
+- 測驗設定頁主標改為「題目管理」，上方 tabs 維持橫向功能列，匯入按鈕文案改為「下載格式檔」、「匯入並預覽」。
+
+下一個阻塞點：
+- 需要真人登入後台並完成 Google OAuth 授權，才能繼續驗證 Gmail 實際寄出、Google Calendar busy 查詢、真實 Calendar event 與 Google Meet 連結。

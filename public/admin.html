@@ -70,11 +70,11 @@
       margin: 0;
       padding: 18px;
       display: grid;
-      grid-template-columns: 236px minmax(0, 1fr);
-      gap: 14px;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 12px;
       align-items: start;
     }
-    main.app-shell.sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
+    main.app-shell.sidebar-collapsed { grid-template-columns: 68px minmax(0, 1fr); }
     .sidebar {
       position: sticky;
       top: 86px;
@@ -88,17 +88,17 @@
     .sidebar-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 4px 10px; border-bottom:1px solid var(--line); margin-bottom:8px; }
     .sidebar-title { font-weight:800; color:var(--ink); line-height:1.35; }
     .sidebar-toggle { width:36px; height:36px; padding:0; flex:0 0 36px; }
-    .nav-group { margin:8px 0; }
-    .nav-group-title { color:var(--muted); font-size:12px; font-weight:800; letter-spacing:0; padding:0 7px 4px; }
-    .nav-items { display:grid; gap:4px; }
+    .nav-group { margin:6px 0; }
+    .nav-group-title { color:var(--muted); font-size:12px; font-weight:800; letter-spacing:0; padding:0 6px 3px; }
+    .nav-items { display:grid; gap:3px; }
     .workspace { min-width:0; }
-    main.sidebar-collapsed .sidebar { padding:10px; }
+    main.sidebar-collapsed .sidebar { padding:8px; }
     main.sidebar-collapsed .sidebar-title,
     main.sidebar-collapsed .nav-group-title,
     main.sidebar-collapsed .tab-label { display:none; }
     main.sidebar-collapsed .sidebar-head { justify-content:center; padding:4px 0 10px; }
-    main.sidebar-collapsed .tab { justify-content:center; padding:10px 0; }
-    .tab-mark { width:28px; height:28px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; background:rgba(26,115,232,.12); color:var(--blue); font-weight:800; flex:0 0 28px; }
+    main.sidebar-collapsed .tab { justify-content:center; padding:8px 0; }
+    .tab-mark { width:24px; height:24px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; background:rgba(26,115,232,.12); color:var(--blue); font-weight:800; font-size:12px; flex:0 0 24px; }
     label { display: block; font-weight: 700; margin-bottom: 7px; }
     input, textarea, select {
       width: 100%;
@@ -222,9 +222,9 @@
     .name-link { border:0; background:transparent; color:var(--blue); padding:0; white-space:normal; text-align:left; font:inherit; font-weight:800; }
     .crm-card-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .crm-batch-toolbar { display:flex; gap:8px; align-items:end; flex-wrap:wrap; }
-    .crm-batch-toolbar > div { flex:1 1 220px; max-width:300px; }
+    .crm-batch-toolbar > div { flex:1 1 210px; max-width:280px; }
     .crm-batch-toolbar button { width:auto; }
-    .crm-batch-summary { margin-top:8px; }
+    .crm-batch-summary { margin-top:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .crm-card-title h3 { margin:0; color:var(--ink); }
     .crm-card-meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
     .crm-meta-item { border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--panel); min-width:0; }
@@ -354,7 +354,7 @@
     details.item > summary {
       display: grid;
       grid-template-columns: 130px minmax(180px, 1fr) 100px;
-      gap: 14px;
+      gap: 12px;
       align-items: center;
       padding: 16px;
       cursor: pointer;
@@ -372,8 +372,8 @@
     .copy-field button { flex: 0 0 auto; }
     .option-editor { display: grid; gap: 7px; }
     .question-row .row { align-items: start; }
-    .module-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 0; padding-top:10px; border-top:1px solid var(--line); }
-    .module-tabs .chip { margin:0; }
+    .module-tabs { display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 0; padding:10px 0 0; border-top:1px solid var(--line); }
+    .module-tabs .chip { margin:0; border-radius:6px; padding:8px 10px; }
     .module-section { display:none; }
     .module-section.active { display:block; }
     .compact-option {
@@ -916,21 +916,21 @@
           '<div class="row">' +
             '<div class="col-2"><h2>客戶 CRM</h2></div>' +
             '<div class="col-2"><label>專案篩選</label><select id="crmProject" onchange="loadCrmByProject(this.value)">' + projectOptions + '</select></div>' +
-            '<div class="col-2"><label>標籤篩選</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
-            '<div class="col-3"><label>流程篩選</label><select id="crmPipelineFilter" onchange="crmPipelineFilter=this.value; renderCrm(cache.crm);">' + crmPipelineOptions(crmPipelineFilter, true) + '</select></div>' +
-            '<div class="col-3"><label>搜尋</label><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名 / Email / 電話 / 答案" oninput="crmSearch=this.value; renderCrm(cache.crm);"></div>' +
+            '<div class="col-2"><label>標籤</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
+            '<div class="col-3"><label>名單狀態</label><select id="crmPipelineFilter" onchange="crmPipelineFilter=this.value; renderCrm(cache.crm);">' + crmPipelineOptions(crmPipelineFilter, true) + '</select></div>' +
+            '<div class="col-3"><label>搜尋名單</label><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名、Email、電話或答案" oninput="crmSearch=this.value; renderCrm(cache.crm);"></div>' +
           '</div>' +
           '<div class="stat-grid">' +
-            statBox('今天作答', res.crmOverview?.todayQuizResponses || 0) +
-            statBox('今天預約', res.crmOverview?.todayBookings || 0) +
+            statBox('今日作答', res.crmOverview?.todayQuizResponses || 0) +
+            statBox('今日預約', res.crmOverview?.todayBookings || 0) +
             statBox('未預約名單', res.crmOverview?.unbookedCount || counts.unbooked) +
-            statBox('即將到來行程', res.crmOverview?.upcomingCount || counts.upcoming) +
+            statBox('近期預約', res.crmOverview?.upcomingCount || counts.upcoming) +
           '</div>' +
           '<div class="subtabs">' +
-            statusChip('upcoming', '即將到來', counts.upcoming) +
-            statusChip('unbooked', '未預約名單', counts.unbooked) +
-            statusChip('past', '已過期 / 完成', counts.past) +
-            statusChip('cancelled', '取消與婉拒', counts.cancelled) +
+            statusChip('upcoming', '近期預約', counts.upcoming) +
+            statusChip('unbooked', '待追蹤名單', counts.unbooked) +
+            statusChip('past', '已完成/過期', counts.past) +
+            statusChip('cancelled', '取消/婉拒', counts.cancelled) +
             statusChip('waitlist', '等候名單', counts.waitlist) +
           '</div>' +
           crmImportPanel(res) +
@@ -945,18 +945,18 @@
       const selectedIds = Object.keys(crmSelectedContacts).filter(function (id) { return crmSelectedContacts[id]; });
       const statusOptions = crmPipelineOptions('', false);
       return '<div class="panel"><div class="crm-batch-toolbar">' +
-        '<button class="secondary" onclick="selectVisibleCrmContacts(true)">全選</button>' +
-        '<button class="secondary" onclick="selectVisibleCrmContacts(false)">清除</button>' +
-        '<div><label>替選取名單加標籤</label><input id="crmBatchTags" placeholder="例如：高意願, 待追蹤"></div>' +
-        '<div><label>替選取名單改狀態</label><select id="crmBatchStatus">' + statusOptions + '</select></div>' +
-        '<button onclick="batchUpdateCrmContacts()">套用</button>' +
-      '</div><div class="crm-batch-summary"><button class="secondary" onclick="exportCrmRows()">匯出目前結果 CSV</button><p class="mini">目前結果 ' + selectable.length + ' 筆，可更新 ' + selectedIds.length + ' 筆已選名單。</p></div></div>';
+        '<button class="secondary" onclick="selectVisibleCrmContacts(true)">全選目前結果</button>' +
+        '<button class="secondary" onclick="selectVisibleCrmContacts(false)">取消選取</button>' +
+        '<div><label>替已選名單加標籤</label><input id="crmBatchTags" placeholder="例如：高意願, 待追蹤"></div>' +
+        '<div><label>替已選名單改狀態</label><select id="crmBatchStatus">' + statusOptions + '</select></div>' +
+        '<button onclick="batchUpdateCrmContacts()">套用到已選名單</button>' +
+      '</div><div class="crm-batch-summary"><button class="secondary" onclick="exportCrmRows()">匯出目前結果 CSV</button><p class="mini">目前顯示 ' + selectable.length + ' 筆；已選 ' + selectedIds.length + ' 筆。</p></div></div>';
     }
 
     function crmSelectionCheckbox(item) {
       if (!item.crmContactId) return '';
       const id = String(item.crmContactId);
-      return '<label class="checkline" style="margin:0 10px 0 0;"><input type="checkbox" ' + (crmSelectedContacts[id] ? ' checked' : '') + ' onchange="toggleCrmContactSelection(' + Number(item.crmContactId) + ', this.checked)">選取</label>';
+      return '<label class="checkline" style="margin:0 10px 0 0;"><input type="checkbox" ' + (crmSelectedContacts[id] ? ' checked' : '') + ' onchange="toggleCrmContactSelection(' + Number(item.crmContactId) + ', this.checked)">勾選</label>';
     }
 
     function toggleCrmContactSelection(contactId, checked) {
@@ -980,7 +980,7 @@
       return list.concat([
         ['lead', '新名單'],
         ['quiz_completed', '已作答'],
-        ['unbooked', '待追蹤 / 未預約'],
+        ['unbooked', '待追蹤（未預約）'],
         ['booked', '已預約'],
         ['waitlist', '等候名單'],
         ['completed', '已完成'],
@@ -1219,16 +1219,16 @@
           '<span class="badge">' + escapeHtml(projectLabel) + '</span>' +
         '</div>' +
         '<div class="crm-card-meta">' +
-          '<div class="crm-meta-item"><div class="mini">預約狀態</div><strong>' + escapeHtml(primaryTime) + '</strong></div>' +
-          '<div class="crm-meta-item"><div class="mini">負責顧問</div><strong>' + escapeHtml(ownerLabel) + '</strong></div>' +
-          '<div class="crm-meta-item"><div class="mini">來源專案</div><strong>' + escapeHtml(projectLabel) + '</strong></div>' +
-          '<div class="crm-meta-item"><div class="mini">流程</div><strong>' + escapeHtml(crmPipelineLabel(stageValue || 'lead')) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">下一步</div><strong>' + escapeHtml(primaryTime) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">負責人</div><strong>' + escapeHtml(ownerLabel) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">專案</div><strong>' + escapeHtml(projectLabel) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">名單狀態</div><strong>' + escapeHtml(crmPipelineLabel(stageValue || 'lead')) + '</strong></div>' +
         '</div>' +
         renderTagPills(item.tags || []) +
-        '<div class="answer-box"><div class="mini">表單 / 測驗摘要</div><div class="crm-answer-list">' + crmAnswerPreview(item) + '</div></div>' +
+        '<div class="answer-box"><div class="mini">表單/測驗摘要</div><div class="crm-answer-list">' + crmAnswerPreview(item) + '</div></div>' +
         (item.meetLink ? '<p><a href="' + escapeHtml(item.meetLink) + '" target="_blank">開啟會議連結</a></p>' : '') +
         (item.kind === 'appointment' && crmMode === 'past' ? crmEditor(item) : '') +
-        '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">查看客戶資料卡</button>' + actionButtons + '</div>' +
+        '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">打開資料卡</button>' + actionButtons + '</div>' +
       '</div>';
     }
 
@@ -1301,13 +1301,13 @@
         '<div class="detail-hero">' +
           '<div>' +
             '<div class="detail-identity"><h2>' + escapeHtml(contact.name || '客戶資料卡') + '</h2><span class="badge">' + escapeHtml(lifecycleLabel) + '</span><span class="badge">' + escapeHtml(projectLabel) + '</span></div>' +
-            '<div class="detail-contact-grid">' + crmDetailMeta('電話', contact.phone || '') + crmDetailMeta('Email', contact.email || '') + crmDetailMeta('最新狀態', lifecycleLabel) + '</div>' +
+            '<div class="detail-contact-grid">' + crmDetailMeta('電話', contact.phone || '') + crmDetailMeta('Email', contact.email || '') + crmDetailMeta('名單狀態', lifecycleLabel) + '</div>' +
             tagPills +
           '</div>' +
           '<button class="secondary" onclick="detailDialog().close()">關閉</button>' +
         '</div>' +
         '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + statBox('Email 紀錄', summary.emailCount || 0) + statBox('點擊紀錄', summary.clickCount || 0) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('基本資料', '最近互動') + '<div class="crm-card-meta">' + crmDetailMeta('專案', projectLabel) + crmDetailMeta('最新測驗', compactDate(summary.latestQuizAt)) + crmDetailMeta('最新預約', compactDate(summary.latestAppointmentAt)) + crmDetailMeta('CRM 狀態', lifecycleLabel) + '</div></div>' +
+        '<div class="detail-section">' + sectionTitle('基本資料', '最近互動') + '<div class="crm-card-meta">' + crmDetailMeta('專案', projectLabel) + crmDetailMeta('最新測驗', compactDate(summary.latestQuizAt)) + crmDetailMeta('最新預約', compactDate(summary.latestAppointmentAt)) + crmDetailMeta('名單狀態', lifecycleLabel) + '</div></div>' +
         '<div class="detail-section">' + sectionTitle('名單分類', '標籤用來做歸類，流程狀態用來追蹤進度') + '<div class="row"><div class="col-5"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-3"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-4"><button onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存分類</button></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
         '<div class="detail-section">' + sectionTitle('測驗紀錄', '') + (latest ? '<p>版本：' + escapeHtml(latest.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(latest.submittedAt)) + '</p><div class="actions"><a target="_blank" href="' + escapeHtml(latest.reportUrl || '') + '">開啟報告連結</a></div>' + renderScoreItems(latest.scoreItems || []) : '<p class="mini">沒有測驗紀錄。</p>') + '</div>' +
         '<div class="detail-section">' + sectionTitle('作答詳情', '') + renderAnswerRows(answers) + '</div>' +
@@ -2103,12 +2103,12 @@
         quizEditorTabButton('ranges', '分數區間') +
         quizEditorTabButton('questions', '題目與加分選項') +
       '</div>';
-      document.getElementById('view').innerHTML = '<div class="panel"><h2>測驗設定</h2><div class="row"><div class="col-4"><label>專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>載入版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'A') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button onclick="saveQuizEditor()">儲存測驗設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'P01') + '&version=' + encodeURIComponent(res.versionCode || 'A') + '">開啟前台測驗</a></div></div>' +
-        '<div class="panel module-section" data-section="settings"><h2>測驗設定</h2><label>版本說明</label><textarea id="quizVersionDescription">' + escapeHtml(currentVersion.description || '') + '</textarea></div>' +
+      document.getElementById('view').innerHTML = '<div class="panel"><h2>題目管理</h2><div class="row"><div class="col-4"><label>選擇專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>目前版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'A') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button onclick="saveQuizEditor()">儲存設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'P01') + '&version=' + encodeURIComponent(res.versionCode || 'A') + '">開啟前台測驗</a></div></div>' +
+        '<div class="panel module-section" data-section="settings"><h2>測驗基本設定</h2><label>版本說明</label><textarea id="quizVersionDescription">' + escapeHtml(currentVersion.description || '') + '</textarea></div>' +
         '<div class="panel module-section" data-section="stages"><h2>題目階段</h2><div class="list" id="quizStages">' + (res.stages || []).map(quizStageRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizStage()">新增階段</button></div></div>' +
         '<div class="panel module-section" data-section="dimensions"><h2>分數面向</h2><p>滿分會依照題目選項加分自動計算；後台只需要設定報告頁要顯示的滿分，例如 100。</p><div class="list" id="quizDimensions">' + (res.dimensions || []).map(quizDimensionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizDimension()">新增面向</button></div></div>' +
-        '<div class="panel module-section" data-section="ranges"><h2>分數區間</h2><p>同一個面向的區間不能重疊，例如 0-5、6-10。</p><div class="list" id="quizRanges">' + (res.ranges || []).map(quizRangeRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizRange()">新增區間</button></div></div>' +
-        '<div class="panel module-section" data-section="questions"><h2>題目與選項加分</h2>' + quizQuestionImportPanel() + '<div class="list" id="quizQuestions">' + (res.questions || []).map(quizQuestionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizQuestion()">新增題目</button></div></div>';
+        '<div class="panel module-section" data-section="ranges"><h2>分數區間</h2><p>同一個面向的分數區間不能重疊，例如 0-5、6-10。</p><div class="list" id="quizRanges">' + (res.ranges || []).map(quizRangeRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizRange()">新增區間</button></div></div>' +
+        '<div class="panel module-section" data-section="questions"><h2>題目與選項分數</h2>' + quizQuestionImportPanel() + '<div class="list" id="quizQuestions">' + (res.questions || []).map(quizQuestionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizQuestion()">新增題目</button></div></div>';
       setQuizEditorTab(quizEditorTab);
     }
 
@@ -2128,9 +2128,9 @@
       return '<details class="item" style="margin-bottom:12px;"><summary><span>匯入題目</span><span>CSV / TSV / 試算表貼上</span><span>先預覽後儲存</span></summary>' +
         '<div class="details-body"><div class="row">' +
           '<div class="col-4"><label>選擇檔案</label><input id="quizImportFile" type="file" accept=".csv,.tsv,.txt" onchange="loadQuizImportFile(this)"></div>' +
-          '<div class="col-4 actions"><button class="secondary" type="button" onclick="downloadQuizImportTemplate()">下載格式檔 CSV</button><button type="button" onclick="importQuizQuestions()">匯入到目前設定</button></div>' +
+          '<div class="col-4 actions"><button class="secondary" type="button" onclick="downloadQuizImportTemplate()">下載格式檔</button><button type="button" onclick="importQuizQuestions()">匯入並預覽</button></div>' +
           '<div class="col-4"><p id="quizImportResult" class="mini">支援分數欄位：' + escapeHtml(scoreColumns) + '</p></div>' +
-          '<div class="col-12"><label>貼上資料</label><textarea id="quizImportText" placeholder="題號,階段,階段標題,題型,題目,補充說明,選項代碼,選項文字,需求清晰度,預約急迫度,執行準備度&#10;1,第一階段,目前狀態,單選,你目前最想解決的是什麼,,A,我已經想清楚了,5,3,4"></textarea><p class="mini">每一列是一個選項；同一題多個選項請使用相同題號。分數以整數填寫。匯入後會重繪在畫面上，確認無誤再按上方「儲存測驗設定」。</p></div>' +
+          '<div class="col-12"><label>貼上資料</label><textarea id="quizImportText" placeholder="題號,階段,階段標題,題型,題目,補充說明,選項代碼,選項文字,需求清晰度,預約急迫度,執行準備度&#10;1,第一階段,目前狀態,單選,你目前最想解決的是什麼,,A,我已經想清楚了,5,3,4"></textarea><p class="mini">每一列是一個選項；同一題多個選項請使用相同題號。分數以整數填寫。匯入後會重繪在畫面上，確認無誤後，再按上方「儲存設定」。</p></div>' +
         '</div></div></details>';
     }
 
