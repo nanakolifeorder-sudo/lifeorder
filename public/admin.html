@@ -593,6 +593,10 @@
     let crmPipelineFilter = 'ALL';
     let crmSearch = '';
     let crmSelectedContacts = {};
+    let quizLeadProject = 'ALL';
+    let quizLeadMode = 'unbooked';
+    let quizLeadTagFilter = 'ALL';
+    let quizLeadSearch = '';
     let emailProject = 'ALL';
     let emailModule = 'booking';
     let quizEditorTab = 'settings';
@@ -782,6 +786,7 @@
     function availableTabs() {
       return [
         { id: 'crm', group: '客戶管理', mark: '客', label: '客戶 CRM', ok: true },
+        { id: 'quizLeads', group: '客戶管理', mark: '測', label: '測驗名單', ok: can('CRM_ALL') },
         { id: 'analytics', group: '客戶管理', mark: '數', label: '作答數據', ok: can('ANALYTICS') },
         { id: 'schedule', group: '預約系統', mark: '排', label: '排班系統', ok: true },
         { id: 'consultants', group: '預約系統', mark: '顧', label: '顧問管理', ok: isAdmin() },
@@ -829,6 +834,7 @@
       });
       const map = {
         crm: loadCrm,
+        quizLeads: loadQuizLeads,
         schedule: loadSchedule,
         consultants: loadConsultants,
         projects: loadProjects,
@@ -847,6 +853,7 @@
     function refreshCurrent() {
       delete cache[currentView];
       if (currentView === 'crm') delete cache.crm;
+      if (currentView === 'quizLeads') delete cache.quizLeads;
       showView(currentView);
     }
 
@@ -858,6 +865,94 @@
       document.getElementById('view').innerHTML = '<div class="panel"><h2>發生錯誤</h2><p class="bad">' + escapeHtml(err.message || err) + '</p></div>';
     }
 
+    function loadQuizLeads() {
+      loading('測驗名單');
+      api('getQuizLeadList', { projectCode: quizLeadProject }).then(function (res) {
+        cache.quizLeads = res;
+        renderQuizLeads(res);
+      }).catch(showError);
+    }
+
+    function loadQuizLeadsByProject(value) {
+      quizLeadProject = value || 'ALL';
+      delete cache.quizLeads;
+      loadQuizLeads();
+    }
+
+    function quizLeadStatusValue(item) {
+      if (item.hasBooking || item.appointmentId) return 'booked';
+      return 'unbooked';
+    }
+
+    function quizLeadStatusLabel(value) {
+      return value === 'booked' ? '已預約' : '未預約';
+    }
+
+    function quizLeadMatchesFilters(item) {
+      if (quizLeadMode !== 'ALL' && quizLeadStatusValue(item) !== quizLeadMode) return false;
+      const tags = Array.isArray(item.tags) ? item.tags : [];
+      if (quizLeadTagFilter !== 'ALL' && !tags.includes(quizLeadTagFilter)) return false;
+      const needle = String(quizLeadSearch || '').trim().toLowerCase();
+      if (!needle) return true;
+      return [item.clientName, item.clientEmail, item.clientPhone, item.projectName, item.projectCode, item.versionCode, item.answers, quizLeadStatusLabel(quizLeadStatusValue(item))]
+        .some(function (value) { return String(value || '').toLowerCase().includes(needle); });
+    }
+
+    function renderQuizLeads(res) {
+      window.crmCardItems = {};
+      const all = res.responses || [];
+      const stats = res.stats || {};
+      const rows = all.filter(quizLeadMatchesFilters).sort(function (a, b) { return (b.timeObj || 0) - (a.timeObj || 0); });
+      const projectOptions = ['<option value="ALL">所有專案</option>'].concat((res.projects || []).map(function (p) {
+        return '<option value="' + escapeHtml(p.code) + '"' + (quizLeadProject === p.code ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>';
+      })).join('');
+      const tagOptions = ['<option value="ALL">所有標籤</option>'].concat((res.crmTags || []).map(function (tag) {
+        return '<option value="' + escapeHtml(tag) + '"' + (quizLeadTagFilter === tag ? ' selected' : '') + '>' + escapeHtml(tag) + '</option>';
+      })).join('');
+      document.getElementById('view').innerHTML =
+        '<div class="panel">' +
+          '<div class="row">' +
+            '<div class="col-3"><h2>測驗名單</h2><p class="mini">看每一份測驗作答，預設顯示尚未預約的人。</p></div>' +
+            '<div class="col-3"><label>專案篩選</label><select onchange="loadQuizLeadsByProject(this.value)">' + projectOptions + '</select></div>' +
+            '<div class="col-2"><label>預約狀態</label><select onchange="quizLeadMode=this.value; renderQuizLeads(cache.quizLeads);"><option value="unbooked"' + (quizLeadMode === 'unbooked' ? ' selected' : '') + '>未預約</option><option value="booked"' + (quizLeadMode === 'booked' ? ' selected' : '') + '>已預約</option><option value="ALL"' + (quizLeadMode === 'ALL' ? ' selected' : '') + '>全部</option></select></div>' +
+            '<div class="col-2"><label>標籤</label><select onchange="quizLeadTagFilter=this.value; renderQuizLeads(cache.quizLeads);">' + tagOptions + '</select></div>' +
+            '<div class="col-2"><label>搜尋</label><input value="' + escapeHtml(quizLeadSearch) + '" placeholder="姓名、Email、答案" oninput="quizLeadSearch=this.value; renderQuizLeads(cache.quizLeads);"></div>' +
+          '</div>' +
+          '<div class="stat-grid">' +
+            statBox('今日作答', stats.today || 0) +
+            statBox('全部作答', stats.total || all.length) +
+            statBox('未預約測驗', stats.unbooked || 0) +
+            statBox('已預約測驗', stats.booked || 0) +
+          '</div>' +
+        '</div>' +
+        '<div class="panel"><div class="actions">' +
+          '<button class="chip ' + (quizLeadMode === 'unbooked' ? ' active' : '') + '" onclick="quizLeadMode=&quot;unbooked&quot;; renderQuizLeads(cache.quizLeads);">未預約 <span class="badge">' + escapeHtml(String(stats.unbooked || 0)) + '</span></button>' +
+          '<button class="chip ' + (quizLeadMode === 'booked' ? ' active' : '') + '" onclick="quizLeadMode=&quot;booked&quot;; renderQuizLeads(cache.quizLeads);">已預約 <span class="badge">' + escapeHtml(String(stats.booked || 0)) + '</span></button>' +
+          '<button class="chip ' + (quizLeadMode === 'ALL' ? ' active' : '') + '" onclick="quizLeadMode=&quot;ALL&quot;; renderQuizLeads(cache.quizLeads);">全部 <span class="badge">' + escapeHtml(String(stats.total || all.length)) + '</span></button>' +
+        '</div></div>' +
+        '<div class="list">' + (rows.length ? rows.map(quizLeadCard).join('') : '<div class="panel"><p>目前沒有符合條件的測驗名單。</p></div>') + '</div>';
+    }
+
+    function quizLeadCard(item) {
+      const key = 'quiz_' + String(item.rowId || item.publicId || item.clientEmail || Math.random());
+      window.crmCardItems[key] = item;
+      const status = quizLeadStatusValue(item);
+      const projectLabel = item.projectName || item.projectCode || '未指定專案';
+      const reportLink = item.reportUrl ? '<a class="secondary" target="_blank" href="' + escapeHtml(item.reportUrl) + '">開啟報告</a>' : '';
+      return '<div class="client-card ' + escapeHtml(status) + ' quiz-response">' +
+        '<div class="card-top"><div><div class="crm-card-title"><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> <span class="badge">' + escapeHtml(quizLeadStatusLabel(status)) + '</span><span class="badge">版本 ' + escapeHtml(item.versionCode || '') + '</span></div>' +
+        '<p class="mini">' + escapeHtml(compactDate(item.submittedAt)) + ' ｜ ' + escapeHtml(item.clientPhone || '無電話') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p></div><span class="badge">' + escapeHtml(projectLabel) + '</span></div>' +
+        '<div class="crm-card-meta">' +
+          '<div class="crm-meta-item"><div class="mini">作答時間</div><strong>' + escapeHtml(compactDate(item.submittedAt) || '無資料') + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">預約狀態</div><strong>' + escapeHtml(quizLeadStatusLabel(status)) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">專案</div><strong>' + escapeHtml(projectLabel) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">版本</div><strong>' + escapeHtml(item.versionCode || '預設') + '</strong></div>' +
+        '</div>' +
+        renderTagPills(item.tags || []) +
+        '<div class="answer-box"><div class="mini">作答摘要</div><div class="crm-answer-list">' + crmAnswerPreview(item) + '</div></div>' +
+        '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">打開資料卡</button>' + reportLink + '</div>' +
+      '</div>';
+    }
     function loadCrm() {
       if (cache.crm) {
         renderCrm(cache.crm);
