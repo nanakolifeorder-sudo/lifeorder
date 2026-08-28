@@ -45,7 +45,7 @@ function normalizeProject(value) {
 
 async function applySql(client, file) {
   const fullPath = path.resolve(process.cwd(), file);
-  const sql = fs.readFileSync(fullPath, 'utf8');
+  const sql = fs.readFileSync(fullPath, 'utf8').replace(/^\uFEFF/, '');
   await client.query(sql);
   console.log(`SQL applied: ${file}`);
 }
