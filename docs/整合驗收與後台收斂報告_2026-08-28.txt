@@ -43,15 +43,32 @@ https://dm-booking-saas.vercel.app/report?tenant=dm-test&p=P01&qrid=16efc8d0-268
 - 修正 availability specific date 的時區比對，避免 date_value 以 UTC 儲存後無法對到 Asia/Taipei 日期。
 - 已補 dm-test 顧問 id 4 的 2026-08-29 到 2026-09-07 測試時段，每天 10:00-17:00。
 
-三、目前注意事項
+三、Email / OAuth 驗收結果
 
-Email queue 本次為 0，原因是 P01 目前沒有被觸發的啟用信件模板；不是測驗、CTA、預約、CRM 串接錯誤。
+已補 P01 內部測試 Email 模板：
+- quiz_completed：測驗完成通知。
+- quiz_completed_unbooked：未預約跟進。
+- booking_created：預約成功通知。
+- meeting_before：會議前提醒。
+
+production E2E 已驗證：
+- 測驗送出後會建立 2 筆 quiz module queue。
+- 完成預約後，quiz_completed 與 quiz_completed_unbooked 會被取消。
+- 完成預約後會新增 booking_created 與 meeting_before 兩筆 booking module queue。
+- booking module queue 已正確帶 appointment_id 與 quiz_response_id。
+- CRM timeline 可看到測驗完成、報告查看、CTA 點擊、預約建立、信件排入佇列。
+
+正式寄信注意事項：
+- dm-test 目前沒有任何顧問或管理員連接 Google OAuth sender，因此 queue 可以建立，但不能正式寄出 Gmail。
+- 正式上線前需要由管理員完成 Gmail OAuth，或指定可寄信的系統寄件帳號。
+
+四、目前注意事項
 
 internal_test booking 只應用在 tenant = dm-test：
 - 正式 tenant 仍維持原規則，顧問必須連接 Google Calendar 或 Microsoft Calendar 才會產生可預約時段。
 - internal_test 預約會建立 appointments 與 CRM timeline，但不會真的建立 Google Calendar event。
 
-四、本次後台 UI 收斂內容
+五、本次後台 UI 收斂內容
 
 已整理：
 - 左側功能列寬度與間距縮小，降低佔用畫面。
@@ -65,9 +82,9 @@ internal_test booking 只應用在 tenant = dm-test：
 - CRM 批次操作文案改成「替選取名單加標籤」、「替選取名單改狀態」、「套用」。
 - 測驗設定上方 tabs 增加分隔線，讓目前編輯區與切換區更清楚。
 
-五、目前結論
+六、目前結論
 
 測驗漏斗到 CRM 的主資料鏈已成立：
 /quiz 作答 -> /report 報告 -> CTA 點擊追蹤 -> CRM 資料卡歷程。
 
-剩下要補的是「可預約時段 / 顧問 OAuth / 排班」設定完成後，再跑一次真正完成預約的驗收。
+完整測驗到預約到 CRM 的 production 主鏈路已跑通。剩下正式上線前必補的是 Gmail / Calendar OAuth 實際授權，以及後台 UI 的細部驗收調整。
