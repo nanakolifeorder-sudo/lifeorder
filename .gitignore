@@ -5,3 +5,4 @@ node_modules
 *.log
 *.xlsx
 legacy_import_payload.json
+outputs/

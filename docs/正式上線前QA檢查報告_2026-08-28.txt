@@ -1,0 +1,130 @@
+正式上線前 QA 檢查報告
+日期：2026-08-28
+
+一、完整流程 smoke
+
+production 網址：https://dm-booking-saas.vercel.app
+測試 tenant：dm-test
+測試 project：P01
+測試 Email：qa-e2e-1787893089@example.com
+測試 qrid：dd042058-f2be-4fde-9531-3e442b89ed10
+
+已完成：
+
+1. /quiz 可取得測驗設定並送出作答。
+2. /report 可產生 qrid 報告連結。
+3. 報告頁預約 CTA 點擊追蹤成功。
+4. /booking 可取得 70 個內部測試時段。
+5. 預約送出成功，使用內部測試 Calendar 模式建立測試會議連結。
+6. 測驗完成但未預約的 queue cancellation 邏輯在前一輪驗收已通過。
+
+本輪補洞：
+
+1. 發現內部測試模式下，已存在於資料庫的預約時段仍可能出現在 getAvailableTimes 清單。
+2. 已修正 getAvailableTimes，現在會同時納入 Calendar busy 與 appointments 資料表，排除已預約且未取消的時段。
+
+二、手機版檢查
+
+目前完成靜態響應式檢查：
+
+1. admin.html 已有 780px 以下側欄轉單欄、CRM 卡片與資料卡欄位縮排規則。
+2. quiz.html 已有 640px 以下按鈕全寬與表單 padding 調整。
+3. report.html 已有 720px 以下圖表 / 內容單欄與 CTA 全寬規則。
+4. booking.html 已有 760px 以下日曆與時段區塊單欄規則。
+
+尚未完成：
+
+1. 真機手機點擊驗收。
+2. Playwright 手機截圖驗收。
+
+三、Vercel env vars 檢查
+
+已由 production API 行為間接確認：
+
+1. DATABASE_URL 可連線。
+2. APP_URL / rewrite 基礎行為可用。
+3. /quiz、/report、/booking、/admin rewrite 可開啟。
+
+仍需在 Vercel UI 人工確認值是否為正式值：
+
+1. DATABASE_URL
+2. APP_URL
+3. JWT_SECRET
+4. TOKEN_ENCRYPTION_KEY
+5. GOOGLE_CLIENT_ID
+6. GOOGLE_CLIENT_SECRET
+7. GOOGLE_REDIRECT_URI
+8. CRON_SECRET
+9. EMAIL_FROM 或 sender 相關設定
+10. Zoom 相關設定若要啟用再補
+
+注意：Vercel secret 類型的值無法在 UI 或程式端讀回，只能改值、重設或透過 production 行為間接驗證。
+
+四、Supabase schema / migration 檢查
+
+已盤點 migration 檔：
+
+1. sql/schema.sql
+   - tenants
+   - projects
+   - consultants
+   - availability_rules
+   - questions
+   - appointments
+   - rejected_clients
+   - waitlist_clients
+   - page_views
+   - email_templates
+   - leads
+   - email_queue
+   - email_suppressions
+   - admin_alerts
+
+2. sql/integration-phase-2-quiz-crm-schema.sql
+   - quiz_versions
+   - quiz_stages
+   - quiz_questions
+   - quiz_question_options
+   - quiz_score_dimensions
+   - quiz_score_ranges
+   - quiz_result_settings
+   - quiz_report_blocks
+   - crm_contacts
+   - quiz_responses
+   - quiz_response_answers
+   - crm_timeline_events
+   - page_settings
+   - CRM / quiz / email / page view 擴充欄位與 index
+
+3. sql/upgrade-security-email-backup.sql
+   - login_attempts
+   - email_suppressions
+   - admin_alerts
+   - email_queue retry 欄位
+
+五、備份 / 匯出流程確認
+
+已存在文件：docs/supabase_backup_zh.txt
+目前交付判斷：
+
+1. Supabase 正式備份仍以 Supabase dashboard / pg_dump / SQL export 為主。
+2. CRM 名單匯出已在後台支援 CSV。
+3. 匯入格式檔已補 CRM 與測驗題目模板。
+4. 正式移交客戶前，需用客戶 Supabase project 跑一次完整 backup / restore 演練。
+
+六、OAuth / 真寄信狀態
+
+尚未完成正式 OAuth 與真寄信，原因不是程式阻塞，而是需要真人登入授權：
+
+1. 管理員 Gmail 寄信授權尚未完成正式帳號驗收。
+2. 顧問 Google Calendar busy / event 尚未完成正式帳號驗收。
+3. Google Meet 實際連結目前 dm-test 使用 internal_test 連結，正式帳號授權後再驗。
+4. Zoom 流程仍列為後續選配。
+5. queue 邏輯已通，但 Gmail sender 未完成正式授權前不能視為真寄信驗收完成。
+
+七、工程師 / 最高權限後台
+
+已確認目前有後端最高權限基礎與 API 保護設計。
+尚未實作入口網址，因為入口網址命名前必須先詢問業主。
+
+待業主提供：工程師後台入口網址名稱。

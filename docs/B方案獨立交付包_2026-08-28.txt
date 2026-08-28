@@ -1,0 +1,79 @@
+B 方案獨立交付包整理
+日期：2026-08-28
+
+一、交付定位
+
+B 方案不是現在立刻拆出去，而是先在目前帳號與 repo 完成整合版。等功能穩定後，再整理成可複製到客戶自有帳號的獨立交付包。
+
+二、獨立交付時客戶需要準備
+
+1. GitHub repo
+2. Vercel project
+3. Supabase project
+4. Google Cloud OAuth project
+5. Gmail sender 授權帳號
+6. 顧問 Google Calendar 授權帳號
+7. 如需 Zoom，再補 Zoom app / OAuth 設定
+
+三、系統交付內容
+
+1. 前台
+   - /quiz 測驗或報名表單
+   - /report 測驗結果 / 報名完成頁
+   - /booking 預約頁
+   - iframe 安裝碼
+
+2. 後台
+   - 客戶 CRM
+   - 已預約行程管理
+   - 等候名單
+   - 拒絕 / 淘汰名單
+   - 作答數據
+   - 客戶歷程紀錄
+   - 預約表單
+   - 排班系統
+   - 顧問管理
+   - 提醒信管理
+   - 題目管理
+   - 分數 / 分類規則
+   - 檢測報告設定
+   - 測驗結果頁設定
+   - 跟進信管理
+
+3. 匯入格式
+   - CRM 匯入格式檔
+   - 測驗題目匯入格式檔
+   - Google Sheets 建立副本引導
+
+四、多客戶與工程師後台
+
+1. 客戶版登入後預設只看到自己的系統。
+2. 多客戶管理 UI 預設隱藏。
+3. 多客戶管理只給工程師 / 最高權限後台使用。
+4. 不做登入頁連點後門。
+5. 工程師後台必須使用正式後端權限保護。
+6. 工程師後台入口網址尚未命名，命名前必須先由業主確認。
+
+五、搬遷步驟
+
+1. 建立客戶 GitHub repo。
+2. 複製目前整合版程式碼。
+3. 建立客戶 Supabase project。
+4. 執行 schema migration。
+5. 匯入必要 demo / 初始設定。
+6. 在 Vercel 建立 project 並設定環境變數。
+7. 在 Google Cloud 建立 OAuth client。
+8. 設定 OAuth redirect URI。
+9. 管理員完成 Gmail 授權。
+10. 顧問完成 Google Calendar 授權。
+11. 跑完整 /quiz -> /report -> /booking -> CRM 驗收。
+
+六、交付前必查
+
+1. DATABASE_URL 指向客戶 Supabase。
+2. APP_URL 指向客戶正式網域。
+3. JWT_SECRET / TOKEN_ENCRYPTION_KEY 已重新產生。
+4. Google OAuth client id / secret 不沿用開發環境。
+5. Supabase RLS / 權限政策已套用。
+6. Email queue 與 cron secret 可正常工作。
+7. 備份 / 匯出流程已交付。

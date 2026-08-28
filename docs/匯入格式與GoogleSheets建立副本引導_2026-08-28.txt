@@ -1,0 +1,53 @@
+匯入格式與 Google Sheets 建立副本引導
+日期：2026-08-28
+
+一、已提供的本機格式檔
+
+1. CRM 匯入 CSV
+   - templates/crm-import-template.csv
+   - 用途：匯入既有 Google 表單、活動報名、人工整理名單。
+   - 主要欄位：姓名、Email、手機、來源、狀態、標籤、備註、專案代碼、負責顧問、建立日期。
+
+2. 測驗題目匯入 CSV
+   - templates/quiz-import-template.csv
+   - 用途：讓客戶先在試算表整理題目，再匯入後台。
+   - 主要欄位：專案代碼、版本名稱、階段名稱、階段說明、題目文字、題型、是否必填、選項文字、加分面向、加分數值、排序。
+
+3. XLSX 格式檔
+   - outputs/import-templates-2026-08-28/crm-import-template.xlsx
+   - outputs/import-templates-2026-08-28/quiz-import-template.xlsx
+   - 這兩份包含「使用說明」、「正式匯入工作表」、「選單資料」。
+
+二、Google Sheets 使用方式
+
+建議交付給客戶時，先把 XLSX 匯入 Google Drive 並轉成 Google Sheets。目前已建立的 Google Sheets 格式檔：
+
+1. CRM 匯入格式檔
+   - https://docs.google.com/spreadsheets/d/118mChfmFw0CcL9-E7kulPRXLhoChk3UZbHW5S4iU_I4
+
+2. 測驗題目匯入格式檔
+   - https://docs.google.com/spreadsheets/d/1WHxe8Z-zfPSQIg_1eewFwaTH4ySKTjP-UI-J9-Sgz-0
+
+客戶使用流程：
+
+1. 打開 Google Sheets 格式檔。
+2. 點選「檔案」。
+3. 點選「建立副本」。
+4. 在副本中填寫資料。
+5. 不要修改第一列欄位名稱。
+6. 填好後下載成 CSV 或 XLSX，再回到後台匯入。
+
+三、欄位設計原則
+
+1. 客戶不用理解內部代碼。
+2. 題型、是否必填、狀態、來源盡量用選單。
+3. 測驗面向用「面向名稱」填寫，系統背後再對應或建立面向代碼。
+4. 加分數值以整數為主。
+5. CRM 標籤可用逗號分隔，例如：高意願,待追蹤。
+
+四、後續實作注意
+
+1. 後台「匯入題目」旁邊應提供「下載格式檔」。
+2. 若有 Google Sheets 公開模板連結，按鈕文案可改成「開啟 Google Sheets 格式檔」。
+3. 匯入前需做欄位檢查，避免欄位名稱被改掉造成資料錯位。
+4. 匯入結果應回報成功筆數、略過筆數、錯誤列與錯誤原因。
