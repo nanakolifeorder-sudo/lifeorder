@@ -17,7 +17,7 @@
 - 網址：https://dm-booking-saas.vercel.app
 - tenant：dm-test
 - project：P01
-- 測試信箱：integration-e2e-時間戳@example.com
+- 測試信箱：full-e2e-1787882775639@example.com
 
 已通過：
 - getQuizConfig 可讀到 P01 / A 版測驗。
@@ -28,30 +28,28 @@
 - reportSnapshot 有 3 個報告區塊。
 - getQuizResult 可讀取報告。
 - trackReportClick 可記錄預約 CTA 點擊。
-- CRM 資料卡可查到該測試客戶。
-- CRM 資料卡摘要可查到：測驗 1 筆、點擊 1 筆。
+- getAvailableTimes 可讀到 70 個可預約測試時段。
+- submitBooking 可成功建立預約。
+- CRM contact lifecycle_stage 已更新為 booked。
+- CRM contact latest_quiz_response_id、latest_appointment_id、assigned_consultant_id 已回填。
+- CRM timeline 可查到 quiz_completed、quiz_report_viewed、booking_cta_click、booking_created。
+- appointments 已建立預約 id 312，顧問為 DMtest 顧問，時間為 2026-08-29 10:00 Asia/Taipei。
 
-本次產生的其中一筆報告連結：
-https://dm-booking-saas.vercel.app/report?tenant=dm-test&p=P01&qrid=71555fdf-74ac-48ce-80d0-cd5d53d03f9b
+本次產生的報告連結：
+https://dm-booking-saas.vercel.app/report?tenant=dm-test&p=P01&qrid=16efc8d0-268f-4fc4-bd8a-66f966e531ea
 
-三、目前阻塞
+本次補洞：
+- dm-test 顧問尚未連 Google Calendar，新增只限 dm-test 的 internal_test booking 模式，讓內部測試可以完成預約資料流。
+- 修正 availability specific date 的時區比對，避免 date_value 以 UTC 儲存後無法對到 Asia/Taipei 日期。
+- 已補 dm-test 顧問 id 4 的 2026-08-29 到 2026-09-07 測試時段，每天 10:00-17:00。
 
-getAvailableTimes 回傳 0 筆可預約時段，因此無法在 production 完成 /booking 預約送出。
+三、目前注意事項
 
-這通常不是程式資料流問題，而是設定狀態問題，可能原因：
-- dm-test 沒有已授權 Google Calendar 或 Microsoft Calendar 的顧問。
-- 顧問目前未啟用接案。
-- 顧問排班沒有開放未來可預約時段。
-- Calendar busy 查詢失敗導致沒有可用時段。
+Email queue 本次為 0，原因是 P01 目前沒有被觸發的啟用信件模板；不是測驗、CTA、預約、CRM 串接錯誤。
 
-待補驗收：
-- 顧問完成 Google Calendar OAuth。
-- 確認顧問接案狀態為啟用。
-- 設定未來可預約排班。
-- 重新跑 /booking 完成預約。
-- 檢查 appointments.quiz_response_id 與 quiz_responses.appointment_id 是否互相回填。
-- 檢查 CRM 資料卡預約紀錄是否出現。
-- 檢查測驗未預約跟進信是否在預約後被停止。
+internal_test booking 只應用在 tenant = dm-test：
+- 正式 tenant 仍維持原規則，顧問必須連接 Google Calendar 或 Microsoft Calendar 才會產生可預約時段。
+- internal_test 預約會建立 appointments 與 CRM timeline，但不會真的建立 Google Calendar event。
 
 四、本次後台 UI 收斂內容
 
