@@ -4,7 +4,7 @@ DM Booking SaaS 中央版
 
 1. 核心代碼集中放在你自己的 GitHub / Vercel。
 2. 資料集中放在一個 Postgres 資料庫，靠 tenant 區分不同客戶。
-3. 客戶 Systeme 頁面只貼很薄的安裝碼。
+3. 客戶 Systeme / ClickFunnels 頁面只貼 iframe 安裝碼。
 4. 每位顧問透過 Google OAuth 連接自己的 Calendar / Meet。
 5. 之後維護只要更新 GitHub，Vercel 會重新部署中央版本。
 
@@ -12,7 +12,7 @@ DM Booking SaaS 中央版
 
 - public/booking.html：客人看的預約頁。
 - public/admin.html：客戶使用的後台。
-- public/embed.js：Systeme 預約頁嵌入用。
+- public/embed.js：舊版 inline script 嵌入保留相容；新安裝以 iframe 為主。
 - api/index.js：中央 API 入口。
 - api/oauth-callback.js：Google OAuth 回呼。
 - lib/*.js：資料庫、登入、OAuth、時段、預約邏輯。

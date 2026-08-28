@@ -1,0 +1,19 @@
+<!--
+Systeme / ClickFunnels 測驗或報名表單 iframe 安裝碼
+
+請替換：
+1. src 裡的 Vercel 網址，例如 https://dm-booking-saas.vercel.app
+2. tenant：使用者代碼，例如 dm-test
+3. p：專案代碼，例如 P01
+4. version：需要指定 A/B 版本時才加，例如 &version=A
+-->
+
+<iframe
+  src="https://dm-booking-saas.vercel.app/quiz?tenant=dm-test&p=P01"
+  title="線上測驗"
+  width="100%"
+  height="920"
+  loading="lazy"
+  style="width:100%;min-height:920px;border:0;display:block;"
+  referrerpolicy="strict-origin-when-cross-origin"
+></iframe>

@@ -1,21 +1,18 @@
 <!--
-Systeme 預約頁安裝碼
+Systeme / ClickFunnels iframe 安裝碼
 
-你只要改下面 3 個值：
-1. appUrl：你的 Vercel 網址，例如 https://dm-booking-saas.vercel.app
+請替換：
+1. src 裡的 Vercel 網址，例如 https://dm-booking-saas.vercel.app
 2. tenant：使用者代碼，例如 dm-test
-3. project：專案代碼，例如 P01
+3. p：專案代碼，例如 P01
 -->
 
-<div id="dm-booking"></div>
-
-<script>
-  window.DM_BOOKING_CONFIG = {
-    appUrl: "https://你的-vercel-網址.vercel.app",
-    tenant: "client-slug",
-    project: "P01",
-    containerId: "dm-booking",
-    minHeight: "850px"
-  };
-</script>
-<script src="https://你的-vercel-網址.vercel.app/embed.js"></script>
+<iframe
+  src="https://dm-booking-saas.vercel.app/booking?tenant=dm-test&p=P01"
+  title="線上預約"
+  width="100%"
+  height="900"
+  loading="lazy"
+  style="width:100%;min-height:900px;border:0;display:block;"
+  referrerpolicy="strict-origin-when-cross-origin"
+></iframe>

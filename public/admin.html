@@ -366,7 +366,8 @@
       border-top: 1px solid var(--line);
     }
     .copy-field { display: flex; gap: 7px; align-items: center; }
-    .copy-field input { min-width: 0; }
+    .copy-field input, .copy-field textarea { min-width: 0; }
+    .copy-field textarea { min-height: 92px; resize: vertical; font-family: Consolas, 'Courier New', monospace; font-size: 12px; line-height: 1.45; }
     .copy-field button { flex: 0 0 auto; }
     .option-editor { display: grid; gap: 7px; }
     .question-row .row { align-items: start; }
@@ -1804,7 +1805,7 @@
     }
 
     function copyBookingUrl(button) {
-      const input = button.closest('.copy-field').querySelector('input');
+      const input = button.closest('.copy-field').querySelector('input, textarea');
       const copied = function () {
         const original = button.textContent;
         button.textContent = '已複製';
@@ -1823,8 +1824,22 @@
       copied();
     }
 
+    function iframeInstallCode(url, title, minHeight) {
+      return '<iframe src="' + url + '" title="' + title + '" width="100%" height="' + minHeight + '" loading="lazy" style="width:100%;min-height:' + minHeight + 'px;border:0;display:block;" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+    }
+
+    function projectInstallBox(label, code) {
+      return '<label>' + escapeHtml(label) + '</label><div class="copy-field"><textarea readonly>' + escapeHtml(code) + '</textarea><button class="secondary" type="button" onclick="copyBookingUrl(this)">複製</button></div>';
+    }
+
     function projectForm(row) {
       const bookingUrl = row.bookingUrl || '';
+      const baseUrl = bookingUrl ? bookingUrl.split('/booking?')[0] : '';
+      const projectCode = row.code || 'P01';
+      const quizUrl = baseUrl ? baseUrl + '/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) : '';
+      const bookingInstallCode = bookingUrl ? iframeInstallCode(bookingUrl, '線上預約', 900) : '';
+      const quizInstallCode = quizUrl ? iframeInstallCode(quizUrl, '線上測驗', 920) : '';
+      const installBox = !row.rowId ? '' : '<div class="col-12"><h3>iframe 安裝碼</h3><p class="mini">複製到 Systeme / ClickFunnels / 網頁 HTML 區塊即可；測驗頁會自動把作答資料寫回 CRM，報告 CTA 會接回預約流程。</p></div><div class="col-6">' + projectInstallBox('測驗 / 報名表單 iframe', quizInstallCode) + '</div><div class="col-6">' + projectInstallBox('預約頁 iframe', bookingInstallCode) + '</div>';
       const isNew = !row.rowId;
       const inviteBox = isNew ? '' :
         '<div class="col-12 invite-box"><h3>發送預約邀請</h3><div class="row">' +
@@ -1843,6 +1858,7 @@
           '<div class="col-6"><label>防呆網址</label><input class="p-fallback" value="' + escapeHtml(row.fallbackUrl || '') + '"></div>' +
           '<div class="col-6"><label>客製化注意事項</label><textarea class="p-notice">' + escapeHtml(row.bookingNotice || '') + '</textarea></div>' +
           '<div class="col-6"><label>婉拒訊息</label><textarea class="p-reject">' + escapeHtml(row.rejectValue || '') + '</textarea></div>' +
+          installBox +
           '<div class="col-12 actions"><button onclick="saveProject(this)">儲存專案</button></div>' + inviteBox +
         '</div></div>' +
       '</details>';
