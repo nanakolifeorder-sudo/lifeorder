@@ -2617,7 +2617,7 @@
           '<div class="email-purpose-body">' + rows.map(function (row) { return emailTemplateForm(row, projectOptions); }).join('') + '</div></details>';
       }).join('');
       const leads = (res.leads || []).slice(0, 20).map(function (lead) {
-        return '<tr><td>' + escapeHtml(lead.client_name) + '</td><td>' + escapeHtml(lead.client_email) + '</td><td>' + escapeHtml(lead.project_name) + '</td><td>' + escapeHtml(emailStatusLabel(lead.status)) + '</td></tr>';
+        return '<tr><td>' + escapeHtml(compactDate(lead.updated_at || lead.created_at)) + '</td><td>' + escapeHtml(lead.client_name) + '</td><td>' + escapeHtml(lead.client_email) + '</td><td>' + escapeHtml(lead.project_name) + '</td><td>' + escapeHtml(emailStatusLabel(lead.status)) + '</td></tr>';
       }).join('');
       const queue = visibleQueue.slice(0, 20).map(function (item) {
         const retry = Number(item.retry_count || 0) ? '（已重試 ' + Number(item.retry_count || 0) + '/' + Number(item.max_attempts || 3) + '）' : '';
@@ -2634,7 +2634,7 @@
         '<div class="subtabs">' + emailModuleChip('booking', '預約提醒信') + emailModuleChip('quiz', '測驗跟進信') + '</div><div class="list" style="margin-top:16px;">' +
         '<h3>新增信件範本</h3>' + emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, module: emailModule, status: 'active', triggerName: defaultEmailTrigger(emailModule), timeParam: emailModule === 'quiz' ? 24 : 0, stopWhenBooked: true }, projectOptions) +
         '<h3 style="margin-top:20px;">已建立的自動信件</h3>' + groupedTemplates + '</div></div>' +
-        '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
+        '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>日期時間</th><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>觸發</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信告警</h2><table><thead><tr><th>等級</th><th>標題</th><th>內容</th></tr></thead><tbody>' + alerts + '</tbody></table></div>' +
         '<div class="panel"><h2>退訂與拒收名單</h2><table><thead><tr><th>Email</th><th>原因</th><th>來源</th></tr></thead><tbody>' + suppressions + '</tbody></table></div>';
