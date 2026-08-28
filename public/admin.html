@@ -70,8 +70,8 @@
       margin: 0;
       padding: 18px;
       display: grid;
-      grid-template-columns: 260px minmax(0, 1fr);
-      gap: 18px;
+      grid-template-columns: 236px minmax(0, 1fr);
+      gap: 14px;
       align-items: start;
     }
     main.app-shell.sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
@@ -83,14 +83,14 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       box-shadow: var(--shadow);
-      padding: 12px;
+      padding: 10px;
     }
-    .sidebar-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 4px 12px; border-bottom:1px solid var(--line); margin-bottom:10px; }
+    .sidebar-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 4px 10px; border-bottom:1px solid var(--line); margin-bottom:8px; }
     .sidebar-title { font-weight:800; color:var(--ink); line-height:1.35; }
     .sidebar-toggle { width:36px; height:36px; padding:0; flex:0 0 36px; }
-    .nav-group { margin:12px 0; }
-    .nav-group-title { color:var(--muted); font-size:12px; font-weight:800; letter-spacing:0; padding:0 8px 6px; }
-    .nav-items { display:grid; gap:6px; }
+    .nav-group { margin:8px 0; }
+    .nav-group-title { color:var(--muted); font-size:12px; font-weight:800; letter-spacing:0; padding:0 7px 4px; }
+    .nav-items { display:grid; gap:4px; }
     .workspace { min-width:0; }
     main.sidebar-collapsed .sidebar { padding:10px; }
     main.sidebar-collapsed .sidebar-title,
@@ -185,7 +185,7 @@
       align-items:center;
       justify-content:flex-start;
       gap:10px;
-      padding:10px;
+      padding:8px 9px;
       text-align:left;
       white-space:normal;
     }
@@ -221,7 +221,8 @@
     .client-card.lead, .client-card.contact { border-left-color: var(--green); }
     .name-link { border:0; background:transparent; color:var(--blue); padding:0; white-space:normal; text-align:left; font:inherit; font-weight:800; }
     .crm-card-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .crm-batch-toolbar { display:grid; grid-template-columns:auto auto minmax(220px,1fr) minmax(220px,1fr) auto; gap:10px; align-items:end; }
+    .crm-batch-toolbar { display:flex; gap:8px; align-items:end; flex-wrap:wrap; }
+    .crm-batch-toolbar > div { flex:1 1 220px; max-width:300px; }
     .crm-batch-toolbar button { width:auto; }
     .crm-batch-summary { margin-top:8px; }
     .crm-card-title h3 { margin:0; color:var(--ink); }
@@ -267,7 +268,7 @@
       white-space: pre-wrap;
       border: 1px solid var(--line);
       border-radius: 6px;
-      padding: 12px;
+      padding: 10px;
       color: var(--muted);
       background: var(--panel);
       margin-top: 10px;
@@ -371,7 +372,7 @@
     .copy-field button { flex: 0 0 auto; }
     .option-editor { display: grid; gap: 7px; }
     .question-row .row { align-items: start; }
-    .module-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 0; }
+    .module-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 0; padding-top:10px; border-top:1px solid var(--line); }
     .module-tabs .chip { margin:0; }
     .module-section { display:none; }
     .module-section.active { display:block; }
@@ -426,7 +427,7 @@
     }
     .warning-box {
       margin: 14px 0;
-      padding: 12px;
+      padding: 10px;
       border: 1px solid var(--yellow);
       border-radius: 6px;
       background: rgba(246, 177, 0, .1);
@@ -768,13 +769,14 @@
     function availableTabs() {
       return [
         { id: 'crm', group: '客戶管理', mark: '客', label: '客戶 CRM', ok: true },
-        { id: 'analytics', group: '客戶管理', mark: '數', label: '作答 / 戰情數據', ok: can('ANALYTICS') },
+        { id: 'analytics', group: '客戶管理', mark: '數', label: '作答數據', ok: can('ANALYTICS') },
         { id: 'schedule', group: '預約系統', mark: '排', label: '排班系統', ok: true },
         { id: 'consultants', group: '預約系統', mark: '顧', label: '顧問管理', ok: isAdmin() },
         { id: 'questions', group: '預約系統', mark: '表', label: '預約表單', ok: can('FORMS') },
-        { id: 'emails', group: '預約系統', mark: '信', label: '提醒 / 跟進信', ok: can('EMAILS') },
-        { id: 'quizEditor', group: '測驗系統', mark: '題', label: '題目與分數規則', ok: can('FORMS') },
-        { id: 'reportEditor', group: '測驗系統', mark: '報', label: '檢測報告編輯器', ok: can('FORMS') },
+        { id: 'bookingEmails', group: '預約系統', mark: '信', label: '提醒信管理', ok: can('EMAILS') },
+        { id: 'quizEditor', group: '測驗系統', mark: '題', label: '題目管理', ok: can('FORMS') },
+        { id: 'reportEditor', group: '測驗系統', mark: '報', label: '檢測報告設定', ok: can('FORMS') },
+        { id: 'quizEmails', group: '測驗系統', mark: '追', label: '跟進信管理', ok: can('EMAILS') },
         { id: 'projects', group: '系統設定', mark: '專', label: '專案管理', ok: can('PROJECTS') },
         { id: 'usage', group: '系統設定', mark: '用', label: '系統用量', ok: isSystemOwner() },
         { id: 'users', group: '系統設定', mark: '帳', label: '帳號 / 權限管理', ok: isSystemOwner() }
@@ -820,7 +822,8 @@
         questions: loadQuestions,
         quizEditor: loadQuizEditor,
         reportEditor: loadReportEditor,
-        emails: loadEmails,
+        bookingEmails: loadBookingEmails,
+        quizEmails: loadQuizEmails,
         analytics: loadAnalytics,
         usage: loadSystemUsage,
         users: loadUserManagement
@@ -851,7 +854,7 @@
         }).catch(showError);
         return;
       }
-      loading('客戶總覽 CRM');
+      loading('客戶 CRM');
       api('getConsultantAppointments', { projectCode: crmProject }).then(function (res) {
         cache.crm = res;
         renderCrm(res);
@@ -911,7 +914,7 @@
       document.getElementById('view').innerHTML =
         '<div class="panel">' +
           '<div class="row">' +
-            '<div class="col-2"><h2>客戶總覽 CRM</h2></div>' +
+            '<div class="col-2"><h2>客戶 CRM</h2></div>' +
             '<div class="col-2"><label>專案篩選</label><select id="crmProject" onchange="loadCrmByProject(this.value)">' + projectOptions + '</select></div>' +
             '<div class="col-2"><label>標籤篩選</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
             '<div class="col-3"><label>流程篩選</label><select id="crmPipelineFilter" onchange="crmPipelineFilter=this.value; renderCrm(cache.crm);">' + crmPipelineOptions(crmPipelineFilter, true) + '</select></div>' +
@@ -942,11 +945,11 @@
       const selectedIds = Object.keys(crmSelectedContacts).filter(function (id) { return crmSelectedContacts[id]; });
       const statusOptions = crmPipelineOptions('', false);
       return '<div class="panel"><div class="crm-batch-toolbar">' +
-        '<button class="secondary" onclick="selectVisibleCrmContacts(true)">全選目前結果</button>' +
-        '<button class="secondary" onclick="selectVisibleCrmContacts(false)">清除選取</button>' +
-        '<div><label>批次新增標籤</label><input id="crmBatchTags" placeholder="例如：高意願, 待追蹤"></div>' +
-        '<div><label>批次狀態</label><select id="crmBatchStatus">' + statusOptions + '</select></div>' +
-        '<button onclick="batchUpdateCrmContacts()">批次更新</button>' +
+        '<button class="secondary" onclick="selectVisibleCrmContacts(true)">全選</button>' +
+        '<button class="secondary" onclick="selectVisibleCrmContacts(false)">清除</button>' +
+        '<div><label>替選取名單加標籤</label><input id="crmBatchTags" placeholder="例如：高意願, 待追蹤"></div>' +
+        '<div><label>替選取名單改狀態</label><select id="crmBatchStatus">' + statusOptions + '</select></div>' +
+        '<button onclick="batchUpdateCrmContacts()">套用</button>' +
       '</div><div class="crm-batch-summary"><button class="secondary" onclick="exportCrmRows()">匯出目前結果 CSV</button><p class="mini">目前結果 ' + selectable.length + ' 筆，可更新 ' + selectedIds.length + ' 筆已選名單。</p></div></div>';
     }
 
@@ -2551,8 +2554,18 @@
       }).catch(function (err) { alert(err.message); });
     }
 
+
+    function loadBookingEmails() {
+      emailModule = 'booking';
+      loadEmails();
+    }
+
+    function loadQuizEmails() {
+      emailModule = 'quiz';
+      loadEmails();
+    }
     function loadEmails() {
-      loading('信件管理');
+      loading(emailModuleTitle(emailModule));
       const scope = emailProject === 'ALL' ? scopedProjectCode() : emailProject;
       api('getEmailAutomationData', { projectCode: scope }).then(renderEmails).catch(showError);
     }

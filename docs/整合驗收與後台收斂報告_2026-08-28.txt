@@ -1,0 +1,75 @@
+整合驗收與後台收斂報告
+日期：2026-08-28
+
+一、本次驗收目標
+
+1. 從 /quiz 作答。
+2. 送出後進入 /report。
+3. 點擊報告頁預約 CTA。
+4. 進入 /booking。
+5. 完成預約。
+6. 回 CRM 檢查作答、分數、報告、預約、Email、點擊歷程是否串起來。
+7. 做後台 UI 最終整理：左側欄、分類命名、測驗設定 tabs、CRM 批次操作與文案。
+
+二、production 黑箱驗收結果
+
+測試環境：
+- 網址：https://dm-booking-saas.vercel.app
+- tenant：dm-test
+- project：P01
+- 測試信箱：integration-e2e-時間戳@example.com
+
+已通過：
+- getQuizConfig 可讀到 P01 / A 版測驗。
+- 測驗題目數：4 題。
+- 分數面向數：3 個。
+- submitQuiz 可成功建立 quiz_response。
+- scoreSummary 有 3 個面向分數。
+- reportSnapshot 有 3 個報告區塊。
+- getQuizResult 可讀取報告。
+- trackReportClick 可記錄預約 CTA 點擊。
+- CRM 資料卡可查到該測試客戶。
+- CRM 資料卡摘要可查到：測驗 1 筆、點擊 1 筆。
+
+本次產生的其中一筆報告連結：
+https://dm-booking-saas.vercel.app/report?tenant=dm-test&p=P01&qrid=71555fdf-74ac-48ce-80d0-cd5d53d03f9b
+
+三、目前阻塞
+
+getAvailableTimes 回傳 0 筆可預約時段，因此無法在 production 完成 /booking 預約送出。
+
+這通常不是程式資料流問題，而是設定狀態問題，可能原因：
+- dm-test 沒有已授權 Google Calendar 或 Microsoft Calendar 的顧問。
+- 顧問目前未啟用接案。
+- 顧問排班沒有開放未來可預約時段。
+- Calendar busy 查詢失敗導致沒有可用時段。
+
+待補驗收：
+- 顧問完成 Google Calendar OAuth。
+- 確認顧問接案狀態為啟用。
+- 設定未來可預約排班。
+- 重新跑 /booking 完成預約。
+- 檢查 appointments.quiz_response_id 與 quiz_responses.appointment_id 是否互相回填。
+- 檢查 CRM 資料卡預約紀錄是否出現。
+- 檢查測驗未預約跟進信是否在預約後被停止。
+
+四、本次後台 UI 收斂內容
+
+已整理：
+- 左側功能列寬度與間距縮小，降低佔用畫面。
+- 左側導覽分類名稱更貼近正式規劃。
+- 客戶管理：客戶 CRM、作答數據。
+- 預約系統：預約表單、排班系統、顧問管理、提醒信管理。
+- 測驗系統：題目管理、檢測報告設定、跟進信管理。
+- 系統設定：專案管理、系統用量、帳號 / 權限管理。
+- Email 後台入口拆成提醒信管理與跟進信管理，但底層仍共用 email_templates / email_queue。
+- CRM 批次操作列改成更緊湊的排列。
+- CRM 批次操作文案改成「替選取名單加標籤」、「替選取名單改狀態」、「套用」。
+- 測驗設定上方 tabs 增加分隔線，讓目前編輯區與切換區更清楚。
+
+五、目前結論
+
+測驗漏斗到 CRM 的主資料鏈已成立：
+/quiz 作答 -> /report 報告 -> CTA 點擊追蹤 -> CRM 資料卡歷程。
+
+剩下要補的是「可預約時段 / 顧問 OAuth / 排班」設定完成後，再跑一次真正完成預約的驗收。
