@@ -1,0 +1,121 @@
+客戶帳號搬運作業筆記（Vercel 以外）
+日期：2026-08-29
+客戶 Google 帳號：nanako.lifeorder@gmail.com
+
+一、目前可先完成的項目
+
+1. Supabase
+   - 建立客戶 Supabase project。
+   - 取得 DATABASE_URL。
+   - 跑 schema / migration。
+   - 建立 tenant、P01 專案、客戶後台管理員。
+
+2. GitHub
+   - 建立客戶版 repo。
+   - 將目前整合版程式碼推到客戶 repo。
+   - 設定 GitHub Actions secrets 預留欄位。
+   - 本機目前沒有 GitHub CLI，因此若要我代推，需要你先用瀏覽器建立 repo 或提供 repo URL，或在本機安裝/登入 gh。
+
+3. Google Cloud
+   - 建立 Google Cloud project。
+   - 啟用 Gmail API 與 Google Calendar API。
+   - 設定 OAuth consent screen。
+   - 建立 OAuth Client。
+   - Vercel 正式網址還沒完成前，Authorized redirect URI 可先暫緩；正式部署後補：APP_URL/api/oauth-callback。
+
+二、已新增的搬運工具
+
+1. .env.client.example
+   - 客戶環境變數範本。
+   - 請複製成 .env.client 或填到 Vercel Environment Variables。
+   - 不要把 .env.client commit 到 GitHub。
+
+2. scripts/generate-client-secrets.js
+   - 產生 JWT_SECRET、TOKEN_ENCRYPTION_KEY、WEBHOOK_SECRET、CRON_SECRET、INSTALLER_SECRET。
+   - 指令：npm run client:secrets
+
+3. scripts/client-db-setup.js
+   - 對新 Supabase 執行 schema / migration。
+   - 建立客戶 tenant、P01 專案、後台管理員帳號。
+   - 指令：npm run client:db:setup
+
+三、Supabase 操作流程
+
+1. 進 Supabase Dashboard。
+2. New project。
+3. Project name 建議：nanako-lifeorder-booking 或 lifeorder-crm。
+4. Region 建議選 Asia Pacific / Tokyo 或 Singapore，以接近台灣為主。
+5. 設定 database password，這個密碼由你或客戶保管。
+6. 建好後到 Database > Connect。
+7. 選 Transaction pooler。
+8. 複製 URI，格式類似：
+   postgresql://postgres.xxxxx:[YOUR-PASSWORD]@aws-xxx.pooler.supabase.com:6543/postgres
+9. 將 [YOUR-PASSWORD] 換成 Supabase database password。
+10. 在本機建立 .env.client，填入 DATABASE_URL 與 CLIENT_ADMIN_PASSWORD。
+11. 執行：npm run client:db:setup
+
+四、客戶初始值建議
+
+CLIENT_TENANT_SLUG=nanako
+CLIENT_TENANT_NAME=Life Order 客戶系統
+CLIENT_PROJECT_CODE=P01
+CLIENT_PROJECT_NAME=人生診斷卡點
+CLIENT_ADMIN_NAME=Life Order 管理員
+CLIENT_ADMIN_EMAIL=nanako.lifeorder@gmail.com
+CLIENT_ADMIN_PASSWORD=由你或客戶指定臨時密碼
+
+五、Google Cloud 操作流程
+
+1. 進 https://console.cloud.google.com/。
+2. 確認右上角帳號是 nanako.lifeorder@gmail.com。
+3. 建立新 project，建議名稱：Life Order Booking CRM。
+4. 啟用 API：
+   - Gmail API
+   - Google Calendar API
+5. OAuth consent screen：
+   - App name：Life Order Booking CRM
+   - User support email：nanako.lifeorder@gmail.com
+   - Developer contact email：nanako.lifeorder@gmail.com
+   - Publishing status 初期可先 Testing；若只給內部帳號使用，可先加入 test users。
+6. Scopes：
+   - Gmail send
+   - Calendar read busy / events
+7. Credentials > Create OAuth client ID。
+8. Application type：Web application。
+9. Authorized redirect URI：
+   - Vercel 完成後填 https://正式網域/api/oauth-callback
+   - 若先用目前測試站，可填 https://dm-booking-saas.vercel.app/api/oauth-callback，但客戶獨立站上線後要改回客戶正式網址。
+10. 取得 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET。
+
+六、GitHub 搬運流程
+
+方式 A：你先用瀏覽器建立空 repo，我再幫你推
+
+1. 到 https://github.com/new。
+2. Repository name 建議：lifeorder-booking-crm。
+3. Visibility 建議 Private。
+4. 不要勾 Initialize with README，避免第一次 push 衝突。
+5. 建好後把 repo URL 貼給我。
+
+方式 B：安裝/登入 GitHub CLI 後我再代建
+
+1. 安裝 gh。
+2. 執行 gh auth login。
+3. 確認登入的是客戶 GitHub 帳號。
+4. 我就可以用命令代建與推送。
+
+七、目前會卡住的點
+
+1. Vercel 電話驗證尚未通過，不能正式建立 Vercel project。
+2. GitHub repo 若未建立或本機沒有 gh，不能直接自動推到客戶 GitHub。
+3. Supabase database password 必須由你或客戶提供到 .env.client，不能只靠我猜。
+4. Google Cloud OAuth 建立時，若遇到帳號驗證、付款或敏感授權提示，必須由你確認。
+
+八、Vercel 通過電話驗證後下一步
+
+1. 用 Vercel Import Git Repository 匯入客戶 GitHub repo。
+2. 設定環境變數。
+3. 部署。
+4. 把 Vercel 正式網址填回 Google Cloud OAuth redirect URI。
+5. 回後台完成 Gmail / Calendar OAuth 授權。
+6. 跑 /quiz -> /report -> /booking -> CRM 完整驗收。

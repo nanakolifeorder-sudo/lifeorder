@@ -10,7 +10,9 @@
     "db:migrate:phase2": "node scripts/run-sql-file.js sql/integration-phase-2-quiz-crm-schema.sql",
     "db:seed:phase2": "node scripts/run-sql-file.js sql/integration-phase-2-demo-seed.sql",
     "smoke:phase3": "node scripts/phase3-smoke-test.js",
-    "preflight:phase3": "node scripts/phase3-preflight.js"
+    "preflight:phase3": "node scripts/phase3-preflight.js",
+    "client:secrets": "node scripts/generate-client-secrets.js",
+    "client:db:setup": "node scripts/client-db-setup.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
