@@ -273,7 +273,17 @@
       background: var(--panel);
       margin-top: 10px;
     }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }    .answer-stat-card { margin-top: 12px; }
+    .answer-stat-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; flex-wrap:wrap; }
+    .answer-stat-head h3 { margin: 8px 0 0; font-size: 16px; line-height: 1.45; }
+    .answer-stat-summary { min-width: 180px; display:flex; flex-direction:column; gap:4px; align-items:flex-end; color:var(--muted); }
+    .answer-stat-summary strong { color:var(--ink); font-size: 14px; }
+    .answer-option-list { display:grid; gap:8px; margin-top:12px; }
+    .answer-option-row { display:grid; grid-template-columns:minmax(180px,1fr) minmax(160px,2fr) 120px; gap:10px; align-items:center; }
+    .answer-option-label { color:var(--ink); line-height:1.4; }
+    .answer-option-meter { height:10px; border-radius:999px; overflow:hidden; background:#111827; border:1px solid var(--line); }
+    .answer-option-meter span { display:block; height:100%; background:var(--brand); }
+    .answer-option-count { color:var(--muted); text-align:right; font-variant-numeric:tabular-nums; }
     .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
     .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
     .stat strong { display: block; color: var(--blue); font-size: 28px; margin-top: 4px; }
@@ -507,6 +517,9 @@
       .row { grid-template-columns: 1fr; }
       .row > * { grid-column: auto !important; }
       .stat-grid, .permission-grid, .crm-card-meta, .detail-contact-grid { grid-template-columns: 1fr 1fr; }
+      .answer-stat-summary { align-items:flex-start; }
+      .answer-option-row { grid-template-columns:1fr; gap:6px; }
+      .answer-option-count { text-align:left; }
       .crm-batch-toolbar { grid-template-columns:1fr; }
       .project-checks, .question-row .option-editor { grid-template-columns: 1fr; }
       .card-top { flex-direction: column; }
@@ -2943,17 +2956,55 @@
     }
 
     function loadAnalytics() {
-      loading('戰情數據');
+      loading('作答數據');
       api('getAnalyticsData', { projectCode: scopedProjectCode() }).then(function (res) {
         const stats = res.stats || {};
         document.getElementById('view').innerHTML =
-          '<div class="panel"><h2>戰情數據</h2><div class="stat-grid">' +
+          '<div class="panel"><h2>作答數據</h2><p>這裡看的是每個專案、每個版本底下，每一題的作答分布。</p><div class="stat-grid">' +
+          statBox('測驗作答', stats.quizResponses || 0) +
           statBox('頁面瀏覽', stats.views || 0) +
           statBox('預約數', stats.bookings || 0) +
-          statBox('婉拒數', stats.rejected || 0) +
           statBox('等候名單', stats.waitlist || 0) +
-          '</div></div>';
+          '</div></div>' +
+          renderQuizAnswerStats(res.quizAnswerStats || []);
       }).catch(showError);
+    }
+
+    function questionTypeLabel(type) {
+      return ({ single: '單選', multiple: '複選', short_text: '簡答', long_text: '長答' })[type] || type || '題目';
+    }
+
+    function renderQuizAnswerStats(versions) {
+      if (!versions.length) return '<div class="panel"><p>目前沒有可統計的測驗題目或作答紀錄。</p></div>';
+      return versions.map(function (version) {
+        const questions = version.questions || [];
+        return '<div class="panel"><h2>' + escapeHtml(version.projectCode || '') + '｜' + escapeHtml(version.versionCode || '') + ' 版題目統計</h2>' +
+          '<p>此版本目前共有 ' + escapeHtml(String(questions.length)) + ' 題，累計 ' + escapeHtml(String(version.responseCount || 0)) + ' 份作答。</p>' +
+          (questions.length ? questions.map(renderQuestionAnswerStats).join('') : '<p>這個版本尚未建立題目。</p>') +
+        '</div>';
+      }).join('');
+    }
+
+    function renderQuestionAnswerStats(question) {
+      const options = question.options || [];
+      const top = question.topOption;
+      const topText = top && Number(top.count || 0) > 0
+        ? escapeHtml(top.label || top.key || '') + '（' + escapeHtml(String(top.count || 0)) + ' 人）'
+        : '尚無明顯最多人選';
+      return '<div class="item answer-stat-card">' +
+        '<div class="answer-stat-head"><div><span class="badge">' + escapeHtml(questionTypeLabel(question.type)) + '</span> <span class="mini">' + escapeHtml(question.stageTitle || '') + '</span><h3>第 ' + escapeHtml(String(question.questionNo || '')) + ' 題｜' + escapeHtml(question.title || '') + '</h3></div>' +
+        '<div class="answer-stat-summary"><span>作答 ' + escapeHtml(String(question.answerCount || 0)) + ' 人</span><strong>最多：' + topText + '</strong></div></div>' +
+        '<div class="answer-option-list">' +
+          (options.length ? options.map(function (option) { return renderAnswerOptionBar(option, question.answerCount || 0); }).join('') : '<p class="mini">這題目前沒有選項統計。</p>') +
+        '</div></div>';
+    }
+
+    function renderAnswerOptionBar(option, total) {
+      const count = Number(option.count || 0);
+      const rate = total ? Math.round(count / Number(total || 1) * 100) : 0;
+      return '<div class="answer-option-row"><div class="answer-option-label">' + escapeHtml(option.label || option.key || '未命名選項') + '</div>' +
+        '<div class="answer-option-meter"><span style="width:' + Math.max(0, Math.min(100, rate)) + '%"></span></div>' +
+        '<div class="answer-option-count">' + escapeHtml(String(count)) + ' 人｜' + escapeHtml(String(rate)) + '%</div></div>';
     }
 
     function statBox(label, value) {
