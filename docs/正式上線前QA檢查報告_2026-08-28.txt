@@ -128,3 +128,15 @@ production 網址：https://dm-booking-saas.vercel.app
 尚未實作入口網址，因為入口網址命名前必須先詢問業主。
 
 待業主提供：工程師後台入口網址名稱。
+八、部署後最終 smoke
+
+部署後重新驗收完成：
+
+1. /quiz submit 成功。
+2. /report CTA 點擊追蹤成功。
+3. getAvailableTimes 回傳 66 個可用時段，已排除先前測試占用時段。
+4. /booking submit 成功。
+5. 測試預約時段：08/29 (週六) 14:00。
+6. 測試 qrid：b235d3e1-78de-441b-b1d1-7f39c3b2e59c。
+7. 測試 email：qa-deploy-1787893518@example.com。
+8. 內部測試 meet link 已產生。
