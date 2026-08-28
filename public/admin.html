@@ -374,6 +374,27 @@
     .module-tabs .chip { margin:0; }
     .module-section { display:none; }
     .module-section.active { display:block; }
+    .compact-option {
+      display: flex;
+      gap: 8px;
+      align-items: end;
+      padding: 10px;
+      flex-wrap: wrap;
+    }
+    .compact-option > div:first-child { flex: 0 0 88px; }
+    .compact-option > div:nth-child(2) { flex: 1 1 280px; }
+    .compact-score { flex: 0 0 132px; }
+    .compact-option label {
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .compact-option .danger {
+      align-self: end;
+      min-height: 38px;
+      padding: 8px 10px;
+      white-space: nowrap;
+    }
     .report-editor-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr); gap:16px; align-items:start; }
     .report-block-row summary { grid-template-columns: 1fr 140px 120px; }
     .preview-frame { border:1px solid var(--line); border-radius:8px; background:var(--panel-2); padding:16px; min-height:420px; }
@@ -385,7 +406,7 @@
     .preview-cta { display:inline-flex; min-height:42px; align-items:center; justify-content:center; padding:10px 14px; border-radius:6px; background:var(--blue); color:#fff; font-weight:700; text-decoration:none; }
     .block-tools { display:flex; gap:6px; flex-wrap:wrap; }
     .block-tools button { padding:7px 9px; }
-    @media (max-width:860px) { .report-editor-grid { grid-template-columns:1fr; } .preview-grid { grid-template-columns:1fr; } }
+    @media (max-width:860px) { .report-editor-grid { grid-template-columns:1fr; } .preview-grid { grid-template-columns:1fr; } .compact-option > div, .compact-score { flex: 1 1 100%; } }
     .question-row .q-options-wrap {
       padding-top: 2px;
       border-top: 1px solid var(--line);
@@ -2066,7 +2087,7 @@
       document.getElementById('view').innerHTML = '<div class="panel"><h2>測驗設定</h2><div class="row"><div class="col-4"><label>專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>載入版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'A') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button onclick="saveQuizEditor()">儲存測驗設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'P01') + '&version=' + encodeURIComponent(res.versionCode || 'A') + '">開啟前台測驗</a></div></div>' +
         '<div class="panel module-section" data-section="settings"><h2>測驗設定</h2><label>版本說明</label><textarea id="quizVersionDescription">' + escapeHtml(currentVersion.description || '') + '</textarea></div>' +
         '<div class="panel module-section" data-section="stages"><h2>題目階段</h2><div class="list" id="quizStages">' + (res.stages || []).map(quizStageRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizStage()">新增階段</button></div></div>' +
-        '<div class="panel module-section" data-section="dimensions"><h2>分數面向</h2><p>內部滿分用來計算比例；顯示滿分可設 100，報告頁會自動換算。</p><div class="list" id="quizDimensions">' + (res.dimensions || []).map(quizDimensionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizDimension()">新增面向</button></div></div>' +
+        '<div class="panel module-section" data-section="dimensions"><h2>分數面向</h2><p>滿分會依照題目選項加分自動計算；後台只需要設定報告頁要顯示的滿分，例如 100。</p><div class="list" id="quizDimensions">' + (res.dimensions || []).map(quizDimensionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizDimension()">新增面向</button></div></div>' +
         '<div class="panel module-section" data-section="ranges"><h2>分數區間</h2><p>同一個面向的區間不能重疊，例如 0-5、6-10。</p><div class="list" id="quizRanges">' + (res.ranges || []).map(quizRangeRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizRange()">新增區間</button></div></div>' +
         '<div class="panel module-section" data-section="questions"><h2>題目與選項加分</h2>' + quizQuestionImportPanel() + '<div class="list" id="quizQuestions">' + (res.questions || []).map(quizQuestionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizQuestion()">新增題目</button></div></div>';
       setQuizEditorTab(quizEditorTab);
@@ -2077,25 +2098,43 @@
     }
 
     function quizDimensionRow(dim) {
-      return '<div class="item qe-dim"><input type="hidden" class="qe-dim-key" value="' + escapeHtml(dim.dimensionKey || '') + '"><div class="row"><div class="col-4"><label>面向名稱</label><input class="qe-dim-name" value="' + escapeHtml(dim.name || '') + '"></div><div class="col-2"><label>內部滿分</label><input class="qe-dim-max" type="number" step="0.01" value="' + escapeHtml(dim.maxScore || 10) + '"></div><div class="col-2"><label>顯示滿分</label><input class="qe-dim-display-max" type="number" step="0.01" value="' + escapeHtml(dim.displayMaxScore || '') + '"></div><div class="col-4"><label>圖表</label><select class="qe-dim-chart">' + selectedOption('radar', dim.chartType || 'radar', '雷達 / 多邊形') + selectedOption('bar', dim.chartType, '長條') + selectedOption('none', dim.chartType, '不顯示') + '</select></div><div class="col-4"><label>格式</label><select class="qe-dim-format">' + selectedOption('number', dim.displayScoreFormat || 'number', '數字') + selectedOption('percent', dim.displayScoreFormat, '百分比') + selectedOption('decimal', dim.displayScoreFormat, '小數') + '</select></div><div class="col-4"><label>取整</label><select class="qe-dim-rounding">' + selectedOption('round', dim.roundingMode || 'round', '四捨五入') + selectedOption('floor', dim.roundingMode, '無條件捨去') + selectedOption('ceil', dim.roundingMode, '無條件進位') + selectedOption('none', dim.roundingMode, '保留小數') + '</select></div><div class="col-4"><label>排序</label><input class="qe-dim-sort" type="number" value="' + escapeHtml(dim.sortOrder || 0) + '"></div><div class="col-12"><label>面向說明</label><textarea class="qe-dim-description">' + escapeHtml(dim.description || '') + '</textarea></div></div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-dim&quot;).remove()">刪除</button></div></div>';
+      return '<div class="item qe-dim"><input type="hidden" class="qe-dim-key" value="' + escapeHtml(dim.dimensionKey || '') + '"><input type="hidden" class="qe-dim-max" value="' + escapeHtml(dim.maxScore || 1) + '"><div class="row"><div class="col-4"><label>面向名稱</label><input class="qe-dim-name" value="' + escapeHtml(dim.name || '') + '"></div><div class="col-2"><label>顯示滿分</label><input class="qe-dim-display-max" type="number" step="1" value="' + escapeHtml(dim.displayMaxScore || 100) + '"></div><div class="col-3"><label>圖表</label><select class="qe-dim-chart">' + selectedOption('radar', dim.chartType || 'radar', '雷達 / 多邊形') + selectedOption('bar', dim.chartType, '長條') + selectedOption('none', dim.chartType, '不顯示') + '</select></div><div class="col-3"><label>格式</label><select class="qe-dim-format">' + selectedOption('number', dim.displayScoreFormat || 'number', '數字') + selectedOption('percent', dim.displayScoreFormat, '百分比') + '</select></div><div class="col-4"><label>取整</label><select class="qe-dim-rounding">' + selectedOption('round', dim.roundingMode || 'round', '四捨五入') + selectedOption('floor', dim.roundingMode, '無條件捨去') + selectedOption('ceil', dim.roundingMode, '無條件進位') + '</select></div><div class="col-4"><label>排序</label><input class="qe-dim-sort" type="number" value="' + escapeHtml(dim.sortOrder || 0) + '"></div><div class="col-12"><label>面向說明</label><textarea class="qe-dim-description">' + escapeHtml(dim.description || '') + '</textarea></div></div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-dim&quot;).remove()">刪除</button></div></div>';
     }
-
     function quizRangeRow(range) {
-      return '<div class="item qe-range"><input type="hidden" class="qe-range-key" value="' + escapeHtml(range.rangeKey || '') + '"><div class="row"><div class="col-3"><label>面向</label><select class="qe-range-dim">' + quizDimensionOptions(range.dimensionKey) + '</select></div><div class="col-2"><label>最低分</label><input class="qe-range-min" type="number" step="0.01" value="' + escapeHtml(range.minScore || 0) + '"></div><div class="col-2"><label>最高分</label><input class="qe-range-max" type="number" step="0.01" value="' + escapeHtml(range.maxScore || 0) + '"></div><div class="col-5"><label>區間標籤</label><input class="qe-range-label" value="' + escapeHtml(range.label || '') + '" placeholder="例如：方向清楚、需要補強"></div><div class="col-6"><label>標題</label><input class="qe-range-title" value="' + escapeHtml(range.title || '') + '"></div><div class="col-6"><label>副標</label><input class="qe-range-subtitle" value="' + escapeHtml(range.subtitle || '') + '"></div><div class="col-8"><label>內容</label><textarea class="qe-range-body">' + escapeHtml(range.body || '') + '</textarea></div><div class="col-4"><label>圖片網址</label><input class="qe-range-image" value="' + escapeHtml(range.imageUrl || '') + '"></div></div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-range&quot;).remove()">刪除</button></div></div>';
+      return '<div class="item qe-range"><input type="hidden" class="qe-range-key" value="' + escapeHtml(range.rangeKey || '') + '"><div class="row"><div class="col-3"><label>面向</label><select class="qe-range-dim">' + quizDimensionOptions(range.dimensionKey) + '</select></div><div class="col-2"><label>最低分</label><input class="qe-range-min" type="number" step="1" value="' + escapeHtml(Math.round(Number(range.minScore || 0))) + '"></div><div class="col-2"><label>最高分</label><input class="qe-range-max" type="number" step="1" value="' + escapeHtml(Math.round(Number(range.maxScore || 0))) + '"></div><div class="col-5"><label>區間標籤</label><input class="qe-range-label" value="' + escapeHtml(range.label || '') + '" placeholder="例如：方向清楚、需要補強"></div><div class="col-6"><label>標題</label><input class="qe-range-title" value="' + escapeHtml(range.title || '') + '"></div><div class="col-6"><label>副標</label><input class="qe-range-subtitle" value="' + escapeHtml(range.subtitle || '') + '"></div><div class="col-8"><label>內容</label><textarea class="qe-range-body">' + escapeHtml(range.body || '') + '</textarea></div><div class="col-4"><label>圖片網址</label><input class="qe-range-image" value="' + escapeHtml(range.imageUrl || '') + '"></div></div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-range&quot;).remove()">刪除</button></div></div>';
     }
-
     function quizQuestionImportPanel() {
       const data = window.quizEditorData || {};
       const scoreColumns = (data.dimensions || []).map(function (dim) { return dim.name || dim.dimensionKey; }).join('、') || '各分數面向名稱';
       return '<details class="item" style="margin-bottom:12px;"><summary><span>匯入題目</span><span>CSV / TSV / 試算表貼上</span><span>先預覽後儲存</span></summary>' +
         '<div class="details-body"><div class="row">' +
           '<div class="col-4"><label>選擇檔案</label><input id="quizImportFile" type="file" accept=".csv,.tsv,.txt" onchange="loadQuizImportFile(this)"></div>' +
-          '<div class="col-4"><button type="button" onclick="importQuizQuestions()">匯入到目前設定</button></div>' +
+          '<div class="col-4 actions"><button class="secondary" type="button" onclick="downloadQuizImportTemplate()">下載格式檔 CSV</button><button type="button" onclick="importQuizQuestions()">匯入到目前設定</button></div>' +
           '<div class="col-4"><p id="quizImportResult" class="mini">支援分數欄位：' + escapeHtml(scoreColumns) + '</p></div>' +
-          '<div class="col-12"><label>貼上資料</label><textarea id="quizImportText" placeholder="題號,階段,階段標題,題型,題目,補充說明,選項代碼,選項文字,選項說明,需求清晰度,預約急迫度,執行準備度&#10;1,第一階段,目前狀態,單選,你目前最想解決的是什麼,,A,我已經想清楚了,,5,3,4"></textarea><p class="mini">每一列是一個選項；同一題多個選項請使用相同題號。匯入後會重繪在畫面上，確認無誤再按上方「儲存測驗設定」。</p></div>' +
+          '<div class="col-12"><label>貼上資料</label><textarea id="quizImportText" placeholder="題號,階段,階段標題,題型,題目,補充說明,選項代碼,選項文字,需求清晰度,預約急迫度,執行準備度&#10;1,第一階段,目前狀態,單選,你目前最想解決的是什麼,,A,我已經想清楚了,5,3,4"></textarea><p class="mini">每一列是一個選項；同一題多個選項請使用相同題號。分數以整數填寫。匯入後會重繪在畫面上，確認無誤再按上方「儲存測驗設定」。</p></div>' +
         '</div></div></details>';
     }
 
+    function downloadQuizImportTemplate() {
+      const data = window.quizEditorData || {};
+      const dimensions = data.dimensions || [];
+      const headers = ['題號', '階段', '階段標題', '題型', '題目', '補充說明', '選項代碼', '選項文字'].concat(dimensions.map(function (dim) { return dim.name || dim.dimensionKey; }));
+      const sampleScores = dimensions.map(function (_dim, index) { return index === 0 ? '5' : '0'; });
+      const rows = [
+        headers,
+        ['1', '第一階段', '目前狀態', '單選', '你目前最想解決的是什麼', '', 'A', '我已經想清楚了'].concat(sampleScores),
+        ['1', '第一階段', '目前狀態', '單選', '你目前最想解決的是什麼', '', 'B', '知道下一步怎麼做'].concat(dimensions.map(function (_dim, index) { return index === 1 ? '3' : '0'; }))
+      ];
+      const csv = rows.map(function (row) { return row.map(csvEscape).join(','); }).join('\n');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'quiz-import-template-' + (field('quizProject') || 'project') + '.csv';
+      document.body.appendChild(link);
+      link.click();
+      URL.revokeObjectURL(link.href);
+      link.remove();
+    }
     function loadQuizImportFile(input) {
       const file = input.files && input.files[0];
       if (!file) return;
@@ -2164,7 +2203,7 @@
         const scoreWeights = {};
         (data.dimensions || []).forEach(function (dim) {
           const rawScore = quizImportCell(row, headers, [dim.dimensionKey, dim.name, '分數_' + dim.name, '加分_' + dim.name]);
-          scoreWeights[dim.dimensionKey] = Number(rawScore || 0);
+          scoreWeights[dim.dimensionKey] = Math.round(Number(rawScore || 0));
         });
         question.options.push({
           optionKey: quizImportCell(row, headers, ['選項代碼', 'optionKey', 'code']) || String.fromCharCode(65 + optionIndex),
@@ -2190,24 +2229,63 @@
       const data = window.quizEditorData || {};
       const scoreInputs = (data.dimensions || []).map(function (dim) {
         const weights = option.scoreWeights || {};
-        return '<div class="col-2"><label>' + escapeHtml(dim.name || dim.dimensionKey) + '</label><input class="qe-option-score" data-dim="' + escapeHtml(dim.dimensionKey) + '" type="number" step="0.01" value="' + escapeHtml(weights[dim.dimensionKey] || 0) + '"></div>';
+        return '<div class="compact-score"><label>' + escapeHtml(dim.name || dim.dimensionKey) + '</label><input class="qe-option-score" data-dim="' + escapeHtml(dim.dimensionKey) + '" type="number" step="1" value="' + escapeHtml(Math.round(Number(weights[dim.dimensionKey] || 0))) + '"></div>';
       }).join('');
-      return '<div class="item qe-option"><div class="row"><div class="col-2"><label>選項代碼</label><input class="qe-option-key" value="' + escapeHtml(option.optionKey || '') + '"></div><div class="col-4"><label>選項文字</label><input class="qe-option-label" value="' + escapeHtml(option.label || '') + '"></div><div class="col-6"><label>選項說明</label><input class="qe-option-description" value="' + escapeHtml(option.description || '') + '"></div>' + scoreInputs + '</div><div class="actions"><button class="danger" onclick="this.closest(&quot;.qe-option&quot;).remove()">刪除選項</button></div></div>';
+      return '<div class="item qe-option compact-option"><div><label>代碼</label><input class="qe-option-key" value="' + escapeHtml(option.optionKey || '') + '"></div><div><label>選項文字</label><input class="qe-option-label" value="' + escapeHtml(option.label || '') + '"><input type="hidden" class="qe-option-description" value="' + escapeHtml(option.description || '') + '"></div>' + scoreInputs + '<button class="danger" type="button" onclick="this.closest(&quot;.qe-option&quot;).remove()">刪除</button></div>';
     }
-
     function collectQuizEditorPayload() {
-      const dimensions = Array.from(document.querySelectorAll('.qe-dim')).map(function (row, index) { return { dimensionKey: row.querySelector('.qe-dim-key').value.trim(), name: row.querySelector('.qe-dim-name').value.trim(), description: row.querySelector('.qe-dim-description').value.trim(), maxScore: Number(row.querySelector('.qe-dim-max').value || 0), displayMaxScore: row.querySelector('.qe-dim-display-max').value.trim(), displayScoreFormat: row.querySelector('.qe-dim-format').value, roundingMode: row.querySelector('.qe-dim-rounding').value, chartType: row.querySelector('.qe-dim-chart').value, sortOrder: Number(row.querySelector('.qe-dim-sort').value || ((index + 1) * 10)) }; }).filter(function (row) { return row.dimensionKey && row.name; });
+      const dimensions = Array.from(document.querySelectorAll('.qe-dim')).map(function (row, index) {
+        return {
+          dimensionKey: row.querySelector('.qe-dim-key').value.trim(),
+          name: row.querySelector('.qe-dim-name').value.trim(),
+          description: row.querySelector('.qe-dim-description').value.trim(),
+          maxScore: Number(row.querySelector('.qe-dim-max').value || 1),
+          displayMaxScore: String(Math.max(1, Math.round(Number(row.querySelector('.qe-dim-display-max').value || 100)))),
+          displayScoreFormat: row.querySelector('.qe-dim-format').value,
+          roundingMode: row.querySelector('.qe-dim-rounding').value,
+          chartType: row.querySelector('.qe-dim-chart').value,
+          sortOrder: Number(row.querySelector('.qe-dim-sort').value || ((index + 1) * 10))
+        };
+      }).filter(function (row) { return row.dimensionKey && row.name; });
+      const stages = Array.from(document.querySelectorAll('.qe-stage')).map(function (row, index) { return { stageKey: row.querySelector('.qe-stage-key').value.trim(), title: row.querySelector('.qe-stage-title').value.trim(), description: row.querySelector('.qe-stage-description').value.trim(), sortOrder: Number(row.querySelector('.qe-stage-sort').value || ((index + 1) * 10)) }; }).filter(function (row) { return row.stageKey && row.title; });
+      const questions = Array.from(document.querySelectorAll('.qe-question')).map(function (row, index) {
+        return {
+          questionNo: Math.round(Number(row.querySelector('.qe-question-no').value || index + 1)),
+          stageKey: row.querySelector('.qe-question-stage').value,
+          title: row.querySelector('.qe-question-title').value.trim(),
+          helpText: row.querySelector('.qe-question-help').value.trim(),
+          type: row.querySelector('.qe-question-type').value,
+          isRequired: row.querySelector('.qe-question-required').value === 'true',
+          sortOrder: Math.round(Number(row.querySelector('.qe-question-sort').value || ((index + 1) * 10))),
+          options: Array.from(row.querySelectorAll('.qe-option')).map(function (optionRow, optionIndex) {
+            const scoreWeights = {};
+            optionRow.querySelectorAll('.qe-option-score').forEach(function (input) { scoreWeights[input.dataset.dim] = Math.round(Number(input.value || 0)); });
+            return { optionKey: optionRow.querySelector('.qe-option-key').value.trim(), label: optionRow.querySelector('.qe-option-label').value.trim(), description: optionRow.querySelector('.qe-option-description').value.trim(), scoreWeights: scoreWeights, sortOrder: (optionIndex + 1) * 10 };
+          }).filter(function (option) { return option.optionKey && option.label; })
+        };
+      }).filter(function (row) { return row.title; });
+      const maxByDimension = {};
+      dimensions.forEach(function (dim) { maxByDimension[dim.dimensionKey] = 0; });
+      questions.forEach(function (question) {
+        dimensions.forEach(function (dim) {
+          const scores = (question.options || []).map(function (option) { return Number((option.scoreWeights || {})[dim.dimensionKey] || 0); });
+          const questionMax = question.type === 'multiple'
+            ? scores.reduce(function (sum, score) { return sum + Math.max(0, score); }, 0)
+            : scores.reduce(function (max, score) { return Math.max(max, score); }, 0);
+          maxByDimension[dim.dimensionKey] += questionMax;
+        });
+      });
+      dimensions.forEach(function (dim) { dim.maxScore = Math.max(1, Math.round(maxByDimension[dim.dimensionKey] || dim.maxScore || 1)); });
       return {
         projectCode: field('quizProject') || 'P01',
         versionCode: field('quizVersionCode') || 'A',
         version: { name: field('quizVersionName'), description: field('quizVersionDescription'), trafficWeight: 100 },
-        stages: Array.from(document.querySelectorAll('.qe-stage')).map(function (row, index) { return { stageKey: row.querySelector('.qe-stage-key').value.trim(), title: row.querySelector('.qe-stage-title').value.trim(), description: row.querySelector('.qe-stage-description').value.trim(), sortOrder: Number(row.querySelector('.qe-stage-sort').value || ((index + 1) * 10)) }; }).filter(function (row) { return row.stageKey && row.title; }),
+        stages: stages,
         dimensions: dimensions,
-        ranges: Array.from(document.querySelectorAll('.qe-range')).map(function (row, index) { return { dimensionKey: row.querySelector('.qe-range-dim').value, rangeKey: row.querySelector('.qe-range-key').value.trim(), label: row.querySelector('.qe-range-label').value.trim(), minScore: Number(row.querySelector('.qe-range-min').value || 0), maxScore: Number(row.querySelector('.qe-range-max').value || 0), title: row.querySelector('.qe-range-title').value.trim(), subtitle: row.querySelector('.qe-range-subtitle').value.trim(), body: row.querySelector('.qe-range-body').value.trim(), imageUrl: row.querySelector('.qe-range-image').value.trim(), sortOrder: (index + 1) * 10 }; }).filter(function (row) { return row.dimensionKey && row.rangeKey; }),
-        questions: Array.from(document.querySelectorAll('.qe-question')).map(function (row, index) { return { questionNo: Number(row.querySelector('.qe-question-no').value || index + 1), stageKey: row.querySelector('.qe-question-stage').value, title: row.querySelector('.qe-question-title').value.trim(), helpText: row.querySelector('.qe-question-help').value.trim(), type: row.querySelector('.qe-question-type').value, isRequired: row.querySelector('.qe-question-required').value === 'true', sortOrder: Number(row.querySelector('.qe-question-sort').value || ((index + 1) * 10)), options: Array.from(row.querySelectorAll('.qe-option')).map(function (optionRow, optionIndex) { const scoreWeights = {}; optionRow.querySelectorAll('.qe-option-score').forEach(function (input) { scoreWeights[input.dataset.dim] = Number(input.value || 0); }); return { optionKey: optionRow.querySelector('.qe-option-key').value.trim(), label: optionRow.querySelector('.qe-option-label').value.trim(), description: optionRow.querySelector('.qe-option-description').value.trim(), scoreWeights: scoreWeights, sortOrder: (optionIndex + 1) * 10 }; }).filter(function (option) { return option.optionKey && option.label; }) }; }).filter(function (row) { return row.title; })
+        ranges: Array.from(document.querySelectorAll('.qe-range')).map(function (row, index) { return { dimensionKey: row.querySelector('.qe-range-dim').value, rangeKey: row.querySelector('.qe-range-key').value.trim(), label: row.querySelector('.qe-range-label').value.trim(), minScore: Math.round(Number(row.querySelector('.qe-range-min').value || 0)), maxScore: Math.round(Number(row.querySelector('.qe-range-max').value || 0)), title: row.querySelector('.qe-range-title').value.trim(), subtitle: row.querySelector('.qe-range-subtitle').value.trim(), body: row.querySelector('.qe-range-body').value.trim(), imageUrl: row.querySelector('.qe-range-image').value.trim(), sortOrder: (index + 1) * 10 }; }).filter(function (row) { return row.dimensionKey && row.rangeKey; }),
+        questions: questions
       };
     }
-
     function rerenderQuizEditorWith(data) {
       data.projects = (window.quizEditorData && window.quizEditorData.projects) || data.projects || [];
       data.versions = (window.quizEditorData && window.quizEditorData.versions) || data.versions || [];
