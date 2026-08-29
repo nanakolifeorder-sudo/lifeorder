@@ -1058,6 +1058,7 @@
         '<div><label>替已選名單加標籤</label><input id="crmBatchTags" placeholder="例如：高意願, 待追蹤"></div>' +
         '<div><label>替已選名單改狀態</label><select id="crmBatchStatus">' + statusOptions + '</select></div>' +
         '<button onclick="batchUpdateCrmContacts()">套用到已選名單</button>' +
+        '<button class="danger" onclick="deleteSelectedCrmContacts()">刪除已選名單</button>' +
       '</div><div class="crm-batch-summary"><button class="secondary" onclick="exportCrmRows()">匯出目前結果 CSV</button><p class="mini">目前顯示 ' + selectable.length + ' 筆；已選 ' + selectedIds.length + ' 筆。</p></div></div>';
     }
 
@@ -1126,6 +1127,18 @@
       }).catch(function (err) { alert(err.message); });
     }
 
+    function deleteSelectedCrmContacts() {
+      const ids = Object.keys(crmSelectedContacts).filter(function (id) { return crmSelectedContacts[id]; }).map(Number);
+      if (!ids.length) { alert('請先選擇要刪除的名單。'); return; }
+      if (!confirm('確定刪除已選的 ' + ids.length + ' 筆名單？刪除後會從 CRM 與測驗名單列表隱藏。')) return;
+      api('deleteCRMContact', { contactIds: ids }).then(function (res) {
+        alert('已刪除：' + (res.summary?.deleted || 0) + ' 筆');
+        crmSelectedContacts = {};
+        delete cache.crm;
+        delete cache.quizLeads;
+        loadCrm();
+      }).catch(function (err) { alert(err.message); });
+    }
     function csvEscape(value) {
       const text = String(value || '');
       return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
@@ -1412,7 +1425,7 @@
             '<div class="detail-contact-grid">' + crmDetailMeta('電話', contact.phone || '') + crmDetailMeta('Email', contact.email || '') + crmDetailMeta('名單狀態', lifecycleLabel) + '</div>' +
             tagPills +
           '</div>' +
-          '<button class="secondary" onclick="detailDialog().close()">關閉</button>' +
+          '<div class="actions"><button class="danger" onclick="deleteCrmContact(' + Number(contact.id || 0) + ')">刪除名單</button><button class="secondary" onclick="detailDialog().close()">關閉</button></div>' +
         '</div>' +
         '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + statBox('Email 紀錄', summary.emailCount || 0) + statBox('點擊紀錄', summary.clickCount || 0) + '</div>' +
         '<div class="detail-section">' + sectionTitle('基本資料', '最近互動') + '<div class="crm-card-meta">' + crmDetailMeta('專案', projectLabel) + crmDetailMeta('最新測驗', compactDate(summary.latestQuizAt)) + crmDetailMeta('最新預約', compactDate(summary.latestAppointmentAt)) + crmDetailMeta('名單狀態', lifecycleLabel) + '</div></div>' +
@@ -1425,6 +1438,19 @@
         '<div class="detail-section">' + sectionTitle('點擊歷程', '') + renderHistoryList(res.clickEvents || [], '沒有點擊紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>' +
         '<div class="detail-section">' + sectionTitle('客戶歷程', '') + renderHistoryList(res.normalizedTimeline || [], '沒有歷程紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(item.category || '') + '｜' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>';
     }
+    function deleteCrmContact(contactId) {
+      if (!contactId) return;
+      if (!confirm('確定刪除這筆名單？刪除後會從 CRM 與測驗名單列表隱藏。')) return;
+      api('deleteCRMContact', { contactId: contactId }).then(function (res) {
+        alert('已刪除：' + (res.summary?.deleted || 0) + ' 筆');
+        detailDialog().close();
+        delete crmSelectedContacts[String(contactId)];
+        delete cache.crm;
+        delete cache.quizLeads;
+        loadCrm();
+      }).catch(function (err) { alert(err.message); });
+    }
+
     function saveClientLabels(contactId) {
       if (!contactId) return;
       const tags = splitCrmTags(field('crmDetailTags'));

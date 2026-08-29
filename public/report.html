@@ -221,8 +221,61 @@
       }).join('');
     }
 
+    function reportTemplateVars(summary) {
+      const scores = summary.display_scores || summary.scores || {};
+      const levels = summary.levels || {};
+      return {
+        external_score: scores.external ?? '',
+        internal_score: scores.internal ?? '',
+        continuity_score: scores.continuity ?? '',
+        external_level: levels.external || '',
+        internal_level: levels.internal || '',
+        continuity_level: levels.continuity || '',
+        main_order: summary.main_order_title || summary.main_order || '',
+        main_order_title: summary.main_order_title || '',
+        main_order_score: summary.main_order_score ?? '',
+        main_order_level: summary.main_order_level || '',
+        daily_scenario_copy: summary.daily_scenario_copy || ''
+      };
+    }
+
+    function applyReportTemplates(value) {
+      const vars = reportTemplateVars(window.__scoreSummary || {});
+      if (typeof value === 'string') return value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, function (_match, key) { return String(vars[key] ?? ''); });
+      if (Array.isArray(value)) return value.map(applyReportTemplates);
+      if (value && typeof value === 'object') {
+        const next = {};
+        Object.keys(value).forEach(function (key) { next[key] = applyReportTemplates(value[key]); });
+        return next;
+      }
+      return value;
+    }
+
+    function reportBlockVisible(block) {
+      const rule = block.visibilityRule || block.visibility_rule || {};
+      if (!rule || typeof rule !== 'object' || !Object.keys(rule).length) return true;
+      const summary = window.__scoreSummary || {};
+      const mainOrder = summary.main_order || '';
+      if (rule.mainOrder && String(rule.mainOrder) !== String(mainOrder)) return false;
+      if (rule.main_order && String(rule.main_order) !== String(mainOrder)) return false;
+      if (rule.level && String(rule.level) !== String(summary.main_order_level || '')) return false;
+      if (rule.dimensionKey && !Object.prototype.hasOwnProperty.call(summary.display_scores || summary.scores || {}, rule.dimensionKey)) return false;
+      if (rule.rangeKey) {
+        const dimensionKey = rule.dimensionKey || rule.dimension_key || mainOrder;
+        if (String((summary.matched_ranges || {})[dimensionKey] || '') !== String(rule.rangeKey)) return false;
+      }
+      return true;
+    }
+
+    function prepareReportBlock(block) {
+      return applyReportTemplates(block || {});
+    }
+
     function renderBlocks(blocks) {
-      const filtered = (blocks || []).filter(function (block) { return !['score_table', 'score_range_content'].includes(block.blockType); });
+      const filtered = (blocks || [])
+        .filter(function (block) { return !['score_table', 'score_range_content'].includes(block.blockType); })
+        .filter(reportBlockVisible)
+        .map(prepareReportBlock);
       if (!filtered.length) return;
       document.getElementById('blocksSection').classList.remove('hidden');
       document.getElementById('blocks').innerHTML = filtered.map(function (block) {
