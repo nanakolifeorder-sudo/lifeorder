@@ -16,6 +16,7 @@
     p { color:var(--muted); margin:0 0 10px; }
     .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
     .score { border:1px solid var(--line); border-radius:8px; padding:16px; background:var(--soft); }
+    .score p { margin-top:10px; font-size:14px; }
     .chart-wrap { display:grid; grid-template-columns:minmax(260px,420px) minmax(0,1fr); gap:20px; align-items:center; }
     .radar { width:100%; max-width:420px; aspect-ratio:1; }
     .radar-grid { fill:none; stroke:#d7dee8; stroke-width:1; }
@@ -52,6 +53,7 @@
 
     <section class="section hidden" id="scoreSection">
       <h2>分數總覽</h2>
+      <p>每一項滿分 100 分。分數越接近 100，代表這一塊的資料、決定與安排越明確；自己處理時比較不需要反覆確認，身邊重要的人在必要時也比較能接手。</p>
       <div class="grid" id="scores"></div>
     </section>
 
@@ -162,8 +164,13 @@
       const items = scoreItems(summary);
       if (!items.length) return;
       document.getElementById('scoreSection').classList.remove('hidden');
+      const descriptions = {
+        external: '外在秩序牽涉物品、空間、文件、帳號、密碼、保單、帳戶與資產資料。這一塊越明確，日常事情越容易一次處理完。',
+        internal: '內在秩序牽涉關係、願望、價值觀與優先順序。這一塊越明確，你越容易知道哪些事要先安排，哪些責任需要重新分配。',
+        continuity: '延續秩序牽涉家人接手、寵物照顧、百年安排、重要紀錄與想留下的心意。這一塊越明確，臨時變動來臨時，身邊的人越容易照著你的意思處理。'
+      };
       document.getElementById('scores').innerHTML = items.map(function (item) {
-        return '<div class="score"><div class="score-head"><h3>' + escapeHtml(item.name) + '</h3><span class="score-value">' + item.displayScore + (item.displayMax ? '/' + item.displayMax : '') + '</span></div><div class="meter"><span style="width:' + Math.round(item.pct * 100) + '%"></span></div></div>';
+        return '<div class="score"><div class="score-head"><h3>' + escapeHtml(item.name) + '</h3><span class="score-value">' + item.displayScore + (item.displayMax ? '/' + item.displayMax : '') + '</span></div><div class="meter"><span style="width:' + Math.round(item.pct * 100) + '%"></span></div><p>' + escapeHtml(descriptions[item.key] || item.description || '') + '</p></div>';
       }).join('');
     }
 
