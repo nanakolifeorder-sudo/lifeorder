@@ -14,6 +14,9 @@ create table if not exists tenants (
 
 alter table tenants add column if not exists booking_base_urls jsonb not null default '[]'::jsonb;
 alter table tenants add column if not exists webhook_secret text default '';
+alter table tenants add column if not exists zoom_account_id text default '';
+alter table tenants add column if not exists zoom_client_id text default '';
+alter table tenants add column if not exists zoom_client_secret text default '';
 
 create table if not exists login_attempts (
   id bigserial primary key,
@@ -67,6 +70,7 @@ create table if not exists consultants (
 
 alter table consultants add column if not exists microsoft_email text;
 alter table consultants add column if not exists microsoft_refresh_token text;
+alter table consultants add column if not exists max_daily_bookings integer not null default 0;
 
 create table if not exists availability_rules (
   id bigserial primary key,

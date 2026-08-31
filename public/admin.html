@@ -466,6 +466,13 @@
       list-style-position: inside;
     }
     .email-purpose-group > .email-purpose-body { padding: 0 0 12px; }
+    .schedule-day-row { display:grid; grid-template-columns:120px minmax(0,1fr) minmax(0,1fr) auto; gap:12px; align-items:end; }
+    .schedule-window label { color:var(--muted); font-size:12px; font-weight:800; }
+    .schedule-time-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .schedule-window-empty { align-self:center; }
+    .zoom-settings-box { border:1px solid var(--line); border-radius:8px; padding:14px; background:#1f1f1f; margin-bottom:14px; }
+    .panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; }
+    @media (max-width: 960px) { .schedule-day-row { grid-template-columns:1fr; } }
     .rich-editor img {
       display: block;
       max-width: 100%;
@@ -599,7 +606,7 @@
     let quizLeadSearch = '';
     let emailProject = 'ALL';
     let emailModule = 'booking';
-    let quizEditorTab = 'settings';
+    let quizEditorTab = 'questions';
     let sidebarCollapsed = localStorage.getItem('dm_saas_sidebar_collapsed') === '1';
     let ownerProject = localStorage.getItem('dm_saas_' + tenant + '_project') || 'ALL';
     let ownerScope = { tenants: [], projects: [] };
@@ -654,7 +661,8 @@
 
     function videoToolOptions(current) {
       return [
-        ['Google Meet', 'Google Meet']
+        ['Google Meet', 'Google Meet'],
+        ['Zoom', 'Zoom']
       ].map(function (item) { return selectedOption(item[0], current || 'Google Meet', item[1]); }).join('');
     }
 
@@ -796,7 +804,7 @@
         { id: 'reportEditor', group: '測驗系統', mark: '報', label: '檢測報告設定', ok: can('FORMS') },
         { id: 'quizEmails', group: '測驗系統', mark: '追', label: '跟進信管理', ok: can('EMAILS') },
         { id: 'projects', group: '系統設定', mark: '專', label: '專案管理', ok: can('PROJECTS') },
-        { id: 'usage', group: '系統設定', mark: '用', label: '系統用量', ok: isSystemOwner() },
+        { id: 'usage', group: '系統設定', mark: '監', label: '總數據監測', ok: isSystemOwner() },
         { id: 'users', group: '系統設定', mark: '帳', label: '帳號 / 權限管理', ok: isSystemOwner() }
       ].filter(function (tab) { return tab.ok; });
     }
@@ -1668,12 +1676,12 @@
       const days = ['日', '一', '二', '三', '四', '五', '六'];
       const rows = days.map(function (day, i) {
         const rule = weekly[i] || {};
-        return '<div class="row item">' +
-          '<div class="col-2"><strong>星期' + day + '</strong></div>' +
-          '<div class="col-3"><input type="time" id="w_start_' + i + '" value="' + escapeHtml(rule.start || '') + '"></div>' +
-          '<div class="col-3"><input type="time" id="w_end_' + i + '" value="' + escapeHtml(rule.end || '') + '"></div>' +
-          '<div class="col-2"><input type="time" id="w_start2_' + i + '" value="' + escapeHtml(rule.start2 || '') + '"></div>' +
-          '<div class="col-2"><input type="time" id="w_end2_' + i + '" value="' + escapeHtml(rule.end2 || '') + '"></div>' +
+        const hasSecond = Boolean(rule.start2 || rule.end2);
+        return '<div class="item schedule-day-row" data-day="' + i + '">' +
+          '<strong>星期' + day + '</strong>' +
+          '<div class="schedule-window"><label>第一時段</label><div class="schedule-time-pair"><input type="time" id="w_start_' + i + '" value="' + escapeHtml(rule.start || '') + '"><input type="time" id="w_end_' + i + '" value="' + escapeHtml(rule.end || '') + '"></div></div>' +
+          '<div class="schedule-window schedule-second"' + (hasSecond ? '' : ' style="display:none;"') + '><label>第二時段</label><div class="schedule-time-pair"><input type="time" id="w_start2_' + i + '" value="' + escapeHtml(rule.start2 || '') + '"><input type="time" id="w_end2_' + i + '" value="' + escapeHtml(rule.end2 || '') + '"></div></div>' +
+          '<div class="schedule-window-empty"><button class="secondary" type="button" onclick="toggleSecondWeeklySlot(this)">' + (hasSecond ? '移除第二時段' : '+ 第二時段') + '</button></div>' +
         '</div>';
       }).join('');
       const specific = (res.specific || []).slice(0, 6);
@@ -1698,7 +1706,8 @@
         scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請先連結 Google Calendar。</div>';
       } else if (res.meetTool === 'Microsoft Teams' && !res.microsoftConnected) {
         scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請先連結 Microsoft Calendar。</div>';
-
+      } else if (String(res.meetTool || '').toLowerCase().includes('zoom')) {
+        scheduleWarning = '<div class="warning-box"><strong>Zoom 尚未完成正式預約串接：</strong>目前可先儲存顧問使用 Zoom 與金鑰設定；要自動產生 Zoom 會議連結，還需要完成下一階段 Zoom OAuth / API 串接。</div>';
       } else if (!(res.weekly || []).length && !(res.specific || []).length) {
         scheduleWarning = '<div class="warning-box"><strong>目前不會顯示預約時段：</strong>請至少設定一組完整的開始與結束時間。</div>';
       }
@@ -1710,6 +1719,7 @@
           '<div class="col-2"><label>間隔分鐘</label><input id="interval" type="number" value="' + (res.settings?.interval || 60) + '"></div>' +
           '<div class="col-2"><label>前緩衝</label><input id="bufferBefore" type="number" value="' + (res.settings?.bufferBefore || 0) + '"></div>' +
           '<div class="col-2"><label>後緩衝</label><input id="bufferAfter" type="number" value="' + (res.settings?.bufferAfter || 0) + '"></div>' +
+          '<div class="col-2"><label>一天最多預約</label><input id="maxDailyBookings" type="number" min="0" value="' + (res.settings?.maxDailyBookings || 0) + '"><div class="mini">0 代表不限制</div></div>' +
           '<div class="col-3"><label>最早可預約（幾天後）</label><input id="minDays" type="number" min="0" max="365" value="' + (res.settings?.minDays ?? 1) + '"><div class="mini">0 代表今天，1 代表明天</div></div>' +
           '<div class="col-3"><label>開放到未來第幾天</label><input id="maxDays" type="number" min="1" max="365" value="' + (res.settings?.maxDays ?? 14) + '"><div class="mini">例如 30 代表顯示未來 30 天</div></div>' +
         '</div>' +
@@ -1718,6 +1728,22 @@
         '<h3 style="margin-top:16px;">每週固定時段</h3>' + rows +
         '<h3 style="margin-top:16px;">指定日期加開</h3>' + specificRows +
         '<div class="actions"><button onclick="saveSchedule(' + res.consultantId + ')">儲存排班</button></div>';
+    }
+
+    function toggleSecondWeeklySlot(button) {
+      const row = button.closest('.schedule-day-row');
+      const second = row.querySelector('.schedule-second');
+      const visible = second.style.display !== 'none';
+      if (visible) {
+        second.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+        second.style.display = 'none';
+        button.textContent = '+ 第二時段';
+      } else {
+        second.style.display = '';
+        button.textContent = '移除第二時段';
+        const input = second.querySelector('input');
+        if (input) input.focus();
+      }
     }
 
     function collectScheduleRules() {
@@ -1760,6 +1786,7 @@
           interval: Number(field('interval') || 60),
           bufferBefore: Number(field('bufferBefore') || 0),
           bufferAfter: Number(field('bufferAfter') || 0),
+          maxDailyBookings: Number(field('maxDailyBookings') || 0),
           minDays: minDays,
           maxDays: maxDays
         },
@@ -1861,6 +1888,10 @@
           '<div class="col-2"><label>角色</label><select class="c-role-main"><option value="CONSULTANT"' + (!isTenantAdminRole ? ' selected' : '') + '>團隊顧問</option><option value="TENANT_ADMIN"' + (isTenantAdminRole ? ' selected' : '') + '>使用者管理員</option></select></div>' +
           '<div class="col-2"><label>視訊工具</label><select class="c-meet">' + videoToolOptions(row.meetTool) + '</select></div>' +
           '<div class="col-2"><label>時區</label><select class="c-tz">' + timeZoneOptions(row.shiftTZ) + '</select></div>' +
+          '<div class="col-2"><label>預約間隔</label><input class="c-interval" type="number" min="15" step="5" value="' + escapeHtml(row.interval || 60) + '"></div>' +
+          '<div class="col-2"><label>前緩衝</label><input class="c-buffer-before" type="number" min="0" step="5" value="' + escapeHtml(row.bufferBefore || 0) + '"></div>' +
+          '<div class="col-2"><label>後緩衝</label><input class="c-buffer-after" type="number" min="0" step="5" value="' + escapeHtml(row.bufferAfter || 0) + '"></div>' +
+          '<div class="col-2"><label>一天最多預約</label><input class="c-max-daily" type="number" min="0" value="' + escapeHtml(row.maxDailyBookings || 0) + '"><div class="mini">0 代表不限制</div></div>' +
           '<div class="col-12"><label>團隊顧問附加權限</label>' + permissionChecks(row.sysRole || '') + '</div>' +
           '<div class="col-12 actions">' +
             '<button onclick="saveConsultant(this)">儲存</button>' +
@@ -1881,8 +1912,29 @@
       const html = '<div class="panel"><div class="row"><div class="col-8"><h2>' + escapeHtml(tenantDisplayName) + '團隊顧問</h2></div>' +
         '<div class="col-4"><button class="secondary" onclick="ensureDemoAccounts()">建立測試帳號</button></div></div><div class="list">' +
         consultants.map(function (row) { return consultantForm(row, adminProjects); }).join('') +
-        '</div></div><div class="panel"><h2>新增' + escapeHtml(tenantDisplayName) + '團隊顧問</h2>' + consultantForm({ isAccepting: '是', weight: 50, projects: 'ALL', meetTool: 'Google Meet', shiftTZ: 'Asia/Taipei' }, adminProjects) + '</div>';
+        '</div></div>' + zoomSettingsPanel(res.zoomSettings || {}) + '<div class="panel"><h2>新增' + escapeHtml(tenantDisplayName) + '團隊顧問</h2>' + consultantForm({ isAccepting: '是', weight: 50, projects: 'ALL', meetTool: 'Google Meet', shiftTZ: 'Asia/Taipei', interval: 60, bufferBefore: 0, bufferAfter: 0, maxDailyBookings: 0 }, adminProjects) + '</div>';
       document.getElementById('view').innerHTML = html;
+    }
+
+    function zoomSettingsPanel(settings) {
+      return '<div class="panel"><div class="panel-head"><div><h2>Zoom 金鑰設定</h2><p class="mini">若顧問視訊工具選 Zoom，請先填入 Zoom Server-to-Server OAuth 的三組金鑰。正式自動建立 Zoom 會議仍需要後續串接流程。</p></div><a class="button secondary" target="_blank" rel="noopener" href="https://app.notion.com/p/Zoom-34b7d1e3c4c38051bec1d47bddd915ec?source=copy_link">開啟 Zoom 金鑰教學</a></div>' +
+        '<div class="zoom-settings-box"><div class="row">' +
+          '<div class="col-4"><label>Zoom Account ID</label><input id="zoomAccountId" value="' + escapeHtml(settings.accountId || '') + '"></div>' +
+          '<div class="col-4"><label>Zoom Client ID</label><input id="zoomClientId" value="' + escapeHtml(settings.clientId || '') + '"></div>' +
+          '<div class="col-4"><label>Zoom Client Secret</label><input id="zoomClientSecret" type="password" autocomplete="new-password" placeholder="' + (settings.hasClientSecret ? '已設定；留空代表不變更' : '貼上 Client Secret') + '"></div>' +
+          '<div class="col-12 actions"><button type="button" onclick="saveZoomSettings()">儲存 Zoom 金鑰</button></div>' +
+        '</div></div></div>';
+    }
+
+    function saveZoomSettings() {
+      api('saveTenantVideoSettings', {
+        zoomAccountId: field('zoomAccountId'),
+        zoomClientId: field('zoomClientId'),
+        zoomClientSecret: field('zoomClientSecret')
+      }).then(function () {
+        alert('Zoom 金鑰已儲存');
+        loadConsultants();
+      }).catch(function (err) { alert(err.message); });
     }
 
     function collectPermissions(row) {
@@ -1907,7 +1959,11 @@
         projects: projectCodes.includes('ALL') || !projectCodes.length ? 'ALL' : projectCodes.join(','),
         sysRole: collectPermissions(row),
         meetTool: row.querySelector('.c-meet').value.trim() || 'Google Meet',
-        shiftTZ: row.querySelector('.c-tz').value.trim() || 'Asia/Taipei'
+        shiftTZ: row.querySelector('.c-tz').value.trim() || 'Asia/Taipei',
+        interval: Number(row.querySelector('.c-interval')?.value || 60),
+        bufferBefore: Number(row.querySelector('.c-buffer-before')?.value || 0),
+        bufferAfter: Number(row.querySelector('.c-buffer-after')?.value || 0),
+        maxDailyBookings: Number(row.querySelector('.c-max-daily')?.value || 0)
       };
       api('saveConsultantData', payload).then(function () {
         alert('已儲存');
@@ -2047,7 +2103,7 @@
         '<div class="panel"><div class="row"><div class="col-8"><h2>Booking 網址管理</h2><p class="mini">保留系統網址，也可新增已指向本系統的自訂網域；所有專案只會使用勾選的主要網址。</p></div>' +
         '<div class="col-4 actions"><button class="secondary" type="button" onclick="addBookingBase()">新增網址</button><button type="button" onclick="saveBookingBases()">儲存主要網址</button></div></div>' +
         '<input id="systemBookingBase" type="hidden" value="' + escapeHtml(systemBase) + '"><div id="bookingBaseList">' + baseRows + '</div></div>' +
-        '<div class="panel"><h2>專案管理</h2><div class="list">' +
+        '<div class="panel"><h2>專案管理</h2><p class="mini">專案管理負責專案名稱、預約連結、嵌入碼與邀請連結。預約前後緩衝、預約間隔、一天最多預約幾場，請到「顧問管理」或「排班系統」設定，因為這些限制會跟著每位顧問走。</p><div class="list">' +
         (res.projects || []).map(projectForm).join('') +
         '</div></div><div class="panel"><h2>新增專案</h2>' + projectForm({ status: 'active' }) + '</div>';
     }
@@ -2231,11 +2287,11 @@
       const projectOptions = projectRows.map(function (p) { return '<option value="' + escapeHtml(p.code) + '"' + (p.code === res.projectCode ? ' selected' : '') + '>' + escapeHtml(p.name || p.code) + '</option>'; }).join('');
       const versionOptions = (res.versions || []).map(function (v) { return '<option value="' + escapeHtml(v.version_code) + '"' + (v.version_code === res.versionCode ? ' selected' : '') + '>' + escapeHtml(v.version_code + '｜' + (v.name || '未命名')) + '</option>'; }).join('') || '<option value="A">A｜預設版本</option>';
       const tabBar = '<div class="module-tabs">' +
-        quizEditorTabButton('settings', '測驗設定') +
+        quizEditorTabButton('questions', '題目與加分選項') +
         quizEditorTabButton('stages', '題目階段') +
         quizEditorTabButton('dimensions', '分數面向') +
         quizEditorTabButton('ranges', '分數區間') +
-        quizEditorTabButton('questions', '題目與加分選項') +
+        quizEditorTabButton('settings', '測驗設定') +
       '</div>';
       document.getElementById('view').innerHTML = '<div class="panel"><h2>題目管理</h2><div class="row"><div class="col-4"><label>選擇專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>目前版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'A') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button onclick="saveQuizEditor()">儲存設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'P01') + '&version=' + encodeURIComponent(res.versionCode || 'A') + '">開啟前台測驗</a></div></div>' +
         '<div class="panel module-section" data-section="settings"><h2>測驗基本設定</h2><label>版本說明</label><textarea id="quizVersionDescription">' + escapeHtml(currentVersion.description || '') + '</textarea></div>' +
@@ -2751,15 +2807,20 @@
         return '<tr><td>' + escapeHtml(item.client_email || '') + '</td><td>' + escapeHtml(emailStatusLabel(item.reason || 'unsubscribe')) + '</td><td>' + escapeHtml(item.source || '') + '</td></tr>';
       }).join('');
       document.getElementById('view').innerHTML =
-        '<div class="panel"><div class="row"><div class="col-5"><h2>' + escapeHtml(emailModuleTitle(emailModule)) + '</h2><p class="mini">' + escapeHtml(emailModuleHelp(emailModule)) + '</p></div><div class="col-4"><label>目前專案</label><select onchange="loadEmailsByProject(this.value)">' + filterOptions + '</select></div><div class="col-3"><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div>' +
-        '<div class="subtabs">' + emailModuleChip('booking', '預約提醒信') + emailModuleChip('quiz', '測驗跟進信') + '</div><div class="list" style="margin-top:16px;">' +
-        '<h3>新增信件範本</h3>' + emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, module: emailModule, status: 'active', triggerName: defaultEmailTrigger(emailModule), timeParam: emailModule === 'quiz' ? 24 : 0, stopWhenBooked: true }, projectOptions) +
-        '<h3 style="margin-top:20px;">已建立的自動信件</h3>' + groupedTemplates + '</div></div>' +
+        '<div class="panel"><div class="row"><div class="col-5"><h2>' + escapeHtml(emailModuleTitle(emailModule)) + '</h2><p class="mini">' + escapeHtml(emailModuleHelp(emailModule)) + '</p></div><div class="col-4"><label>目前專案</label><select onchange="loadEmailsByProject(this.value)">' + filterOptions + '</select></div><div class="col-3 actions"><button type="button" onclick="toggleNewEmailTemplate()">新增信件範本</button><button class="secondary" onclick="runEmails()">立即處理待寄信件</button></div></div>' +
+        '<div class="subtabs">' + emailModuleChip('booking', '預約提醒信') + emailModuleChip('quiz', '測驗跟進信') + '</div><div id="newEmailTemplateBox" class="list hidden" style="margin-top:16px;">' +
+        emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, module: emailModule, status: 'active', triggerName: defaultEmailTrigger(emailModule), timeParam: emailModule === 'quiz' ? 24 : 0, stopWhenBooked: true }, projectOptions) + '</div><div class="list" style="margin-top:16px;">' +
+        '<h3>已建立的自動信件</h3>' + groupedTemplates + '</div></div>' +
         '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>日期時間</th><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>觸發</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>' +
         '<div class="panel"><h2>寄信告警</h2><table><thead><tr><th>等級</th><th>標題</th><th>內容</th></tr></thead><tbody>' + alerts + '</tbody></table></div>' +
         '<div class="panel"><h2>退訂與拒收名單</h2><table><thead><tr><th>Email</th><th>原因</th><th>來源</th></tr></thead><tbody>' + suppressions + '</tbody></table></div>';
       initializeEmailEditors(visibleTemplates);
+    }
+
+    function toggleNewEmailTemplate() {
+      const box = document.getElementById('newEmailTemplateBox');
+      if (box) box.classList.toggle('hidden');
     }
 
     function emailModuleTitle(moduleName) {
@@ -2850,7 +2911,7 @@
     function emailTemplateForm(row, projectOptions) {
       const isNew = !row.rowId;
       const moduleName = templateEmailModule(row);
-      return '<details class="item email-row" data-id="' + (row.rowId || 'new') + '" data-module="' + escapeHtml(moduleName) + '"' + (isNew ? ' open' : '') + '>' +
+      return '<details class="item email-row" data-id="' + (row.rowId || 'new') + '" data-module="' + escapeHtml(moduleName) + '">' +
         '<summary><span>' + escapeHtml(row.name || '新增信件') + '</span><span>' + escapeHtml(emailTriggerLabel(row.triggerName)) + '</span><span>' + Number(row.timeParam || 0) + ' 小時</span></summary>' +
         '<div class="details-body"><div class="row">' +
           '<div class="col-2"><label>專案</label><select class="e-project">' + projectOptions.replace('value="' + row.projectCode + '"', 'value="' + row.projectCode + '" selected') + '</select></div>' +
@@ -3140,12 +3201,12 @@
     }
 
     function loadSystemUsage() {
-      loading('系統用量');
+      loading('總數據監測');
       api('getSystemUsage', {}).then(function (res) {
         const dbMb = Number(res.databaseMb || 0);
         const imageMb = Number(res.emailImageMb || 0);
         document.getElementById('view').innerHTML =
-          '<div class="panel"><h2>系統用量</h2><p>這裡顯示本系統可直接量到的資料；Vercel 與 Supabase 平台帳單仍以官方 Usage 頁為準。</p>' +
+          '<div class="panel"><h2>總數據監測</h2><p>這裡顯示本系統可直接量到的資料與用量；Vercel 與 Supabase 平台帳單仍以官方 Usage 頁為準。</p>' +
             '<div class="stat-grid">' +
               usageCard('Supabase 資料庫', dbMb, 500, 'MB', '免費方案到 500MB；70% 開始提醒。') +
               usageCard('信件範本與圖片', imageMb, 10, 'MB', '目前使用者的信件範本總上限 10MB。') +

@@ -311,6 +311,11 @@ $$;
 alter table crm_contacts add column if not exists tags text[] not null default array[]::text[];
 alter table crm_contacts add column if not exists notes text default '';
 
+alter table tenants add column if not exists zoom_account_id text default '';
+alter table tenants add column if not exists zoom_client_id text default '';
+alter table tenants add column if not exists zoom_client_secret text default '';
+alter table consultants add column if not exists max_daily_bookings integer not null default 0;
+
 alter table projects add column if not exists default_quiz_version_code text not null default 'A';
 alter table quiz_score_dimensions add column if not exists display_max_score numeric(10,2);
 alter table quiz_score_dimensions add column if not exists display_score_format text not null default 'number';
