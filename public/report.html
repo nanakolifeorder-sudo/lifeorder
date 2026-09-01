@@ -17,7 +17,7 @@
     .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
     .score { border:1px solid var(--line); border-radius:8px; padding:16px; background:var(--soft); }
     .score p { margin-top:10px; font-size:14px; }
-    .chart-wrap { display:grid; grid-template-columns:minmax(260px,420px) minmax(0,1fr); gap:20px; align-items:center; }
+    .chart-wrap { display:flex; justify-content:center; align-items:center; }
     .radar { width:100%; max-width:420px; aspect-ratio:1; }
     .radar-grid { fill:none; stroke:#d7dee8; stroke-width:1; }
     .radar-axis { stroke:#e5eaf1; stroke-width:1; }
@@ -214,10 +214,7 @@
         return '<text class="radar-label" x="' + point.labelX.toFixed(1) + '" y="' + point.labelY.toFixed(1) + '" text-anchor="' + anchor + '" dominant-baseline="middle">' + escapeHtml(point.value.name) + '</text>';
       }).join('');
       const dots = points.map(function (point) { return '<circle class="radar-dot" cx="' + point.x.toFixed(1) + '" cy="' + point.y.toFixed(1) + '" r="4"></circle>'; }).join('');
-      const legend = items.map(function (item) {
-        return '<div class="legend-item"><strong><span>' + escapeHtml(item.name) + '</span><span>' + item.score + (item.max ? '/' + item.max : '') + '</span></strong><div class="meter"><span style="width:' + Math.round(item.pct * 100) + '%"></span></div></div>';
-      }).join('');
-      return '<article class="content score-chart"><h2>' + escapeHtml(config.title || '多面向分數圖') + '</h2><div class="chart-wrap"><svg class="radar" viewBox="0 0 320 320" role="img" aria-label="多面向分數雷達圖">' + rings + axes + '<polygon class="radar-shape" points="' + shape + '"></polygon>' + dots + labels + '</svg><div class="legend">' + legend + '</div></div></article>';
+      return '<article class="content score-chart"><h2>' + escapeHtml(config.title || '多面向分數圖') + '</h2><div class="chart-wrap"><svg class="radar" viewBox="0 0 320 320" role="img" aria-label="多面向分數雷達圖">' + rings + axes + '<polygon class="radar-shape" points="' + shape + '"></polygon>' + dots + labels + '</svg></div></article>';
     }
 
     function renderMatchedContent(items) {
