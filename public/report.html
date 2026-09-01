@@ -32,6 +32,8 @@
     .meter { height:8px; background:#e8eaed; border-radius:999px; overflow:hidden; margin-top:10px; }
     .meter span { display:block; height:100%; background:var(--green); width:0; }
     .content { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
+    .report-block { background:#fff; border:1px solid var(--line); border-radius:8px; padding:22px; box-shadow:0 8px 28px rgba(60,64,67,.08); margin-bottom:16px; }
+    #scoreChart .content { border-top:0; padding-top:0; }
     .report-image { width:100%; max-height:320px; object-fit:cover; border-radius:8px; border:1px solid var(--line); margin:8px 0 14px; }
     .button { border:0; border-radius:6px; background:var(--blue); color:#fff; font:inherit; font-weight:700; padding:13px 18px; cursor:pointer; text-decoration:none; display:inline-flex; justify-content:center; align-items:center; min-height:46px; }
     .button.secondary { background:#fff; color:var(--blue); border:1px solid var(--line); }
@@ -55,6 +57,7 @@
       <h2>分數總覽</h2>
       <p>每一項滿分 100 分。分數越接近 100，代表這一塊的資料、決定與安排越明確；自己處理時比較不需要反覆確認，身邊重要的人在必要時也比較能接手。</p>
       <div class="grid" id="scores"></div>
+      <div id="scoreChart"></div>
     </section>
 
     <section class="section hidden" id="contentSection">
@@ -161,6 +164,8 @@
     }
 
     function renderScores(summary, settings) {
+      const chartTarget = document.getElementById('scoreChart');
+      if (chartTarget) chartTarget.innerHTML = settings && settings.show_chart === true ? renderRadarChart(summary, { title: '人生秩序三角圖' }) : '';
       if (settings && settings.show_score_cards === false) return;
       const items = scoreItems(summary);
       if (!items.length) return;
@@ -212,7 +217,7 @@
       const legend = items.map(function (item) {
         return '<div class="legend-item"><strong><span>' + escapeHtml(item.name) + '</span><span>' + item.score + (item.max ? '/' + item.max : '') + '</span></strong><div class="meter"><span style="width:' + Math.round(item.pct * 100) + '%"></span></div></div>';
       }).join('');
-      return '<article class="content"><h2>' + escapeHtml(config.title || '多面向分數圖') + '</h2><div class="chart-wrap"><svg class="radar" viewBox="0 0 320 320" role="img" aria-label="多面向分數雷達圖">' + rings + axes + '<polygon class="radar-shape" points="' + shape + '"></polygon>' + dots + labels + '</svg><div class="legend">' + legend + '</div></div></article>';
+      return '<article class="content score-chart"><h2>' + escapeHtml(config.title || '多面向分數圖') + '</h2><div class="chart-wrap"><svg class="radar" viewBox="0 0 320 320" role="img" aria-label="多面向分數雷達圖">' + rings + axes + '<polygon class="radar-shape" points="' + shape + '"></polygon>' + dots + labels + '</svg><div class="legend">' + legend + '</div></div></article>';
     }
 
     function renderMatchedContent(items) {
@@ -288,22 +293,22 @@
       document.getElementById('blocksSection').classList.remove('hidden');
       document.getElementById('blocks').innerHTML = filtered.map(function (block) {
         const content = block.content || {};
+        let html = '';
         if (block.blockType === 'score_chart') return renderRadarChart(window.__scoreSummary || {}, Object.assign({ title: block.title }, content));
-        if (block.blockType === 'heading') return '<h2>' + escapeHtml(content.text || block.title || '') + '</h2>';
-        if (block.blockType === 'text') return '<p>' + escapeHtml(content.text || '').replace(/\n/g, '<br>') + '</p>';
-        if (block.blockType === 'list') return '<ul>' + (content.items || []).map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>';
-        if (block.blockType === 'image') return '<img class="report-image" src="' + escapeHtml(content.url || '') + '" alt="' + escapeHtml(content.alt || '') + '">';
-        if (block.blockType === 'button' || block.blockType === 'link') {
+        if (block.blockType === 'heading') html = '<h2>' + escapeHtml(content.text || block.title || '') + '</h2>';
+        else if (block.blockType === 'text') html = (block.title ? '<h2>' + escapeHtml(block.title) + '</h2>' : '') + '<p>' + escapeHtml(content.text || '').replace(/\n/g, '<br>') + '</p>';
+        else if (block.blockType === 'list') html = (block.title ? '<h2>' + escapeHtml(block.title) + '</h2>' : '') + '<ul>' + (content.items || []).map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>';
+        else if (block.blockType === 'image') html = (block.title ? '<h2>' + escapeHtml(block.title) + '</h2>' : '') + '<img class="report-image" src="' + escapeHtml(content.url || '') + '" alt="' + escapeHtml(content.alt || '') + '">';
+        else if (block.blockType === 'button' || block.blockType === 'link') {
           const label = content.label || block.title || '了解更多';
           const href = appendReportParams(content.url || '#', content);
-          return '<p><a class="button secondary"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
-        }
-        if (block.blockType === 'booking_cta') {
+          html = '<p><a class="button secondary"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
+        } else if (block.blockType === 'booking_cta') {
           const label = content.label || '預約一對一諮詢';
           const href = content.urlMode === 'custom' && content.url ? appendReportParams(content.url, content) : bookingUrl();
-          return '<p><a class="button"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
+          html = '<p><a class="button"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
         }
-        return '';
+        return html ? '<article class="report-block">' + html + '</article>' : '';
       }).join('');
     }
 
@@ -324,10 +329,7 @@
         document.getElementById('topActions').innerHTML = '<a class="button" href="' + bookingUrl() + '" data-block-key="top-booking" data-block-type="booking_cta" data-link-label="' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '" onclick="return followReportLink(event,this)">' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '</a><a class="button secondary" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '">重新檢測</a>';
         document.getElementById('topActions').classList.remove('hidden');
         window.__scoreSummary = summary;
-        const reportBlocks = (snapshot.blocks || []).slice();
-        if (settings.show_chart === true && !reportBlocks.some(function (block) { return block.blockType === 'score_chart'; })) {
-          reportBlocks.unshift({ blockType: 'score_chart', title: '多面向分數圖', content: { chartType: 'radar' } });
-        }
+        const reportBlocks = (snapshot.blocks || []).slice();
         renderScores(summary, settings);
         renderMatchedContent(snapshot.matched_content || []);
         renderBlocks(reportBlocks);
@@ -340,6 +342,7 @@
   </script>
 </body>
 </html>
+
 
 
 

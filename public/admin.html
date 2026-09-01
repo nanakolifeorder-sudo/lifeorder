@@ -472,6 +472,11 @@
     .schedule-window-empty { align-self:center; }
     .zoom-settings-box { border:1px solid var(--line); border-radius:8px; padding:14px; background:#1f1f1f; margin-bottom:14px; }
     .panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; }
+    .table-scroll { max-height: 288px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+    .table-scroll table th { position: sticky; top: 0; z-index: 1; }
+    .tag-pick-grid { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:8px; }
+    .consultant-status-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .consultant-status-card { border:1px solid var(--line); border-radius:8px; padding:12px; background:var(--panel-2); }
     @media (max-width: 960px) { .schedule-day-row { grid-template-columns:1fr; } }
     .rich-editor img {
       display: block;
@@ -563,9 +568,9 @@
     <div class="panel">
       <h2>登入後台</h2>
       <label>Email</label>
-      <input id="loginEmail" type="email" autocomplete="username" value="" placeholder="請輸入 Email">
+      <input id="loginEmail" type="email" autocomplete="off" data-1p-ignore data-lpignore="true" value="" placeholder="請輸入 Email">
       <label style="margin-top:12px;">密碼</label>
-      <input id="loginPassword" type="password" autocomplete="current-password" value="" placeholder="請輸入密碼">
+      <input id="loginPassword" type="password" autocomplete="new-password" data-1p-ignore data-lpignore="true" value="" placeholder="請輸入密碼">
       <button style="width:100%; margin-top:16px;" onclick="login()">登入</button>
       <p id="loginMsg" class="bad"></p>
     </div>
@@ -602,6 +607,10 @@
     let crmPurchasePlanFilter = 'ALL';
     let crmPurchaseDateFrom = '';
     let crmPurchaseDateTo = '';
+    let crmConsultantFilter = 'ALL';
+    let crmAccessCodeFilter = 'ALL';
+    let crmDateFrom = '';
+    let crmDateTo = '';
     let accessCodeProject = 'ALL';
     let crmSelectedContacts = {};
     let quizLeadProject = 'ALL';
@@ -1161,6 +1170,14 @@
       const tagOptions = ['<option value="ALL">所有標籤</option>'].concat((res.crmTags || []).map(function (tag) {
         return '<option value="' + escapeHtml(tag) + '"' + (crmTagFilter === tag ? ' selected' : '') + '>' + escapeHtml(tag) + '</option>';
       })).join('');
+
+      const consultantOptions = ['<option value="ALL">所有顧問</option>', '<option value="UNASSIGNED"' + (crmConsultantFilter === 'UNASSIGNED' ? ' selected' : '') + '>尚未指派</option>'].concat((res.allConsultants || []).map(function (c) {
+        return '<option value="' + escapeHtml(c.id) + '"' + (String(crmConsultantFilter) === String(c.id) ? ' selected' : '') + '>' + escapeHtml(c.name || c.login_email || c.email || c.id) + '</option>';
+      })).join('');
+      const accessCodes = Array.from(new Set(all.map(function (item) { return String(item.accessCode || '').trim(); }).filter(Boolean))).sort(function (a, b) { return a.localeCompare(b, 'zh-Hant'); });
+      const accessCodeOptions = ['<option value="ALL">所有重測碼</option>', '<option value="NONE"' + (crmAccessCodeFilter === 'NONE' ? ' selected' : '') + '>未使用</option>'].concat(accessCodes.map(function (code) {
+        return '<option value="' + escapeHtml(code) + '"' + (crmAccessCodeFilter === code ? ' selected' : '') + '>' + escapeHtml(code) + '</option>';
+      })).join('');
       document.getElementById('view').innerHTML =
         '<div class="panel">' +
           '<div class="row">' +
@@ -1168,7 +1185,11 @@
             '<div class="col-2"><label>專案篩選</label><select id="crmProject" onchange="loadCrmByProject(this.value)">' + projectOptions + '</select></div>' +
             '<div class="col-2"><label>標籤</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
             '<div class="col-3"><label>名單狀態</label><select id="crmPipelineFilter" onchange="crmPipelineFilter=this.value; renderCrm(cache.crm);">' + crmPipelineOptions(crmPipelineFilter, true) + '</select></div>' +
-            '<div class="col-3"><label>搜尋名單</label><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名、Email、電話或答案" oninput="crmSearch=this.value; renderCrm(cache.crm);"></div>' +
+            '<div class="col-3"><label>搜尋名單</label><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名、Email、電話、答案或重測碼" oninput="crmSearch=this.value; renderCrm(cache.crm);"></div>' +
+            '<div class="col-3"><label>負責顧問</label><select onchange="crmConsultantFilter=this.value; renderCrm(cache.crm);">' + consultantOptions + '</select></div>' +
+            '<div class="col-3"><label>折扣 / 重測碼</label><select onchange="crmAccessCodeFilter=this.value; renderCrm(cache.crm);">' + accessCodeOptions + '</select></div>' +
+            '<div class="col-3"><label>名單日期起</label><input type="date" value="' + escapeHtml(crmDateFrom) + '" onchange="crmDateFrom=this.value; renderCrm(cache.crm);"></div>' +
+            '<div class="col-3"><label>名單日期迄</label><input type="date" value="' + escapeHtml(crmDateTo) + '" onchange="crmDateTo=this.value; renderCrm(cache.crm);"></div>' +
             '<div class="col-3"><label>購買方案</label><select onchange="crmPurchasePlanFilter=this.value; renderCrm(cache.crm);">' + crmPurchasePlanOptions(res.purchasePlans || []) + '</select></div>' +
             '<div class="col-3"><label>購買日期起</label><input type="date" value="' + escapeHtml(crmPurchaseDateFrom) + '" onchange="crmPurchaseDateFrom=this.value; renderCrm(cache.crm);"></div>' +
             '<div class="col-3"><label>購買日期迄</label><input type="date" value="' + escapeHtml(crmPurchaseDateTo) + '" onchange="crmPurchaseDateTo=this.value; renderCrm(cache.crm);"></div>' +
@@ -1292,9 +1313,9 @@
     function exportCrmRows() {
       const rows = window.crmVisibleRows || [];
       if (!rows.length) { alert('目前沒有可匯出的結果。'); return; }
-      const header = ['姓名', 'Email', '電話', '專案', '狀態', '購買方案', '購買日期', '標籤', '備註'];
+      const header = ['日期時間', '姓名', 'Email', '電話', '專案', '狀態', '負責顧問', '折扣/重測碼', '購買方案', '購買日期', '標籤', '備註'];
       const body = rows.map(function (row) {
-        return [row.clientName, row.clientEmail, row.clientPhone, row.projectName || row.projectCode, crmStatusLabel(row.lifecycleStage || row.status), row.purchasePlan || '', normalizeDateInput(row.purchaseDate), (row.tags || []).join(';'), row.contactNotes || row.answers || ''].map(csvEscape).join(',');
+        return [row.meetTime || compactDate(row.submittedAt || row.createdAt), row.clientName, row.clientEmail, row.clientPhone, row.projectName || row.projectCode, crmStatusLabel(row.lifecycleStage || row.status), row.consultant || '', row.accessCode || '', row.purchasePlan || '', normalizeDateInput(row.purchaseDate), (row.tags || []).join(';'), row.contactNotes || row.answers || ''].map(csvEscape).join(',');
       });
       const newline = String.fromCharCode(10);
       const blob = new Blob(['\ufeff' + header.join(',') + newline + body.join(newline)], { type: 'text/csv;charset=utf-8' });
@@ -1427,12 +1448,19 @@
       if (crmTagFilter !== 'ALL' && !tags.includes(crmTagFilter)) return false;
       if (crmPipelineFilter !== 'ALL' && crmPipelineValue(item) !== crmPipelineFilter) return false;
       if (crmPurchasePlanFilter !== 'ALL' && String(item.purchasePlan || '') !== crmPurchasePlanFilter) return false;
+      if (crmConsultantFilter === 'UNASSIGNED' && (item.consultantId || item.consultant)) return false;
+      if (crmConsultantFilter !== 'ALL' && crmConsultantFilter !== 'UNASSIGNED' && String(item.consultantId || '') !== String(crmConsultantFilter)) return false;
+      if (crmAccessCodeFilter === 'NONE' && String(item.accessCode || '').trim()) return false;
+      if (crmAccessCodeFilter !== 'ALL' && crmAccessCodeFilter !== 'NONE' && String(item.accessCode || '') !== crmAccessCodeFilter) return false;
+      const rowDate = normalizeDateInput(item.submittedAt || item.createdAt || item.updatedAt || item.meetTime);
+      if (crmDateFrom && (!rowDate || rowDate < crmDateFrom)) return false;
+      if (crmDateTo && (!rowDate || rowDate > crmDateTo)) return false;
       const purchaseDate = normalizeDateInput(item.purchaseDate);
       if (crmPurchaseDateFrom && (!purchaseDate || purchaseDate < crmPurchaseDateFrom)) return false;
       if (crmPurchaseDateTo && (!purchaseDate || purchaseDate > crmPurchaseDateTo)) return false;
       const needle = String(crmSearch || '').trim().toLowerCase();
       if (!needle) return true;
-      return [item.clientName, item.clientEmail, item.clientPhone, item.projectName, item.projectCode, item.answers, item.status, item.purchasePlan, item.purchaseDate, crmPipelineLabel(crmPipelineValue(item))]
+      return [item.clientName, item.clientEmail, item.clientPhone, item.projectName, item.projectCode, item.answers, item.status, item.purchasePlan, item.purchaseDate, item.consultant, item.accessCode, crmPipelineLabel(crmPipelineValue(item))]
         .concat(tags)
         .some(function (value) { return String(value || '').toLowerCase().includes(needle); });
     }
@@ -1578,6 +1606,10 @@
     function renderClientDetail(res) {
       const dialog = detailDialog();
       const contact = res.contact || {};
+      const knownTags = cache.crm?.crmTags || [];
+      const contactTags = Array.isArray(contact.tags) ? contact.tags : [];
+      const tagChecks = knownTags.length ? '<div class="tag-pick-grid">' + knownTags.map(function (tag) { return '<label class="checkline"><input class="crm-detail-tag-check" type="checkbox" value="' + escapeHtml(tag) + '"' + (contactTags.includes(tag) ? ' checked' : '') + '> ' + escapeHtml(tag) + '</label>'; }).join('') + '</div>' : '<p class="mini">目前尚未建立標籤。</p>';
+      const consultantSelect = ['<option value="">尚未指派</option>'].concat((cache.crm?.allConsultants || []).map(function (c) { return '<option value="' + escapeHtml(c.id) + '"' + (String(contact.assigned_consultant_id || '') === String(c.id) ? ' selected' : '') + '>' + escapeHtml(c.name || c.login_email || c.email || c.id) + '</option>'; })).join('');
       const summary = res.crmSummary || {};
       const latest = res.latestQuiz || null;
       const answers = latest ? (res.answersByResponse || {})[String(latest.id)] || [] : [];
@@ -1595,7 +1627,7 @@
         '</div>' +
         '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + statBox('Email 紀錄', summary.emailCount || 0) + statBox('點擊紀錄', summary.clickCount || 0) + '</div>' +
         '<div class="detail-section">' + sectionTitle('基本資料', '最近互動') + '<div class="crm-card-meta">' + crmDetailMeta('專案', projectLabel) + crmDetailMeta('最新測驗', compactDate(summary.latestQuizAt)) + crmDetailMeta('最新預約', compactDate(summary.latestAppointmentAt)) + crmDetailMeta('名單狀態', lifecycleLabel) + '</div></div>' +
-        '<div class="detail-section">' + sectionTitle('名單分類與購買紀錄', '標籤用來歸類，流程狀態用來追蹤進度，購買欄位可匯出給內部結算') + '<div class="row"><div class="col-4"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-3"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-3"><label>購買方案</label><input id="crmDetailPurchasePlan" value="' + escapeHtml(contact.purchase_plan || '') + '" placeholder="例如：完整版檢測、諮詢"></div><div class="col-2"><label>購買日期</label><input id="crmDetailPurchaseDate" type="date" value="' + escapeHtml(normalizeDateInput(contact.purchase_date)) + '"></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
+        '<div class="detail-section">' + sectionTitle('名單分類與購買紀錄', '可指派顧問、套用標籤、更新流程與購買紀錄，匯出時會一併帶出') + '<div class="row"><div class="col-4"><label>指派顧問</label><select id="crmDetailConsultant">' + consultantSelect + '</select></div><div class="col-4"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-4"><label>新增標籤</label><input id="crmDetailNewTags" list="crmKnownTags" placeholder="輸入新標籤，可用逗號分隔"><datalist id="crmKnownTags">' + crmTagOptionsHtml(knownTags) + '</datalist></div><div class="col-12"><label>既有標籤</label>' + tagChecks + '</div><div class="col-4"><label>購買方案</label><input id="crmDetailPurchasePlan" value="' + escapeHtml(contact.purchase_plan || '') + '" placeholder="例如：完整版檢測、諮詢"></div><div class="col-3"><label>購買日期</label><input id="crmDetailPurchaseDate" type="date" value="' + escapeHtml(normalizeDateInput(contact.purchase_date)) + '"></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
         '<div class="detail-section">' + sectionTitle('測驗紀錄', '') + (latest ? '<p>版本：' + escapeHtml(latest.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(latest.submittedAt)) + '</p><div class="actions"><a target="_blank" href="' + escapeHtml(latest.reportUrl || '') + '">開啟報告連結</a></div>' + renderScoreItems(latest.scoreItems || []) : '<p class="mini">沒有測驗紀錄。</p>') + '</div>' +
         '<div class="detail-section">' + sectionTitle('作答詳情', '') + renderAnswerRows(answers) + '</div>' +
         '<div class="detail-section">' + sectionTitle('報告結果', '') + renderHistoryList(latest ? latest.matchedContent || [] : [], '沒有報告區間內容。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '｜' + escapeHtml(item.label || '') + '</strong><p>' + escapeHtml(item.title || '') + '</p><p>' + escapeHtml(item.body || '') + '</p></div>'; }) + '</div>' +
@@ -1619,10 +1651,11 @@
 
     function saveClientLabels(contactId) {
       if (!contactId) return;
-      const tags = splitCrmTags(field('crmDetailTags'));
+      const checkedTags = Array.from(document.querySelectorAll('.crm-detail-tag-check:checked')).map(function (input) { return input.value; });
+      const tags = splitCrmTags(checkedTags.concat(splitCrmTags(field('crmDetailNewTags'))).join(','));
       const notes = field('crmDetailNotes');
       const lifecycleStage = field('crmDetailStage');
-      api('saveCRMContactLabels', { contactId: contactId, tags: tags, notes: notes, lifecycleStage: lifecycleStage, purchasePlan: field('crmDetailPurchasePlan'), purchaseDate: field('crmDetailPurchaseDate') }).then(function (res) {
+      api('saveCRMContactLabels', { contactId: contactId, tags: tags, notes: notes, lifecycleStage: lifecycleStage, assignedConsultantId: field('crmDetailConsultant'), purchasePlan: field('crmDetailPurchasePlan'), purchaseDate: field('crmDetailPurchaseDate') }).then(function (res) {
         delete cache.crm;
         return Promise.all([
           api('getCRMContactDetail', { contactId: contactId }),
@@ -2032,8 +2065,8 @@
       const passwordControl = row.rowId
         ? '<div class="password-reset-slot"><button class="secondary" type="button" onclick="showPasswordReset(this)">設定新密碼</button></div>'
         : '<div class="password-reset-slot"><label>登入密碼</label><input class="c-password" type="password" autocomplete="new-password" data-1p-ignore data-lpignore="true" required></div>';
-      return '<div class="item consultant-row" data-id="' + id + '">' +
-        '<div class="row">' +
+      return '<details class="item consultant-row" data-id="' + id + '"' + (id === 'new' ? ' open' : '') + '><summary><span>' + escapeHtml(row.name || '新增顧問') + '</span><span>' + escapeHtml(row.loginEmail || '') + '</span><span>' + escapeHtml(row.isAccepting || '是') + '</span></summary>' +
+        '<div class="details-body"><div class="row">' +
           '<div class="col-3"><label>姓名</label><input class="c-name" value="' + escapeHtml(row.name || '') + '"><div class="mini">' + escapeHtml(row.name ? teamConsultantName(row.name) : '') + '</div></div>' +
           '<div class="col-3"><label>Email</label><input class="c-email" value="' + escapeHtml(row.loginEmail || '') + '"></div>' +
           '<div class="col-2">' + passwordControl + '</div>' +
@@ -2060,18 +2093,27 @@
               : '') +
             '<span class="mini">' + (row.googleConnected ? 'Google 已連結 ' + escapeHtml(row.googleEmail || '') : 'Google 尚未連結') + (row.microsoftEnabled ? '；' + (row.microsoftConnected ? 'Microsoft 已連結 ' + escapeHtml(row.microsoftEmail || '') : 'Microsoft 尚未連結') : '') + '</span>' +
           '</div>' +
-        '</div>' +
-      '</div>';
+        '</div></div>' +
+      '</details>';
+    }
+
+    function renderConsultantStatusList(consultants) {
+      if (!consultants.length) return '<p class="mini">目前尚未建立顧問。</p>';
+      return '<div class="consultant-status-grid">' + consultants.map(function (row) {
+        return '<div class="consultant-status-card"><strong>' + escapeHtml(row.name || row.loginEmail || '') + '</strong><p class="mini">' + escapeHtml(row.loginEmail || '') + '</p><p>狀態：' + escapeHtml(row.isAccepting === '否' ? '不接收派單' : '接收派單') + '</p><p>視訊：' + escapeHtml(row.meetTool || 'Google Meet') + '</p><p>Google：' + escapeHtml(row.googleConnected ? '已連結' : '尚未連結') + '</p></div>';
+      }).join('') + '</div>';
     }
 
     function renderConsultants(res) {
       adminProjects = res.projects || [];
       const consultants = (res.consultants || []).filter(projectMatchesScope);
-      const html = '<div class="panel"><div class="row"><div class="col-8"><h2>' + escapeHtml(tenantDisplayName) + '團隊顧問</h2></div>' +
-        '<div class="col-4"><button class="secondary" onclick="ensureDemoAccounts()">建立測試帳號</button></div></div><div class="list">' +
-        consultants.map(function (row) { return consultantForm(row, adminProjects); }).join('') +
-        '</div></div>' + zoomSettingsPanel(res.zoomSettings || {}) + '<div class="panel"><h2>新增' + escapeHtml(tenantDisplayName) + '團隊顧問</h2>' + consultantForm({ isAccepting: '是', weight: 50, projects: 'ALL', meetTool: 'Google Meet', shiftTZ: 'Asia/Taipei', interval: 60, bufferBefore: 0, bufferAfter: 0, maxDailyBookings: 0 }, adminProjects) + '</div>';
+      const newConsultant = consultantForm({ isAccepting: '是', weight: 50, projects: 'ALL', meetTool: 'Google Meet', shiftTZ: 'Asia/Taipei', interval: 60, bufferBefore: 0, bufferAfter: 0, maxDailyBookings: 0 }, adminProjects);
+      const html = '<div class="panel"><div class="panel-head"><div><h2>' + escapeHtml(tenantDisplayName) + '團隊顧問</h2><p class="mini">先查看顧問清單與連線狀態；需要調整時再展開單一顧問。</p></div><div class="actions"><button type="button" onclick="toggleNewConsultantBox()">新增顧問</button><button class="secondary" onclick="ensureDemoAccounts()">建立測試帳號</button></div></div>' + renderConsultantStatusList(consultants) + '<div id="newConsultantBox" class="list hidden" style="margin-top:16px;">' + newConsultant + '</div></div>' + zoomSettingsPanel(res.zoomSettings || {}) + '<div class="panel"><h2>顧問資料</h2><div class="list">' + consultants.map(function (row) { return consultantForm(row, adminProjects); }).join('') + '</div></div>';
       document.getElementById('view').innerHTML = html;
+    }
+    function toggleNewConsultantBox() {
+      const box = document.getElementById('newConsultantBox');
+      if (box) box.classList.toggle('hidden');
     }
 
     function zoomSettingsPanel(settings) {
@@ -2589,7 +2631,7 @@
 
     function quizQuestionRow(question) {
       const optionHtml = (question.options || []).map(quizOptionRow).join('');
-      return '<div class="item qe-question"><div class="row"><div class="col-2"><label>題號</label><input class="qe-question-no" type="number" value="' + escapeHtml(question.questionNo || 1) + '"></div><div class="col-3"><label>階段</label><select class="qe-question-stage">' + quizStageOptions(question.stageKey || '1') + '</select></div><div class="col-3"><label>題型</label><select class="qe-question-type">' + selectedOption('single', question.type || 'single', '單選') + selectedOption('multiple', question.type, '複選') + selectedOption('short_text', question.type, '短答') + selectedOption('long_text', question.type, '長答') + '</select></div><div class="col-2"><label>必填</label><select class="qe-question-required">' + selectedOption('true', String(question.isRequired !== false), '必填') + selectedOption('false', String(question.isRequired !== false), '非必填') + '</select></div><div class="col-2"><label>排序</label><input class="qe-question-sort" type="number" value="' + escapeHtml(question.sortOrder || 0) + '"></div><div class="col-12"><label>題目</label><input class="qe-question-title" value="' + escapeHtml(question.title || '') + '"></div><div class="col-12"><label>補充說明</label><input class="qe-question-help" value="' + escapeHtml(question.helpText || '') + '"></div></div><div class="list qe-options" style="margin-top:12px;">' + optionHtml + '</div><div class="actions"><button class="secondary" onclick="addQuizOption(this)">新增選項</button><button class="danger" onclick="this.closest(&quot;.qe-question&quot;).remove()">刪除題目</button></div></div>';
+      return '<details class="item qe-question"><summary><span>第 ' + escapeHtml(question.questionNo || 1) + ' 題</span><span>' + escapeHtml(question.title || '未命名題目') + '</span><span>' + escapeHtml(question.stageKey || '1') + '</span></summary><div class="details-body"><div class="row"><div class="col-2"><label>題號</label><input class="qe-question-no" type="number" value="' + escapeHtml(question.questionNo || 1) + '"></div><div class="col-3"><label>階段</label><select class="qe-question-stage">' + quizStageOptions(question.stageKey || '1') + '</select></div><div class="col-3"><label>題型</label><select class="qe-question-type">' + selectedOption('single', question.type || 'single', '單選') + selectedOption('multiple', question.type, '複選') + selectedOption('short_text', question.type, '短答') + selectedOption('long_text', question.type, '長答') + '</select></div><div class="col-2"><label>必填</label><select class="qe-question-required">' + selectedOption('true', String(question.isRequired !== false), '必填') + selectedOption('false', String(question.isRequired !== false), '非必填') + '</select></div><div class="col-2"><label>排序</label><input class="qe-question-sort" type="number" value="' + escapeHtml(question.sortOrder || 0) + '"></div><div class="col-12"><label>題目</label><input class="qe-question-title" value="' + escapeHtml(question.title || '') + '"></div><div class="col-12"><label>補充說明</label><input class="qe-question-help" value="' + escapeHtml(question.helpText || '') + '"></div></div><div class="list qe-options" style="margin-top:12px;">' + optionHtml + '</div><div class="actions"><button class="secondary" onclick="addQuizOption(this)">新增選項</button><button class="danger" onclick="this.closest(&quot;.qe-question&quot;).remove()">刪除題目</button></div></div></details>';
     }
 
     function quizOptionRow(option) {
@@ -2973,10 +3015,10 @@
         '<div class="subtabs">' + emailModuleChip('booking', '預約提醒信') + emailModuleChip('quiz', '測驗跟進信') + '</div><div id="newEmailTemplateBox" class="list hidden" style="margin-top:16px;">' +
         emailTemplateForm({ projectCode: emailProject === 'ALL' ? (res.projects?.[0]?.code || '') : emailProject, module: emailModule, status: 'active', triggerName: defaultEmailTrigger(emailModule), timeParam: emailModule === 'quiz' ? 24 : 0, stopWhenBooked: true }, projectOptions) + '</div><div class="list" style="margin-top:16px;">' +
         '<h3>已建立的自動信件</h3>' + groupedTemplates + '</div></div>' +
-        '<div class="panel"><h2>名單狀態</h2><table><thead><tr><th>日期時間</th><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div>' +
-        '<div class="panel"><h2>寄信佇列</h2><table><thead><tr><th>Email</th><th>觸發</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div>' +
-        '<div class="panel"><h2>寄信告警</h2><table><thead><tr><th>等級</th><th>標題</th><th>內容</th></tr></thead><tbody>' + alerts + '</tbody></table></div>' +
-        '<div class="panel"><h2>退訂與拒收名單</h2><table><thead><tr><th>Email</th><th>原因</th><th>來源</th></tr></thead><tbody>' + suppressions + '</tbody></table></div>';
+        '<div class="panel"><h2>名單狀態</h2><div class="table-scroll"><table><thead><tr><th>日期時間</th><th>姓名</th><th>Email</th><th>專案</th><th>狀態</th></tr></thead><tbody>' + leads + '</tbody></table></div></div>' +
+        '<div class="panel"><h2>寄信佇列</h2><div class="table-scroll"><table><thead><tr><th>Email</th><th>觸發</th><th>主旨</th><th>狀態</th><th>錯誤</th></tr></thead><tbody>' + queue + '</tbody></table></div></div>' +
+        '<div class="panel"><h2>寄信告警</h2><div class="table-scroll"><table><thead><tr><th>等級</th><th>標題</th><th>內容</th></tr></thead><tbody>' + alerts + '</tbody></table></div></div>' +
+        '<div class="panel"><h2>退訂與拒收名單</h2><div class="table-scroll"><table><thead><tr><th>Email</th><th>原因</th><th>來源</th></tr></thead><tbody>' + suppressions + '</tbody></table></div></div>'; 
       initializeEmailEditors(visibleTemplates);
     }
 
@@ -3567,3 +3609,4 @@
   </script>
 </body>
 </html>
+
