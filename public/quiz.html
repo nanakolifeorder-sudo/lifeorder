@@ -80,6 +80,7 @@
     let config = null;
     let stages = [];
     let currentStage = 0;
+    const savedAnswers = {};
 
     function api(action, payload) {
       return fetch(apiBase + '?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
@@ -105,6 +106,42 @@
     }
 
     function inputName(question) { return 'q_' + question.id; }
+    function answerKey(question) { return String(question.id); }
+
+    function saveCurrentStageAnswers() {
+      const stage = stages[currentStage];
+      if (!stage) return;
+      (stage.questions || []).forEach(function (question) {
+        const nodes = Array.from(document.querySelectorAll('[name="' + inputName(question) + '"]'));
+        if (!nodes.length) return;
+        const key = answerKey(question);
+        if (question.type === 'multiple') {
+          savedAnswers[key] = nodes.filter(function (node) { return node.checked; }).map(function (node) { return node.value; });
+        } else if (question.type === 'single') {
+          const selected = nodes.find(function (node) { return node.checked; });
+          savedAnswers[key] = selected ? selected.value : '';
+        } else {
+          savedAnswers[key] = nodes[0].value || '';
+        }
+      });
+    }
+
+    function restoreStageAnswers() {
+      const stage = stages[currentStage];
+      if (!stage) return;
+      (stage.questions || []).forEach(function (question) {
+        const key = answerKey(question);
+        if (!Object.prototype.hasOwnProperty.call(savedAnswers, key)) return;
+        const value = savedAnswers[key];
+        const nodes = Array.from(document.querySelectorAll('[name="' + inputName(question) + '"]'));
+        nodes.forEach(function (node) {
+          if (node.type === 'radio') node.checked = String(node.value) === String(value);
+          else if (node.type === 'checkbox') node.checked = Array.isArray(value) && value.map(String).includes(String(node.value));
+          else node.value = value || '';
+        });
+      });
+    }
+
 
     function renderQuestion(question) {
       const required = question.isRequired !== false;
@@ -127,6 +164,7 @@
       document.getElementById('identityPanel').classList.toggle('hidden', currentStage !== 0);
       document.getElementById('bar').style.width = stages.length ? Math.round(((currentStage + 1) / stages.length) * 100) + '%' : '0%';
       document.getElementById('questionPanel').innerHTML = '<div class="stage-title"><h2>' + escapeHtml(stage.title || ('第 ' + (currentStage + 1) + ' 階段')) + '</h2><p>' + escapeHtml(stage.description || '') + '</p></div>' + stage.questions.map(renderQuestion).join('');
+      restoreStageAnswers();
       document.getElementById('prevBtn').disabled = currentStage === 0;
       document.getElementById('nextBtn').classList.toggle('hidden', currentStage >= stages.length - 1);
       document.getElementById('submitBtn').classList.toggle('hidden', currentStage < stages.length - 1);
@@ -143,29 +181,28 @@
     }
 
     function collectAnswers() {
-      const answers = {};
-      (config.questions || []).forEach(function (question) {
-        const nodes = Array.from(document.querySelectorAll('[name="' + inputName(question) + '"]'));
-        if (!nodes.length) return;
-        if (question.type === 'multiple') {
-          answers[String(question.id)] = nodes.filter(function (node) { return node.checked; }).map(function (node) { return node.value; });
-        } else if (question.type === 'single') {
-          const selected = nodes.find(function (node) { return node.checked; });
-          answers[String(question.id)] = selected ? selected.value : '';
-        } else {
-          answers[String(question.id)] = nodes[0].value || '';
-        }
-      });
-      return answers;
+      saveCurrentStageAnswers();
+      return Object.assign({}, savedAnswers);
     }
 
-    document.getElementById('prevBtn').addEventListener('click', function () { if (currentStage > 0) { currentStage -= 1; renderStage(); } });
+    document.getElementById('prevBtn').addEventListener('click', function () {
+      if (currentStage > 0) {
+        saveCurrentStageAnswers();
+        currentStage -= 1;
+        renderStage();
+      }
+    });
     document.getElementById('nextBtn').addEventListener('click', function () {
-      try { validateStage(); currentStage += 1; renderStage(); } catch (error) { alert(error.message); }
+      try {
+        validateStage();
+        saveCurrentStageAnswers();
+        currentStage += 1;
+        renderStage();
+      } catch (error) { alert(error.message); }
     });
     document.getElementById('quizForm').addEventListener('submit', function (event) {
       event.preventDefault();
-      try { validateStage(); } catch (error) { alert(error.message); return; }
+      try { validateStage(); saveCurrentStageAnswers(); } catch (error) { alert(error.message); return; }
       const button = document.getElementById('submitBtn');
       button.disabled = true;
       button.textContent = '正在產生報告...';
