@@ -599,6 +599,10 @@
     let crmTagFilter = 'ALL';
     let crmPipelineFilter = 'ALL';
     let crmSearch = '';
+    let crmPurchasePlanFilter = 'ALL';
+    let crmPurchaseDateFrom = '';
+    let crmPurchaseDateTo = '';
+    let accessCodeProject = 'ALL';
     let crmSelectedContacts = {};
     let quizLeadProject = 'ALL';
     let quizLeadMode = 'unbooked';
@@ -803,6 +807,7 @@
         { id: 'quizEditor', group: '測驗系統', mark: '題', label: '題目管理', ok: can('FORMS') },
         { id: 'reportEditor', group: '測驗系統', mark: '報', label: '檢測報告設定', ok: can('FORMS') },
         { id: 'quizEmails', group: '測驗系統', mark: '追', label: '跟進信管理', ok: can('EMAILS') },
+        { id: 'accessCodes', group: '測驗系統', mark: '碼', label: '優惠 / 重測碼', ok: can('CRM_ALL') },
         { id: 'projects', group: '系統設定', mark: '專', label: '專案管理', ok: can('PROJECTS') },
         { id: 'usage', group: '系統設定', mark: '監', label: '總數據監測', ok: isSystemOwner() },
         { id: 'users', group: '系統設定', mark: '帳', label: '帳號 / 權限管理', ok: isSystemOwner() }
@@ -851,6 +856,7 @@
         reportEditor: loadReportEditor,
         bookingEmails: loadBookingEmails,
         quizEmails: loadQuizEmails,
+        accessCodes: loadAccessCodes,
         analytics: loadAnalytics,
         usage: loadSystemUsage,
         users: loadUserManagement
@@ -862,6 +868,7 @@
       delete cache[currentView];
       if (currentView === 'crm') delete cache.crm;
       if (currentView === 'quizLeads') delete cache.quizLeads;
+      if (currentView === 'accessCodes') delete cache.accessCodes;
       showView(currentView);
     }
 
@@ -873,6 +880,133 @@
       document.getElementById('view').innerHTML = '<div class="panel"><h2>發生錯誤</h2><p class="bad">' + escapeHtml(err.message || err) + '</p></div>';
     }
 
+
+
+    function loadAccessCodes() {
+      loading('優惠 / 重測碼');
+      api('getQuizAccessCodeData', { projectCode: accessCodeProject }).then(function (res) {
+        cache.accessCodes = res;
+        renderAccessCodes(res);
+      }).catch(showError);
+    }
+
+    function loadAccessCodesByProject(value) {
+      accessCodeProject = value || 'ALL';
+      delete cache.accessCodes;
+      loadAccessCodes();
+    }
+
+    function accessCodeTypeLabel(type) {
+      const map = { retest: '重測資格', discount: '折扣碼', free_access: '免費開通' };
+      return map[type] || type || '';
+    }
+
+    function accessCodeTypeOptions(current) {
+      return [['retest', '重測資格'], ['discount', '折扣碼'], ['free_access', '免費開通']].map(function (item) {
+        return '<option value="' + item[0] + '"' + (current === item[0] ? ' selected' : '') + '>' + item[1] + '</option>';
+      }).join('');
+    }
+
+    function accessCodeStatusOptions(current) {
+      return ['啟用', '停用'].map(function (item) {
+        return '<option value="' + item + '"' + (current === item ? ' selected' : '') + '>' + item + '</option>';
+      }).join('');
+    }
+
+    function renderAccessCodes(res) {
+      const rows = res.codes || [];
+      const projectOptions = ['<option value="ALL">所有專案</option>'].concat((res.projects || []).map(function (p) {
+        return '<option value="' + escapeHtml(p.code) + '"' + (accessCodeProject === p.code ? ' selected' : '') + '>' + escapeHtml(p.name || p.code) + '</option>';
+      })).join('');
+      document.getElementById('view').innerHTML =
+        '<div class="panel"><div class="row">' +
+          '<div class="col-4"><h2>優惠 / 重測碼</h2><p class="mini">同一個 Email 完成同一份檢測後，需要輸入有效代碼才能再次作答。這裡也保留折扣碼使用統計。</p></div>' +
+          '<div class="col-4"><label>專案篩選</label><select onchange="loadAccessCodesByProject(this.value)">' + projectOptions + '</select></div>' +
+          '<div class="col-4"><label>&nbsp;</label><button onclick="openAccessCodeForm()">新增代碼</button></div>' +
+        '</div></div>' +
+        '<div class="panel hidden" id="accessCodeFormPanel"></div>' +
+        '<div class="list">' + (rows.length ? rows.map(accessCodeCard).join('') : '<div class="panel"><p>目前還沒有代碼。</p></div>') + '</div>';
+    }
+
+    function accessCodeCard(item) {
+      const usageText = String(item.usageCount || item.usedCount || 0) + (item.maxUses ? ' / ' + item.maxUses : ' 次');
+      return '<div class="client-card contact"><div class="card-top"><div><div class="crm-card-title"><strong>' + escapeHtml(item.code) + '</strong><span class="badge">' + escapeHtml(accessCodeTypeLabel(item.codeType)) + '</span><span class="badge">' + escapeHtml(item.status || '') + '</span></div><p class="mini">' + escapeHtml(item.name || '') + '</p></div><span class="badge">' + escapeHtml(item.projectCode || '') + (item.versionCode ? ' / ' + escapeHtml(item.versionCode) : '') + '</span></div>' +
+        '<div class="crm-card-meta">' +
+          '<div class="crm-meta-item"><div class="mini">使用次數</div><strong>' + escapeHtml(usageText) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">使用 Email 數</div><strong>' + escapeHtml(item.uniqueEmailCount || 0) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">每個 Email 可用</div><strong>' + escapeHtml(item.perEmailLimit || 1) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">最後使用</div><strong>' + escapeHtml(compactDate(item.lastUsedAt) || '尚未使用') + '</strong></div>' +
+        '</div>' +
+        (item.discountLabel ? '<p class="mini">折扣說明：' + escapeHtml(item.discountLabel) + '</p>' : '') +
+        (item.notes ? '<div class="answer-box">' + escapeHtml(item.notes) + '</div>' : '') +
+        '<div class="actions"><button class="secondary" onclick="openAccessCodeForm(' + Number(item.rowId || 0) + ')">編輯</button><button class="danger" onclick="deleteAccessCode(' + Number(item.rowId || 0) + ')">刪除</button></div></div>';
+    }
+
+    function accessCodeById(rowId) {
+      return (cache.accessCodes?.codes || []).find(function (item) { return Number(item.rowId) === Number(rowId); }) || null;
+    }
+
+    function openAccessCodeForm(rowId) {
+      const item = rowId ? accessCodeById(rowId) : null;
+      const panel = document.getElementById('accessCodeFormPanel');
+      const projects = cache.accessCodes?.projects || [];
+      const projectOptions = projects.map(function (p) {
+        const selected = (item?.projectCode || (accessCodeProject !== 'ALL' ? accessCodeProject : 'P01')) === p.code;
+        return '<option value="' + escapeHtml(p.code) + '"' + (selected ? ' selected' : '') + '>' + escapeHtml(p.name || p.code) + '</option>';
+      }).join('');
+      panel.innerHTML = '<h3>' + (item ? '編輯代碼' : '新增代碼') + '</h3><div class="row">' +
+        '<div class="col-3"><label>專案</label><select id="accessProject">' + projectOptions + '</select></div>' +
+        '<div class="col-2"><label>版本</label><input id="accessVersion" value="' + escapeHtml(item?.versionCode || 'A') + '" placeholder="A"></div>' +
+        '<div class="col-3"><label>代碼</label><input id="accessCode" value="' + escapeHtml(item?.code || '') + '" placeholder="例如：RETAKE980"></div>' +
+        '<div class="col-2"><label>類型</label><select id="accessType">' + accessCodeTypeOptions(item?.codeType || 'retest') + '</select></div>' +
+        '<div class="col-2"><label>狀態</label><select id="accessStatus">' + accessCodeStatusOptions(item?.status || '啟用') + '</select></div>' +
+        '<div class="col-4"><label>名稱</label><input id="accessName" value="' + escapeHtml(item?.name || '') + '" placeholder="內部辨識名稱"></div>' +
+        '<div class="col-4"><label>折扣說明</label><input id="accessDiscount" value="' + escapeHtml(item?.discountLabel || '') + '" placeholder="例如：完整版 980 重測資格"></div>' +
+        '<div class="col-2"><label>總使用上限</label><input id="accessMaxUses" type="number" min="1" value="' + escapeHtml(item?.maxUses || '') + '" placeholder="不填不限"></div>' +
+        '<div class="col-2"><label>每 Email 次數</label><input id="accessPerEmail" type="number" min="1" value="' + escapeHtml(item?.perEmailLimit || 1) + '"></div>' +
+        '<div class="col-3"><label>開始時間</label><input id="accessStartsAt" type="datetime-local" value="' + escapeHtml(datetimeLocalValue(item?.startsAt)) + '"></div>' +
+        '<div class="col-3"><label>結束時間</label><input id="accessEndsAt" type="datetime-local" value="' + escapeHtml(datetimeLocalValue(item?.endsAt)) + '"></div>' +
+        '<div class="col-6"><label>備註</label><textarea id="accessNotes">' + escapeHtml(item?.notes || '') + '</textarea></div>' +
+        '<div class="col-12"><button onclick="saveAccessCode(' + Number(item?.rowId || 0) + ')">儲存代碼</button> <button class="secondary" onclick="hideAccessCodeForm()">取消</button></div>' +
+      '</div>';
+      panel.classList.remove('hidden');
+    }
+
+    function hideAccessCodeForm() {
+      const panel = document.getElementById('accessCodeFormPanel');
+      if (panel) panel.classList.add('hidden');
+    }
+
+    function datetimeLocalValue(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 16);
+    }
+
+    function saveAccessCode(rowId) {
+      api('saveQuizAccessCode', {
+        rowId: rowId || null,
+        projectCode: field('accessProject'),
+        versionCode: field('accessVersion'),
+        code: field('accessCode'),
+        name: field('accessName'),
+        codeType: field('accessType'),
+        discountLabel: field('accessDiscount'),
+        maxUses: field('accessMaxUses'),
+        perEmailLimit: field('accessPerEmail'),
+        startsAt: field('accessStartsAt') ? new Date(field('accessStartsAt')).toISOString() : null,
+        endsAt: field('accessEndsAt') ? new Date(field('accessEndsAt')).toISOString() : null,
+        status: field('accessStatus'),
+        notes: field('accessNotes')
+      }).then(function () { delete cache.accessCodes; loadAccessCodes(); }).catch(function (err) { alert(err.message); });
+    }
+
+    function deleteAccessCode(rowId) {
+      if (!confirm('確定刪除這組代碼？既有使用紀錄會保留。')) return;
+      api('deleteQuizAccessCode', { rowId: rowId }).then(function () { delete cache.accessCodes; loadAccessCodes(); }).catch(function (err) { alert(err.message); });
+    }
     function loadQuizLeads() {
       loading('測驗名單');
       api('getQuizLeadList', { projectCode: quizLeadProject }).then(function (res) {
@@ -1035,6 +1169,9 @@
             '<div class="col-2"><label>標籤</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
             '<div class="col-3"><label>名單狀態</label><select id="crmPipelineFilter" onchange="crmPipelineFilter=this.value; renderCrm(cache.crm);">' + crmPipelineOptions(crmPipelineFilter, true) + '</select></div>' +
             '<div class="col-3"><label>搜尋名單</label><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名、Email、電話或答案" oninput="crmSearch=this.value; renderCrm(cache.crm);"></div>' +
+            '<div class="col-3"><label>購買方案</label><select onchange="crmPurchasePlanFilter=this.value; renderCrm(cache.crm);">' + crmPurchasePlanOptions(res.purchasePlans || []) + '</select></div>' +
+            '<div class="col-3"><label>購買日期起</label><input type="date" value="' + escapeHtml(crmPurchaseDateFrom) + '" onchange="crmPurchaseDateFrom=this.value; renderCrm(cache.crm);"></div>' +
+            '<div class="col-3"><label>購買日期迄</label><input type="date" value="' + escapeHtml(crmPurchaseDateTo) + '" onchange="crmPurchaseDateTo=this.value; renderCrm(cache.crm);"></div>' +
           '</div>' +
           '<div class="stat-grid">' +
             statBox('今日作答', res.crmOverview?.todayQuizResponses || 0) +
@@ -1155,9 +1292,9 @@
     function exportCrmRows() {
       const rows = window.crmVisibleRows || [];
       if (!rows.length) { alert('目前沒有可匯出的結果。'); return; }
-      const header = ['姓名', 'Email', '電話', '專案', '狀態', '標籤', '備註'];
+      const header = ['姓名', 'Email', '電話', '專案', '狀態', '購買方案', '購買日期', '標籤', '備註'];
       const body = rows.map(function (row) {
-        return [row.clientName, row.clientEmail, row.clientPhone, row.projectName || row.projectCode, crmStatusLabel(row.lifecycleStage || row.status), (row.tags || []).join(';'), row.contactNotes || row.answers || ''].map(csvEscape).join(',');
+        return [row.clientName, row.clientEmail, row.clientPhone, row.projectName || row.projectCode, crmStatusLabel(row.lifecycleStage || row.status), row.purchasePlan || '', normalizeDateInput(row.purchaseDate), (row.tags || []).join(';'), row.contactNotes || row.answers || ''].map(csvEscape).join(',');
       });
       const newline = String.fromCharCode(10);
       const blob = new Blob(['\ufeff' + header.join(',') + newline + body.join(newline)], { type: 'text/csv;charset=utf-8' });
@@ -1268,13 +1405,34 @@
         target.textContent = err.message || String(err);
       });
     }
+
+
+    function normalizeDateInput(value) {
+      if (!value) return '';
+      const text = String(value || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+      const date = new Date(text);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toISOString().slice(0, 10);
+    }
+
+    function crmPurchasePlanOptions(plans) {
+      const current = crmPurchasePlanFilter || 'ALL';
+      return ['<option value="ALL">全部方案</option>'].concat((plans || []).filter(Boolean).map(function (plan) {
+        return '<option value="' + escapeHtml(plan) + '"' + (current === plan ? ' selected' : '') + '>' + escapeHtml(plan) + '</option>';
+      })).join('');
+    }
     function crmMatchesFilters(item) {
       const tags = Array.isArray(item.tags) ? item.tags : [];
       if (crmTagFilter !== 'ALL' && !tags.includes(crmTagFilter)) return false;
       if (crmPipelineFilter !== 'ALL' && crmPipelineValue(item) !== crmPipelineFilter) return false;
+      if (crmPurchasePlanFilter !== 'ALL' && String(item.purchasePlan || '') !== crmPurchasePlanFilter) return false;
+      const purchaseDate = normalizeDateInput(item.purchaseDate);
+      if (crmPurchaseDateFrom && (!purchaseDate || purchaseDate < crmPurchaseDateFrom)) return false;
+      if (crmPurchaseDateTo && (!purchaseDate || purchaseDate > crmPurchaseDateTo)) return false;
       const needle = String(crmSearch || '').trim().toLowerCase();
       if (!needle) return true;
-      return [item.clientName, item.clientEmail, item.clientPhone, item.projectName, item.projectCode, item.answers, item.status, crmPipelineLabel(crmPipelineValue(item))]
+      return [item.clientName, item.clientEmail, item.clientPhone, item.projectName, item.projectCode, item.answers, item.status, item.purchasePlan, item.purchaseDate, crmPipelineLabel(crmPipelineValue(item))]
         .concat(tags)
         .some(function (value) { return String(value || '').toLowerCase().includes(needle); });
     }
@@ -1437,7 +1595,7 @@
         '</div>' +
         '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + statBox('Email 紀錄', summary.emailCount || 0) + statBox('點擊紀錄', summary.clickCount || 0) + '</div>' +
         '<div class="detail-section">' + sectionTitle('基本資料', '最近互動') + '<div class="crm-card-meta">' + crmDetailMeta('專案', projectLabel) + crmDetailMeta('最新測驗', compactDate(summary.latestQuizAt)) + crmDetailMeta('最新預約', compactDate(summary.latestAppointmentAt)) + crmDetailMeta('名單狀態', lifecycleLabel) + '</div></div>' +
-        '<div class="detail-section">' + sectionTitle('名單分類', '標籤用來做歸類，流程狀態用來追蹤進度') + '<div class="row"><div class="col-5"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-3"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-4"><button onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存分類</button></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
+        '<div class="detail-section">' + sectionTitle('名單分類與購買紀錄', '標籤用來歸類，流程狀態用來追蹤進度，購買欄位可匯出給內部結算') + '<div class="row"><div class="col-4"><label>標籤</label><input id="crmDetailTags" list="crmKnownTags" value="' + escapeHtml((contact.tags || []).join(', ')) + '" placeholder="例如：980診斷, 高意願, 企業包班"><datalist id="crmKnownTags">' + crmTagOptionsHtml(cache.crm?.crmTags || []) + '</datalist><p class="mini">多個標籤可用逗號分隔。</p></div><div class="col-3"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-3"><label>購買方案</label><input id="crmDetailPurchasePlan" value="' + escapeHtml(contact.purchase_plan || '') + '" placeholder="例如：完整版檢測、諮詢"></div><div class="col-2"><label>購買日期</label><input id="crmDetailPurchaseDate" type="date" value="' + escapeHtml(normalizeDateInput(contact.purchase_date)) + '"></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div></div></div>' +
         '<div class="detail-section">' + sectionTitle('測驗紀錄', '') + (latest ? '<p>版本：' + escapeHtml(latest.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(latest.submittedAt)) + '</p><div class="actions"><a target="_blank" href="' + escapeHtml(latest.reportUrl || '') + '">開啟報告連結</a></div>' + renderScoreItems(latest.scoreItems || []) : '<p class="mini">沒有測驗紀錄。</p>') + '</div>' +
         '<div class="detail-section">' + sectionTitle('作答詳情', '') + renderAnswerRows(answers) + '</div>' +
         '<div class="detail-section">' + sectionTitle('報告結果', '') + renderHistoryList(latest ? latest.matchedContent || [] : [], '沒有報告區間內容。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '｜' + escapeHtml(item.label || '') + '</strong><p>' + escapeHtml(item.title || '') + '</p><p>' + escapeHtml(item.body || '') + '</p></div>'; }) + '</div>' +
@@ -1464,7 +1622,7 @@
       const tags = splitCrmTags(field('crmDetailTags'));
       const notes = field('crmDetailNotes');
       const lifecycleStage = field('crmDetailStage');
-      api('saveCRMContactLabels', { contactId: contactId, tags: tags, notes: notes, lifecycleStage: lifecycleStage }).then(function (res) {
+      api('saveCRMContactLabels', { contactId: contactId, tags: tags, notes: notes, lifecycleStage: lifecycleStage, purchasePlan: field('crmDetailPurchasePlan'), purchaseDate: field('crmDetailPurchaseDate') }).then(function (res) {
         delete cache.crm;
         return Promise.all([
           api('getCRMContactDetail', { contactId: contactId }),
@@ -2623,7 +2781,9 @@
       if (versionSelect) versionSelect.innerHTML = versions;
       const settings = res.settings || {};
       const blocks = (res.blocks || []);
-      document.getElementById('reportEditorBody').innerHTML =
+      const reportEditorBody = document.getElementById('reportEditorBody');
+      if (!reportEditorBody) return;
+      reportEditorBody.innerHTML =
         '<div class="report-editor-grid">' +
           '<div>' +
             '<div class="item"><div class="row">' +
@@ -2651,7 +2811,9 @@
     }
 
     function addReportBlock() {
-      document.getElementById('reportBlocks').insertAdjacentHTML('beforeend', reportBlockForm({ blockType: 'text', title: '新增文字區塊', content: { text: '' }, isVisible: true }));
+      const list = document.getElementById('reportBlocks');
+      if (!list) return;
+      list.insertAdjacentHTML('beforeend', reportBlockForm({ blockType: 'text', title: '新增文字區塊', content: { text: '' }, isVisible: true }));
       refreshReportPreview();
     }
 

@@ -1,4 +1,4 @@
-﻿create extension if not exists pgcrypto;
+create extension if not exists pgcrypto;
 
 create table if not exists tenants (
   slug text primary key,
@@ -173,6 +173,44 @@ create table if not exists email_templates (
 
 alter table email_templates add column if not exists stop_when_booked boolean not null default true;
 
+create table if not exists quiz_access_codes (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  project_code text not null,
+  version_code text not null default '',
+  code text not null,
+  code_normalized text generated always as (upper(trim(code))) stored,
+  name text not null default '',
+  code_type text not null default 'retest',
+  discount_label text default '',
+  max_uses integer,
+  used_count integer not null default 0,
+  per_email_limit integer not null default 1,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  status text not null default '啟用',
+  notes text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_slug, project_code, version_code, code_normalized),
+  check (code_type in ('retest', 'discount', 'free_access'))
+);
+
+create table if not exists quiz_access_code_usages (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  access_code_id bigint not null references quiz_access_codes(id) on delete cascade,
+  project_code text not null,
+  version_code text not null default '',
+  quiz_response_id bigint,
+  client_email text not null,
+  client_email_normalized text generated always as (lower(client_email)) stored,
+  code text not null,
+  usage_type text not null default 'quiz_submit',
+  metadata jsonb not null default '{}'::jsonb,
+  used_at timestamptz not null default now()
+);
+
 create table if not exists leads (
   id bigserial primary key,
   tenant_slug text not null references tenants(slug) on delete cascade,
@@ -246,7 +284,10 @@ create unique index if not exists uq_active_appointment_slot
 create index if not exists idx_questions_project on questions(tenant_slug, project_code, sort_order);
 create index if not exists idx_rules_consultant on availability_rules(tenant_slug, consultant_id);
 create index if not exists idx_leads_project_email on leads(tenant_slug, project_code, client_email);
+create index if not exists idx_quiz_access_codes_lookup on quiz_access_codes(tenant_slug, project_code, version_code, code_normalized);
+create index if not exists idx_quiz_access_code_usages_code_used on quiz_access_code_usages(access_code_id, used_at desc);
 create index if not exists idx_email_queue_due on email_queue(status, scheduled_at);
 create index if not exists idx_email_queue_retry on email_queue(status, scheduled_at, retry_count);
 create index if not exists idx_login_attempts_lookup on login_attempts(tenant_slug, email, ip_address, created_at);
 create index if not exists idx_admin_alerts_tenant_unresolved on admin_alerts(tenant_slug, resolved_at, created_at desc);
+

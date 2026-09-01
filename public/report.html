@@ -160,7 +160,8 @@
       });
     }
 
-    function renderScores(summary) {
+    function renderScores(summary, settings) {
+      if (settings && settings.show_score_cards === false) return;
       const items = scoreItems(summary);
       if (!items.length) return;
       document.getElementById('scoreSection').classList.remove('hidden');
@@ -324,10 +325,10 @@
         document.getElementById('topActions').classList.remove('hidden');
         window.__scoreSummary = summary;
         const reportBlocks = (snapshot.blocks || []).slice();
-        if (settings.show_chart && !reportBlocks.some(function (block) { return block.blockType === 'score_chart'; })) {
+        if (settings.show_chart === true && !reportBlocks.some(function (block) { return block.blockType === 'score_chart'; })) {
           reportBlocks.unshift({ blockType: 'score_chart', title: '多面向分數圖', content: { chartType: 'radar' } });
         }
-        renderScores(summary);
+        renderScores(summary, settings);
         renderMatchedContent(snapshot.matched_content || []);
         renderBlocks(reportBlocks);
         document.getElementById('loading').classList.add('hidden');

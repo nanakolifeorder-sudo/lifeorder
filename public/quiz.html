@@ -54,6 +54,7 @@
           <div class="field"><label for="clientName">姓名 *</label><input id="clientName" autocomplete="name" required></div>
           <div class="field"><label for="clientEmail">Email *</label><input id="clientEmail" type="email" autocomplete="email" required></div>
           <div class="field"><label for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
+          <div class="field"><label for="accessCode">折扣碼 / 重測碼</label><input id="accessCode" autocomplete="off" placeholder="已有代碼再填寫"></div>
         </section>
 
         <div class="progress"><div class="bar" id="bar"></div></div>
@@ -174,7 +175,13 @@
         phone: document.getElementById('clientPhone').value.trim(),
         answers: collectAnswers()
       }).then(function (res) {
-        if (!res.success) throw new Error(res.message || '送出失敗');
+        if (!res.success) {
+          if (res.code === 'QUIZ_ALREADY_COMPLETED' && res.existingReportUrl) {
+            const goReport = confirm((res.message || '這個 Email 已經完成過本次檢測。') + '\n\n要開啟原本的報告嗎？');
+            if (goReport) { location.href = res.existingReportUrl; return; }
+          }
+          throw new Error(res.message || '送出失敗');
+        }
         location.href = '/report?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '&qrid=' + encodeURIComponent(res.resultId);
       }).catch(function (error) {
         button.disabled = false;

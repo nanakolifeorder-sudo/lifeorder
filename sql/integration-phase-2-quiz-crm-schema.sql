@@ -220,6 +220,44 @@ create table if not exists crm_contacts (
   ))
 );
 
+create table if not exists quiz_access_codes (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  project_code text not null,
+  version_code text not null default '',
+  code text not null,
+  code_normalized text generated always as (upper(trim(code))) stored,
+  name text not null default '',
+  code_type text not null default 'retest',
+  discount_label text default '',
+  max_uses integer,
+  used_count integer not null default 0,
+  per_email_limit integer not null default 1,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  status text not null default '啟用',
+  notes text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_slug, project_code, version_code, code_normalized),
+  check (code_type in ('retest', 'discount', 'free_access'))
+);
+
+create table if not exists quiz_access_code_usages (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  access_code_id bigint not null references quiz_access_codes(id) on delete cascade,
+  project_code text not null,
+  version_code text not null default '',
+  quiz_response_id bigint,
+  client_email text not null,
+  client_email_normalized text generated always as (lower(client_email)) stored,
+  code text not null,
+  usage_type text not null default 'quiz_submit',
+  metadata jsonb not null default '{}'::jsonb,
+  used_at timestamptz not null default now()
+);
+
 create table if not exists quiz_responses (
   id bigserial primary key,
   public_id uuid not null default gen_random_uuid(),
@@ -241,6 +279,11 @@ create table if not exists quiz_responses (
   created_at timestamptz not null default now(),
   unique (tenant_slug, public_id)
 );
+
+alter table quiz_responses add column if not exists access_code_id bigint references quiz_access_codes(id) on delete set null;
+alter table quiz_responses add column if not exists retake_of_response_id bigint references quiz_responses(id) on delete set null;
+create index if not exists idx_quiz_responses_access_code on quiz_responses(access_code_id);
+create index if not exists idx_quiz_responses_retake_of on quiz_responses(retake_of_response_id);
 
 create table if not exists quiz_response_answers (
   id bigserial primary key,
@@ -719,4 +762,5 @@ select a.tenant_slug,
         and e.appointment_id = a.id
         and e.event_type in ('booking_created', 'booking_cancelled')
    );
+
 
