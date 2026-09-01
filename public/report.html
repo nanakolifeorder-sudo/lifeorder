@@ -140,6 +140,15 @@
       return false;
     }
 
+    function renderRichText(value) {
+      const text = String(value || '').replace(/\r\n/g, '\n').trim();
+      if (!text) return '';
+      return text.split(/\n{2,}/).map(function (part) {
+        const paragraph = part.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+        return paragraph ? '<p>' + escapeHtml(paragraph) + '</p>' : '';
+      }).join('');
+    }
+
     function scoreItems(summary) {
       const scores = summary.scores || {};
       const maxScores = summary.max_scores || {};
@@ -223,12 +232,12 @@
       if (!Array.isArray(items) || !items.length) return;
       document.getElementById('contentSection').classList.remove('hidden');
       document.getElementById('matchedContent').innerHTML = items.map(function (item) {
+        const heading = item.title || item.dimensionName || item.dimensionKey || '診斷';
         return '<article class="content">' +
-          '<h3>' + escapeHtml(item.dimensionName || item.dimensionKey || '診斷') + '</h3>' +
+          '<h3>' + escapeHtml(heading) + '</h3>' +
           (item.imageUrl ? '<img class="report-image" src="' + escapeHtml(item.imageUrl) + '" alt="">' : '') +
-          (item.title ? '<h3>' + escapeHtml(item.title) + '</h3>' : '') +
           (item.subtitle ? '<p><strong>' + escapeHtml(item.subtitle) + '</strong></p>' : '') +
-          (item.body ? '<p>' + escapeHtml(item.body).replace(/\n/g, '<br>') + '</p>' : '') +
+          renderRichText(item.body || '') +
           '</article>';
       }).join('');
     }
@@ -295,7 +304,7 @@
         let html = '';
         if (block.blockType === 'score_chart') return renderRadarChart(window.__scoreSummary || {}, Object.assign({ title: block.title }, content));
         if (block.blockType === 'heading') html = '<h2>' + escapeHtml(content.text || block.title || '') + '</h2>';
-        else if (block.blockType === 'text') html = (block.title ? '<h2>' + escapeHtml(block.title) + '</h2>' : '') + '<p>' + escapeHtml(content.text || '').replace(/\n/g, '<br>') + '</p>';
+        else if (block.blockType === 'text') html = (block.title ? '<h2>' + escapeHtml(block.title) + '</h2>' : '') + renderRichText(content.text || '');
         else if (block.blockType === 'list') html = (block.title ? '<h2>' + escapeHtml(block.title) + '</h2>' : '') + '<ul>' + (content.items || []).map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>';
         else if (block.blockType === 'image') html = (block.title ? '<h2>' + escapeHtml(block.title) + '</h2>' : '') + '<img class="report-image" src="' + escapeHtml(content.url || '') + '" alt="' + escapeHtml(content.alt || '') + '">';
         else if (block.blockType === 'button' || block.blockType === 'link') {
@@ -325,7 +334,7 @@
         document.getElementById('title').textContent = settings.title || '你的檢測報告';
         document.getElementById('subtitle').textContent = settings.subtitle || (res.clientName ? res.clientName + '，以下是你的檢測結果。' : '以下是你的檢測結果。');
         document.getElementById('meta').textContent = '版本 ' + (res.versionCode || '') + '｜' + new Date(res.submittedAt).toLocaleString('zh-TW', { hour12:false });
-        document.getElementById('topActions').innerHTML = '<a class="button" href="' + bookingUrl() + '" data-block-key="top-booking" data-block-type="booking_cta" data-link-label="' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '" onclick="return followReportLink(event,this)">' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '</a><a class="button secondary" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '">重新檢測</a>';
+        document.getElementById('topActions').innerHTML = '<a class="button secondary" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '">重新檢測</a>';
         document.getElementById('topActions').classList.remove('hidden');
         window.__scoreSummary = summary;
         const reportBlocks = (snapshot.blocks || []).slice();
