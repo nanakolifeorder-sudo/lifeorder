@@ -353,6 +353,8 @@ $$;
 
 alter table crm_contacts add column if not exists tags text[] not null default array[]::text[];
 alter table crm_contacts add column if not exists notes text default '';
+alter table crm_contacts add column if not exists purchase_plan text default '';
+alter table crm_contacts add column if not exists purchase_date date;
 
 alter table tenants add column if not exists zoom_account_id text default '';
 alter table tenants add column if not exists zoom_client_id text default '';
