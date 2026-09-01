@@ -617,6 +617,8 @@
     let quizLeadMode = 'unbooked';
     let quizLeadTagFilter = 'ALL';
     let quizLeadSearch = '';
+    let quizLeadDateFrom = '';
+    let quizLeadDateTo = '';
     let emailProject = 'ALL';
     let emailModule = 'booking';
     let quizEditorTab = 'questions';
@@ -1018,7 +1020,7 @@
     }
     function loadQuizLeads() {
       loading('測驗名單');
-      api('getQuizLeadList', { projectCode: quizLeadProject }).then(function (res) {
+      api('getQuizLeadList', { projectCode: quizLeadProject, dateFrom: quizLeadDateFrom, dateTo: quizLeadDateTo }).then(function (res) {
         cache.quizLeads = res;
         renderQuizLeads(res);
       }).catch(showError);
@@ -1030,6 +1032,43 @@
       loadQuizLeads();
     }
 
+    function applyQuizLeadFilters() {
+      quizLeadDateFrom = field('quizLeadDateFrom');
+      quizLeadDateTo = field('quizLeadDateTo');
+      delete cache.quizLeads;
+      loadQuizLeads();
+    }
+
+    function exportQuizLeadRows() {
+      const rows = window.quizLeadVisibleRows || [];
+      const header = ['作答時間', '姓名', 'Email', '電話', '專案', '版本', '預約狀態', '指派顧問', '折扣碼/重測碼', '標籤', '作答摘要', '報告連結'];
+      const body = rows.map(function (row) {
+        return [
+          compactDate(row.submittedAt),
+          row.clientName,
+          row.clientEmail,
+          row.clientPhone,
+          row.projectName || row.projectCode,
+          row.versionCode,
+          quizLeadStatusLabel(quizLeadStatusValue(row)),
+          row.assignedConsultantName || row.consultant || '',
+          row.accessCode || '',
+          (row.tags || []).join(';'),
+          row.answers || crmAnswerPreview(row).replace(/<[^>]*>/g, ' '),
+          row.reportUrl || ''
+        ].map(csvEscape).join(',');
+      });
+      const newline = '\r\n';
+      const blob = new Blob(['\ufeff' + header.join(',') + newline + body.join(newline)], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'quiz-leads-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
     function quizLeadStatusValue(item) {
       if (item.hasBooking || item.appointmentId) return 'booked';
       return 'unbooked';
@@ -1054,6 +1093,7 @@
       const all = res.responses || [];
       const stats = res.stats || {};
       const rows = all.filter(quizLeadMatchesFilters).sort(function (a, b) { return (b.timeObj || 0) - (a.timeObj || 0); });
+      window.quizLeadVisibleRows = rows;
       const projectOptions = ['<option value="ALL">所有專案</option>'].concat((res.projects || []).map(function (p) {
         return '<option value="' + escapeHtml(p.code) + '"' + (quizLeadProject === p.code ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>';
       })).join('');
@@ -1068,6 +1108,9 @@
             '<div class="col-2"><label>預約狀態</label><select onchange="quizLeadMode=this.value; renderQuizLeads(cache.quizLeads);"><option value="unbooked"' + (quizLeadMode === 'unbooked' ? ' selected' : '') + '>未預約</option><option value="booked"' + (quizLeadMode === 'booked' ? ' selected' : '') + '>已預約</option><option value="ALL"' + (quizLeadMode === 'ALL' ? ' selected' : '') + '>全部</option></select></div>' +
             '<div class="col-2"><label>標籤</label><select onchange="quizLeadTagFilter=this.value; renderQuizLeads(cache.quizLeads);">' + tagOptions + '</select></div>' +
             '<div class="col-2"><label>搜尋</label><input value="' + escapeHtml(quizLeadSearch) + '" placeholder="姓名、Email、答案" oninput="quizLeadSearch=this.value; renderQuizLeads(cache.quizLeads);"></div>' +
+            '<div class="col-2"><label>測驗日期起</label><input id="quizLeadDateFrom" type="date" value="' + escapeHtml(quizLeadDateFrom) + '"></div>' +
+            '<div class="col-2"><label>測驗日期迄</label><input id="quizLeadDateTo" type="date" value="' + escapeHtml(quizLeadDateTo) + '"></div>' +
+            '<div class="col-2 actions"><button type="button" onclick="applyQuizLeadFilters()">篩選</button><button class="secondary" type="button" onclick="exportQuizLeadRows()">匯出 CSV</button></div>' +
           '</div>' +
           '<div class="stat-grid">' +
             statBox('今日作答', stats.today || 0) +
@@ -3609,4 +3652,6 @@
   </script>
 </body>
 </html>
+
+
 
