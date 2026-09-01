@@ -13,7 +13,7 @@ module.exports = async function handler(req, res) {
     if (!code || !state) throw new Error('Google OAuth callback 缺少 code 或 state。');
 
     const parsedState = verifyOauthState(state);
-    const tokenData = await exchangeCode(code);
+    const tokenData = await exchangeCode(code, parsedState.redirectUri);
     const userInfo = await googleUserInfo(tokenData.access_token);
 
     const refreshToken = tokenData.refresh_token;
@@ -49,3 +49,4 @@ module.exports = async function handler(req, res) {
     `);
   }
 };
+
