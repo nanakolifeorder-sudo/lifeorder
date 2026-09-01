@@ -722,6 +722,31 @@
       return text.split(',').map(function (item) { return item.trim(); }).includes('ALL') || text.split(',').map(function (item) { return item.trim(); }).includes(ownerProject);
     }
 
+    function isCurrentUserRow(row) {
+      const rowId = String(row?.rowId || row?.id || '');
+      const userId = String(currentUser?.id || '');
+      const rowEmail = String(row?.loginEmail || row?.email || '').toLowerCase();
+      const userEmail = String(currentUser?.email || '').toLowerCase();
+      return (rowId && userId && rowId === userId) || (rowEmail && userEmail && rowEmail === userEmail);
+    }
+
+    function uniqueRowsById(rows) {
+      const seen = new Set();
+      return rows.filter(function (row) {
+        const key = String(row?.rowId || row?.id || row?.loginEmail || '');
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function scheduleConsultantVisible(row) {
+      if (isCurrentUserRow(row)) return true;
+      if (isSystemOwner()) return true;
+      const role = String(row?.role || '').toLowerCase();
+      const sysRole = String(row?.sysRole || '').toUpperCase();
+      return role === 'consultant' || role === 'tenant_admin' || sysRole.includes('TENANT_ADMIN') || sysRole === 'ALL';
+    }
     function setTheme(theme) {
       document.body.dataset.theme = theme;
       localStorage.setItem('dm_saas_theme', theme);
@@ -1874,13 +1899,12 @@
       loading('我的排班');
       if (isAdmin()) {
         api('getAdminConsultantData', {}).then(function (res) {
-          scheduleConsultants = (res.consultants || []).filter(projectMatchesScope).filter(function (consultant) {
-            if (isSystemOwner()) return true;
-            const isSelf = String(consultant.loginEmail || '').toLowerCase() === String(currentUser?.email || '').toLowerCase();
-            return isSelf || consultant.role === 'consultant';
-          });
+          scheduleConsultants = uniqueRowsById((res.consultants || []).filter(function (consultant) {
+            return (isCurrentUserRow(consultant) || projectMatchesScope(consultant)) && scheduleConsultantVisible(consultant);
+          }));
           const options = scheduleConsultants.map(function (c) {
-            return '<option value="' + c.rowId + '">' + escapeHtml(teamConsultantName(c.name)) + '</option>';
+            const selected = isCurrentUserRow(c) ? ' selected' : '';
+            return '<option value="' + c.rowId + '"' + selected + '>' + escapeHtml(teamConsultantName(c.name)) + '</option>';
           }).join('');
           if (!options) {
             document.getElementById('view').innerHTML = '<div class="panel"><h2>我的排班</h2><p>這個專案範圍目前沒有可顯示的團隊顧問。</p></div>';
@@ -3652,6 +3676,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
