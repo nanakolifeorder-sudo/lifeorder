@@ -439,8 +439,10 @@
           const href = appendReportParams(content.url || '#', content);
           html = '<p><a class="button secondary"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
         } else if (block.blockType === 'booking_cta') {
-          const label = content.label || '預約一對一諮詢';
-          const href = content.urlMode === 'custom' && content.url ? appendReportParams(content.url, content) : bookingUrl();
+          const reportSettings = window.__reportSettings || {};
+          const label = content.label || reportSettings.booking_cta_label || '預約一對一諮詢';
+          const customUrl = content.urlMode === 'custom' && content.url ? content.url : (reportSettings.booking_cta_url || '');
+          const href = customUrl ? appendReportParams(customUrl, content) : bookingUrl();
           html = '<p><a class="button"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
         }
         return html ? '<article class="report-block">' + html + '</article>' : '';
@@ -457,6 +459,7 @@
         window.__reportResult = res;
         const snapshot = res.reportSnapshot || {};
         const settings = snapshot.result_settings || {};
+        window.__reportSettings = settings;
         const summary = res.scoreSummary || snapshot.score_summary || {};
         document.getElementById('title').textContent = settings.title || '你的檢測報告';
         document.getElementById('subtitle').textContent = settings.subtitle || (res.clientName ? res.clientName + '，以下是你的檢測結果。' : '以下是你的檢測結果。');

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DM 預約系統後台</title>
+  <title>預約系統後台</title>
   <style>
     :root {
       --blue: #1a73e8;
@@ -1103,6 +1103,13 @@
       return value === 'booked' ? '已預約' : '未預約';
     }
 
+    function quizVersionLabel(value) {
+      const code = String(value || '').trim().toUpperCase();
+      if (code === 'A') return '簡易版';
+      if (code === 'B') return '完整版';
+      return code || '預設';
+    }
+
     function quizLeadMatchesFilters(item) {
       if (quizLeadMode !== 'ALL' && quizLeadStatusValue(item) !== quizLeadMode) return false;
       const tags = Array.isArray(item.tags) ? item.tags : [];
@@ -1137,12 +1144,6 @@
             '<div class="col-2"><label>測驗日期迄</label><input id="quizLeadDateTo" type="date" value="' + escapeHtml(quizLeadDateTo) + '"></div>' +
             '<div class="col-2 actions"><button type="button" onclick="applyQuizLeadFilters()">篩選</button><button class="secondary" type="button" onclick="exportQuizLeadRows()">匯出 CSV</button></div>' +
           '</div>' +
-          '<div class="stat-grid">' +
-            statBox('今日作答', stats.today || 0) +
-            statBox('全部作答', stats.total || all.length) +
-            statBox('未預約測驗', stats.unbooked || 0) +
-            statBox('已預約測驗', stats.booked || 0) +
-          '</div>' +
         '</div>' +
         '<div class="panel"><div class="actions">' +
           '<button class="chip ' + (quizLeadMode === 'unbooked' ? ' active' : '') + '" onclick="quizLeadMode=&quot;unbooked&quot;; renderQuizLeads(cache.quizLeads);">未預約 <span class="badge">' + escapeHtml(String(stats.unbooked || 0)) + '</span></button>' +
@@ -1159,13 +1160,13 @@
       const projectLabel = item.projectName || item.projectCode || '未指定專案';
       const reportLink = item.reportUrl ? '<a class="secondary" target="_blank" href="' + escapeHtml(item.reportUrl) + '">開啟報告</a>' : '';
       return '<div class="client-card ' + escapeHtml(status) + ' quiz-response">' +
-        '<div class="card-top"><div><div class="crm-card-title"><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> <span class="badge">' + escapeHtml(quizLeadStatusLabel(status)) + '</span><span class="badge">版本 ' + escapeHtml(item.versionCode || '') + '</span></div>' +
+        '<div class="card-top"><div><div class="crm-card-title"><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> <span class="badge">' + escapeHtml(quizLeadStatusLabel(status)) + '</span><span class="badge">' + escapeHtml(quizVersionLabel(item.versionCode)) + '</span></div>' +
         '<p class="mini">' + escapeHtml(compactDate(item.submittedAt)) + ' ｜ ' + escapeHtml(item.clientPhone || '無電話') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p></div><span class="badge">' + escapeHtml(projectLabel) + '</span></div>' +
         '<div class="crm-card-meta">' +
           '<div class="crm-meta-item"><div class="mini">作答時間</div><strong>' + escapeHtml(compactDate(item.submittedAt) || '無資料') + '</strong></div>' +
           '<div class="crm-meta-item"><div class="mini">預約狀態</div><strong>' + escapeHtml(quizLeadStatusLabel(status)) + '</strong></div>' +
           '<div class="crm-meta-item"><div class="mini">專案</div><strong>' + escapeHtml(projectLabel) + '</strong></div>' +
-          '<div class="crm-meta-item"><div class="mini">版本</div><strong>' + escapeHtml(item.versionCode || '預設') + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">版本</div><strong>' + escapeHtml(quizVersionLabel(item.versionCode)) + '</strong></div>' +
         '</div>' +
         renderTagPills(item.tags || []) +
         '<div class="answer-box"><div class="mini">作答摘要</div><div class="crm-answer-list">' + crmAnswerPreview(item) + '</div></div>' +
@@ -2980,7 +2981,8 @@
               '<div class="col-3"><label>顯示圖表</label><select id="reportShowChart"><option value="true"' + (settings.show_chart !== false ? ' selected' : '') + '>顯示</option><option value="false"' + (settings.show_chart === false ? ' selected' : '') + '>隱藏</option></select></div>' +
               '<div class="col-3"><label>分數卡</label><select id="reportShowCards"><option value="true"' + (settings.show_score_cards !== false ? ' selected' : '') + '>顯示</option><option value="false"' + (settings.show_score_cards === false ? ' selected' : '') + '>隱藏</option></select></div>' +
               '<div class="col-3"><label>分數表</label><select id="reportShowTable"><option value="true"' + (settings.show_score_table !== false ? ' selected' : '') + '>顯示</option><option value="false"' + (settings.show_score_table === false ? ' selected' : '') + '>隱藏</option></select></div>' +
-              '<div class="col-3"><label>CTA 文字</label><input id="reportCtaLabel" value="' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '"></div>' +
+              '<div class="col-3"><label>CTA 文字</label><input id="reportCtaLabel" value="' + escapeHtml(settings.booking_cta_label || '我要做完整版測驗') + '"></div>' +
+              '<div class="col-6"><label>CTA 連結</label><input id="reportCtaUrl" value="' + escapeHtml(settings.booking_cta_url || '') + '" placeholder="https://..."></div>' +
             '</div></div>' +
             '<div class="actions"><button type="button" onclick="addReportBlock()">新增區塊</button><button class="secondary" type="button" onclick="refreshReportPreview()">更新預覽</button><button class="green" type="button" onclick="saveReportEditor()">儲存報告</button></div>' +
             '<div class="list" id="reportBlocks" style="margin-top:12px;">' + blocks.map(reportBlockForm).join('') + '</div>' + renderAgeContentEditor(res) +
@@ -3057,7 +3059,8 @@
           showChart: field('reportShowChart') !== 'false',
           showScoreCards: field('reportShowCards') !== 'false',
           showScoreTable: field('reportShowTable') !== 'false',
-          bookingCtaLabel: field('reportCtaLabel') || '預約一對一諮詢'
+          bookingCtaLabel: field('reportCtaLabel') || '我要做完整版測驗',
+          bookingCtaUrl: field('reportCtaUrl')
         },
         blocks: Array.from(document.querySelectorAll('.report-block-row')).map(collectReportBlock),
         ageContents: collectAgeContents()
@@ -3082,7 +3085,11 @@
         if (block.blockType === 'score_chart') return '<h3>' + escapeHtml(block.title || '多面向分數圖') + '</h3>' + previewRadar();
         if (block.blockType === 'score_table') return '<h3>分數表</h3><table><tbody><tr><td>需求清晰度</td><td>7 / 10</td></tr><tr><td>預約急迫度</td><td>6 / 10</td></tr><tr><td>執行準備度</td><td>8 / 10</td></tr></tbody></table>';
         if (block.blockType === 'button' || block.blockType === 'link') return '<p><a class="button secondary">' + escapeHtml(c.label || block.title || '了解更多') + '</a></p><p class="mini">' + escapeHtml(c.url || '') + (c.appendParams ? '｜會附加追蹤參數' : '') + '</p>';
-        if (block.blockType === 'booking_cta') return '<p><a class="preview-cta">' + escapeHtml(c.label || payload.settings.bookingCtaLabel || '預約一對一諮詢') + '</a></p><p class="mini">' + (c.urlMode === 'custom' ? escapeHtml(c.url || '尚未設定自訂網址') : '系統預約頁') + (c.appendParams ? '｜會附加追蹤參數' : '') + '</p>';
+        if (block.blockType === 'booking_cta') {
+          const fallbackUrl = payload.settings.bookingCtaUrl || '';
+          const targetText = c.urlMode === 'custom' ? (c.url || '尚未設定自訂網址') : (fallbackUrl || '系統預約頁');
+          return '<p><a class="preview-cta">' + escapeHtml(c.label || payload.settings.bookingCtaLabel || '我要做完整版測驗') + '</a></p><p class="mini">' + escapeHtml(targetText) + (c.appendParams ? '｜會附加追蹤參數' : '') + '</p>';
+        }
         return '<p class="mini">分數區間內容會依作答結果自動顯示。</p>';
       }).join('');
       target.innerHTML = '<div class="preview-card"><h1>' + escapeHtml(payload.settings.title || '你的檢測報告') + '</h1><p>' + escapeHtml(payload.settings.subtitle || '') + '</p></div><div class="preview-card"><div class="preview-grid"><div class="preview-score"><strong>需求清晰度</strong><p>7 / 10</p></div><div class="preview-score"><strong>預約急迫度</strong><p>6 / 10</p></div></div></div><div class="preview-card">' + blockHtml + '</div>';

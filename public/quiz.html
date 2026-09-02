@@ -250,7 +250,7 @@
       api('getQuizConfig', {}).then(function (res) {
         if (!res.success) throw new Error(res.message || '尚未設定測驗。');
         config = res;
-        const displayTitle = res.version?.name || (String(res.versionCode || '').toUpperCase() === 'B' ? '人生秩序完整版' : (res.projectName || '檢測'));
+        const displayTitle = res.version?.name || (String(res.versionCode || '').toUpperCase() === 'B' ? '完整版' : (res.projectName || '檢測'));
         document.getElementById('title').textContent = displayTitle + '｜檢測測驗';
         document.title = displayTitle + '｜檢測測驗';
         document.getElementById('subtitle').textContent = res.resultSettings?.subtitle || '請依照目前狀況作答，完成後會產生檢測報告。';

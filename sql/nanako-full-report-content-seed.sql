@@ -5,7 +5,7 @@
 begin;
 
 insert into quiz_versions(tenant_slug, project_code, version_code, name, description, traffic_weight, status, published_at, updated_at)
-values('lifeorder', 'P01', 'B', '人生秩序完整版', '$980 付費版測驗：11 面向完整版報告，一個 Email 限測一次。', 0, '啟用', now(), now())
+values('lifeorder', 'P01', 'B', '完整版', '$980 付費版測驗：11 面向完整版報告，一個 Email 限測一次。', 0, '啟用', now(), now())
 on conflict(tenant_slug, project_code, version_code) do update
 set name = excluded.name, description = excluded.description, status = excluded.status, updated_at = now();
 
