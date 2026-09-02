@@ -168,8 +168,11 @@
 
     function renderStage() {
       const stage = stages[currentStage];
+      const freeVersion = isFreeVersion();
       document.getElementById('identityPanel').classList.remove('hidden');
-      document.getElementById('accessCodeField').classList.toggle('hidden', isFreeVersion());
+      document.getElementById('accessCodeField').classList.toggle('hidden', freeVersion);
+      document.getElementById('clientAge').required = !freeVersion;
+      document.getElementById('clientOccupation').required = !freeVersion;
       document.getElementById('bar').style.width = '100%';
       document.getElementById('questionPanel').innerHTML = '<div class="stage-title"><h2>' + escapeHtml(stage.title || '測驗題目') + '</h2><p>' + escapeHtml(stage.description || '') + '</p></div>' + stage.questions.map(renderQuestion).join('');
       restoreStageAnswers();
