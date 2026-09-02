@@ -1405,4 +1405,24 @@ set label = excluded.label,
     sort_order = excluded.sort_order,
     status = excluded.status;
 
+
+update quiz_questions
+   set help_text = '',
+       updated_at = now()
+ where tenant_slug = 'lifeorder'
+   and project_code = 'P01'
+   and version_code = 'B'
+   and status not in ('deleted');
+
+update quiz_question_options o
+   set label = regexp_replace(label, '[。．.]$', ''),
+       description = regexp_replace(description, '[。．.]$', '')
+  from quiz_questions q
+ where q.id = o.question_id
+   and q.tenant_slug = 'lifeorder'
+   and q.project_code = 'P01'
+   and q.version_code = 'B'
+   and q.status not in ('deleted')
+   and o.status not in ('deleted');
 commit;
+

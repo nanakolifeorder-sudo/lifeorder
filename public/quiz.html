@@ -43,7 +43,6 @@
           <h1 id="title">檢測測驗</h1>
           <p id="subtitle">正在讀取題目...</p>
         </div>
-        <span class="badge" id="versionBadge">版本</span>
       </div>
 
       <div id="loading">載入中...</div>
@@ -94,6 +93,10 @@
 
     function escapeHtml(value) {
       return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
+    function cleanOptionLabel(value) {
+      return String(value || '').trim().replace(/[。．.]$/g, '');
     }
 
     function isFreeVersion() {
@@ -153,11 +156,10 @@
     function renderQuestion(question) {
       const required = question.isRequired !== false;
       let html = '<div class="field" data-question-id="' + question.id + '"><label>' + escapeHtml(question.title) + (required ? ' *' : '') + '</label>';
-      if (question.helpText) html += '<p>' + escapeHtml(question.helpText) + '</p>';
       if (question.type === 'single' || question.type === 'multiple') {
         const type = question.type === 'single' ? 'radio' : 'checkbox';
         (question.options || []).forEach(function (option) {
-          html += '<label class="choice"><input type="' + type + '" name="' + inputName(question) + '" value="' + escapeHtml(option.key) + '"><span>' + escapeHtml(option.label) + '</span></label>';
+          html += '<label class="choice"><input type="' + type + '" name="' + inputName(question) + '" value="' + escapeHtml(option.key) + '"><span>' + escapeHtml(cleanOptionLabel(option.label)) + '</span></label>';
         });
       } else {
         const tag = question.type === 'long_text' ? 'textarea' : 'input';
@@ -248,9 +250,10 @@
       api('getQuizConfig', {}).then(function (res) {
         if (!res.success) throw new Error(res.message || '尚未設定測驗。');
         config = res;
-        document.getElementById('title').textContent = (res.projectName || '檢測') + '｜檢測測驗';
+        const displayTitle = res.version?.name || (String(res.versionCode || '').toUpperCase() === 'B' ? '人生秩序完整版' : (res.projectName || '檢測'));
+        document.getElementById('title').textContent = displayTitle + '｜檢測測驗';
+        document.title = displayTitle + '｜檢測測驗';
         document.getElementById('subtitle').textContent = res.resultSettings?.subtitle || '請依照目前狀況作答，完成後會產生檢測報告。';
-        document.getElementById('versionBadge').textContent = '版本 ' + (res.versionCode || 'A');
         groupStages();
         if (!stages.length) throw new Error('此版本尚未建立題目。');
         document.getElementById('loading').classList.add('hidden');
@@ -264,3 +267,4 @@
   </script>
 </body>
 </html>
+
