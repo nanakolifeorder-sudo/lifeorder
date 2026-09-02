@@ -15,9 +15,9 @@
     h3 { font-size:18px; margin:0 0 6px; }
     p { color:var(--muted); margin:0 0 10px; }
     .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-    .score-snapshot { display:grid; grid-template-columns:minmax(280px,.92fr) minmax(360px,1.08fr); gap:24px; align-items:center; margin-top:14px; }
-    .score-list { display:grid; grid-template-columns:1fr; gap:12px; }
-    .score { border:1px solid var(--line); border-radius:8px; padding:16px; background:var(--soft); }
+    .score-snapshot { display:grid; grid-template-columns:minmax(320px,.95fr) minmax(360px,1.05fr); gap:24px; align-items:center; margin-top:14px; }
+    .score-list { display:grid; grid-template-columns:1fr; gap:10px; }
+    .score { border:1px solid var(--line); border-radius:8px; padding:14px 16px; background:var(--soft); }
     .score p { margin-top:10px; font-size:14px; }
     .chart-wrap { display:flex; justify-content:center; align-items:center; }
     .radar { width:100%; max-width:420px; aspect-ratio:1; }
@@ -31,10 +31,32 @@
     .meter { height:8px; background:#e8eaed; border-radius:999px; overflow:hidden; margin-top:10px; }
     .meter span { display:block; height:100%; background:var(--green); width:0; }
     .content { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
-    .age-content { margin-top:16px; padding:14px 16px; border-left:4px solid var(--blue); background:#f8fbff; border-radius:8px; }
+    .diagnosis-group { border-top:1px solid var(--line); padding-top:18px; margin-top:18px; }
+    .diagnosis-group:first-child { border-top:0; padding-top:0; margin-top:0; }
+    .diagnosis-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .diagnosis-card { border:1px solid var(--line); border-radius:8px; padding:16px; background:#fff; }
+    .diagnosis-card h4 { margin:0 0 8px; font-size:17px; }
+    .age-content { margin-top:16px; padding:16px 18px; border-left:4px solid var(--blue); background:#f8fbff; border-radius:8px; }
     .age-content h4 { margin:4px 0 8px; font-size:18px; }
     .age-content p:last-child { margin-bottom:0; }
     .age-kicker { color:var(--blue); font-size:13px; font-weight:700; margin:0 0 4px; }
+    .age-action-list { margin:10px 0 0; padding-left:20px; color:var(--muted); }
+    .guide { margin-top:22px; display:grid; grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr); gap:16px; }
+    .guide-box { border:1px solid var(--line); border-radius:8px; padding:18px; background:#fff; }
+    .guide-box h3 { margin-bottom:10px; }
+    .legend { display:grid; gap:8px; }
+    .legend-row { display:grid; grid-template-columns:72px 1fr; gap:10px; align-items:start; color:var(--muted); }
+    .legend-chip { height:14px; border-radius:999px; margin-top:6px; }
+    .guide-steps { display:grid; gap:10px; }
+    .guide-step { display:grid; grid-template-columns:28px 1fr; gap:10px; align-items:start; color:var(--muted); }
+    .step-no { width:28px; height:28px; border-radius:999px; background:#eef4ff; color:var(--blue); display:flex; align-items:center; justify-content:center; font-weight:800; }
+    .axis-strip { margin-top:16px; border:1px solid var(--line); border-radius:8px; padding:14px; background:#fff; }
+    .axis-list { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px 12px; margin-top:10px; }
+    .axis-item { color:var(--muted); font-size:14px; }
+    .timeline { display:flex; gap:8px; margin-top:12px; overflow-x:auto; padding-bottom:6px; }
+    .time-item { min-width:126px; border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
+    .time-item strong { display:block; color:var(--ink); }
+    .time-item span { color:var(--muted); font-size:13px; }
     .report-block { background:#fff; border:1px solid var(--line); border-radius:8px; padding:22px; box-shadow:0 8px 28px rgba(60,64,67,.08); margin-bottom:16px; }
     .content strong, .report-block strong { color:#174ea6; font-weight:800; }
     .report-highlight { background:linear-gradient(transparent 58%, rgba(251,188,5,.35) 58%); padding:0 2px; }
@@ -47,7 +69,7 @@
     .muted { color:var(--muted); font-size:14px; }
     .error { color:#d93025; font-weight:700; }
     .hidden { display:none !important; }
-    @media (max-width:720px) { main{padding:16px 12px 44px}.hero,.section{padding:18px}.grid,.score-snapshot{grid-template-columns:1fr}.button{width:100%}.radar{max-width:100%} }
+    @media (max-width:720px) { main{padding:16px 12px 44px}.hero,.section{padding:18px}.grid,.score-snapshot,.guide,.diagnosis-grid{grid-template-columns:1fr}.axis-list{grid-template-columns:repeat(2,minmax(0,1fr))}.button{width:100%}.radar{max-width:100%} }
   </style>
 </head>
 <body>
@@ -66,6 +88,7 @@
         <div id="scoreChart"></div>
         <div class="score-list" id="scores"></div>
       </div>
+      <div id="lifeOrderGuide"></div>
     </section>
 
     <section class="section hidden" id="contentSection">
@@ -186,7 +209,7 @@
 
     function renderScores(summary, settings) {
       const chartTarget = document.getElementById('scoreChart');
-      if (chartTarget) chartTarget.innerHTML = settings && settings.show_chart === true ? renderRadarChart(summary, { title: '人生秩序三角圖' }) : '';
+      if (chartTarget) chartTarget.innerHTML = !settings || settings.show_chart !== false ? renderRadarChart(summary, { title: '人生秩序雷達圖' }) : '';
       if (settings && settings.show_score_cards === false) return;
       const items = scoreItems(summary);
       if (!items.length) return;
@@ -199,6 +222,36 @@
       document.getElementById('scores').innerHTML = items.map(function (item) {
         return '<div class="score"><div class="score-head"><h3>' + escapeHtml(item.name) + '</h3><span class="score-value">' + item.displayScore + (item.displayMax ? '/' + item.displayMax : '') + '</span></div><div class="meter"><span style="width:' + Math.round(item.pct * 100) + '%"></span></div><p>' + escapeHtml(descriptions[item.key] || item.description || '') + '</p></div>';
       }).join('');
+      renderLifeOrderGuide(items);
+    }
+
+
+    function renderLifeOrderGuide(items) {
+      const target = document.getElementById('lifeOrderGuide');
+      if (!target) return;
+      const axisNames = (items || []).map(function (item, index) { return '<span class="axis-item">' + (index + 1) + ' ' + escapeHtml(item.name) + '</span>'; }).join('');
+      target.innerHTML = '<div class="guide">' +
+        '<article class="guide-box"><h3>如何閱讀這張圖</h3><div class="guide-steps">' +
+          '<div class="guide-step"><span class="step-no">1</span><p><strong>先看形狀。</strong> 雷達圖不是要追求完美圓，而是看哪些面向明顯凹下去，哪些面向已經能支撐你。</p></div>' +
+          '<div class="guide-step"><span class="step-no">2</span><p><strong>再看落差。</strong> 同樣 60 分，有些是已經能用但還沒固定，有些是遇到臨時狀況就會卡住。</p></div>' +
+          '<div class="guide-step"><span class="step-no">3</span><p><strong>最後決定順序。</strong> 先處理最容易造成生活摩擦、家人接手困難或長期懸念的那一塊。</p></div>' +
+        '</div></article>' +
+        '<article class="guide-box"><h3>分數說明</h3><div class="legend">' +
+          '<div class="legend-row"><span class="legend-chip" style="background:#4f9a8a"></span><p><strong>80-100</strong> 已有秩序，可以維護與交代。</p></div>' +
+          '<div class="legend-row"><span class="legend-chip" style="background:#88a957"></span><p><strong>60-79</strong> 有基礎，但需要固定成做法。</p></div>' +
+          '<div class="legend-row"><span class="legend-chip" style="background:#e6a23c"></span><p><strong>30-59</strong> 需要關注，先建立基本秩序。</p></div>' +
+          '<div class="legend-row"><span class="legend-chip" style="background:#dd6b75"></span><p><strong>0-29</strong> 失序感較高，優先處理最卡的一件事。</p></div>' +
+        '</div></article>' +
+      '</div>' +
+      '<div class="axis-strip"><h3>11 個面向</h3><div class="axis-list">' + axisNames + '</div></div>' +
+      '<div class="axis-strip"><h3>生命時間軸</h3><div class="timeline">' +
+        '<div class="time-item"><strong>0-20歲</strong><span>探索期</span></div>' +
+        '<div class="time-item"><strong>20-30歲</strong><span>奠基期</span></div>' +
+        '<div class="time-item"><strong>30-45歲</strong><span>成長期</span></div>' +
+        '<div class="time-item"><strong>45-60歲</strong><span>收穫期</span></div>' +
+        '<div class="time-item"><strong>60-75歲</strong><span>豐盛期</span></div>' +
+        '<div class="time-item"><strong>75歲以上</strong><span>傳承期</span></div>' +
+      '</div></div>';
     }
 
     function polygonPoints(items, radius, center) {
@@ -251,16 +304,35 @@
     function renderMatchedContent(items) {
       if (!Array.isArray(items) || !items.length) return;
       document.getElementById('contentSection').classList.remove('hidden');
-      document.getElementById('matchedContent').innerHTML = items.map(function (item) {
-        const heading = item.title || item.dimensionName || item.dimensionKey || '診斷';
-        return '<article class="content">' +
-          '<h3>' + escapeHtml(heading) + '</h3>' +
-          (item.imageUrl ? '<img class="report-image" src="' + escapeHtml(item.imageUrl) + '" alt="">' : '') +
-          (item.subtitle ? '<p><strong>' + escapeHtml(item.subtitle) + '</strong></p>' : '') +
-          renderRichText(item.body || '') +
-          renderAgeContent(item.ageContent) +
+      const order = ['low', 'mid', 'high'];
+      const labels = { low: '目前最需要注意', mid: '已有基礎，下一步要固定', high: '狀態清楚，適合整理成可交代' };
+      const groups = order.map(function (key) { return { key: key, items: items.filter(function (item) { return item.rangeKey === key; }) }; }).filter(function (group) { return group.items.length; });
+      document.getElementById('matchedContent').innerHTML = groups.map(function (group) {
+        const cards = group.items.map(function (item) {
+          const heading = item.dimensionName || item.dimensionKey || '診斷';
+          return '<article class="diagnosis-card"><h4>' + escapeHtml(heading) + '</h4>' +
+            (item.subtitle ? '<p><strong>' + escapeHtml(item.subtitle) + '</strong></p>' : '') +
+            renderRichText(item.body || '') +
           '</article>';
+        }).join('');
+        return '<section class="diagnosis-group"><h3>' + escapeHtml(labels[group.key] || group.items[0].label || '診斷') + '</h3><div class="diagnosis-grid">' + cards + '</div>' + renderAgeGroupSummary(group) + '</section>';
       }).join('');
+    }
+
+    function renderAgeGroupSummary(group) {
+      const withAge = (group.items || []).filter(function (item) { return item.ageContent && (item.ageContent.body || item.ageContent.actionText); });
+      if (!withAge.length) return '';
+      const first = withAge[0].ageContent || {};
+      const names = withAge.map(function (item) { return item.dimensionName || item.dimensionKey; }).filter(Boolean).join('、');
+      const actions = withAge.slice(0, 5).map(function (item) {
+        const action = item.ageContent && item.ageContent.actionText ? item.ageContent.actionText : '';
+        return action ? '<li><strong>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '：</strong>' + renderInlineText(action.replace(/^[^：]{2,18}：/, '')) + '</li>' : '';
+      }).join('');
+      return '<article class="age-content"><p class="age-kicker">' + escapeHtml(first.ageGroupLabel || '目前年齡層') + '補充</p>' +
+        '<h4>' + escapeHtml((first.ageGroupLabel || '這個階段') + '，先看這幾個面向怎麼落地') + '</h4>' +
+        '<p>這一組落在「' + escapeHtml(group.items[0].label || '') + '」的面向包含：' + escapeHtml(names) + '。年齡補充不是重新評分，而是幫你判斷同樣的分數，放在現在的人生階段，哪些事情比較值得先安排。</p>' +
+        (actions ? '<ul class="age-action-list">' + actions + '</ul>' : '') +
+      '</article>';
     }
 
     function reportTemplateVars(summary) {
