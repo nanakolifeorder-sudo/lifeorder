@@ -2884,6 +2884,77 @@
       '</details>';
     }
 
+    function currentReportVersionMeta(res) {
+      const code = String(res.versionCode || field('reportVersion') || '').trim();
+      return (res.versions || []).find(function (v) { return String(v.version_code || '') === code; }) || { version_code: code };
+    }
+
+    function isFullReportEditorVersion(res) {
+      const version = currentReportVersionMeta(res);
+      const code = String(version.version_code || res.versionCode || '').toUpperCase();
+      const text = [code, version.name, version.description].map(function (value) { return String(value || '').toLowerCase(); }).join(' ');
+      return res.isFullVersion === true || ['B', 'PAID', 'FULL', 'PRO', 'PREMIUM'].includes(code) || /(980|付費|完整版|完整|paid|full|premium|pro)/i.test(text);
+    }
+
+    function completeAgeContents(res) {
+      const groups = res.ageGroups || [];
+      const dimensions = res.dimensions || [];
+      const existing = new Map((res.ageContents || []).map(function (item) { return [item.ageGroup + ':' + item.dimensionKey, item]; }));
+      const rows = [];
+      groups.forEach(function (group, groupIndex) {
+        dimensions.forEach(function (dimension, dimensionIndex) {
+          const key = group.key + ':' + dimension.dimension_key;
+          const item = existing.get(key) || {};
+          rows.push(Object.assign({
+            ageGroup: group.key,
+            ageGroupLabel: group.label,
+            dimensionKey: dimension.dimension_key,
+            dimensionName: dimension.name || dimension.dimension_key,
+            title: '',
+            body: '',
+            actionText: '',
+            sortOrder: (groupIndex + 1) * 1000 + (dimensionIndex + 1) * 10
+          }, item));
+        });
+      });
+      return rows;
+    }
+
+    function reportAgeContentForm(item) {
+      return '<details class="item age-content-row" data-age="' + escapeHtml(item.ageGroup || '') + '" data-dimension="' + escapeHtml(item.dimensionKey || '') + '">' +
+        '<summary><span>' + escapeHtml(item.ageGroupLabel || item.ageGroup || '') + '</span><span>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '</span><span>年齡補充</span></summary>' +
+        '<div class="details-body"><div class="row">' +
+          '<div class="col-4"><label>年齡層</label><input value="' + escapeHtml(item.ageGroupLabel || item.ageGroup || '') + '" disabled></div>' +
+          '<div class="col-4"><label>面向</label><input value="' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '" disabled></div>' +
+          '<div class="col-4"><label>小標</label><input class="age-title" value="' + escapeHtml(item.title || '') + '"></div>' +
+          '<div class="col-12"><label>年齡階段補充說明</label><textarea class="age-body" placeholder="說明這個年齡層在此面向為什麼重要、目前可能遇到什麼情境。">' + escapeHtml(item.body || '') + '</textarea></div>' +
+          '<div class="col-12"><label>下一步建議</label><textarea class="age-action" placeholder="給一段具體、溫和、可行的下一步。">' + escapeHtml(item.actionText || '') + '</textarea></div>' +
+        '</div></div></details>';
+    }
+
+    function renderAgeContentEditor(res) {
+      if (!isFullReportEditorVersion(res)) return '<div class="item"><h3>完整版年齡補充文案</h3><p class="mini">目前版本不是完整版，年齡層文案不會套用。請切換到完整版版本後再設定。</p></div>';
+      const rows = completeAgeContents(res);
+      const grouped = (res.ageGroups || []).map(function (group) {
+        const groupRows = rows.filter(function (item) { return item.ageGroup === group.key; });
+        return '<details class="item" open><summary><span>' + escapeHtml(group.label) + '</span><span>' + groupRows.length + ' 個面向</span><span>完整版</span></summary><div class="details-body">' + groupRows.map(reportAgeContentForm).join('') + '</div></details>';
+      }).join('');
+      return '<div class="item"><h3>完整版年齡補充文案</h3><p class="mini">這裡管理 6 年齡層 × 11 面向的補充建議。分數級距仍由上方 33 組分數文案負責，這裡只補上人生階段脈絡與下一步。</p></div><div id="reportAgeContents" class="list" style="margin-top:12px;">' + grouped + '</div>';
+    }
+
+    function collectAgeContents() {
+      return Array.from(document.querySelectorAll('.age-content-row')).map(function (row, index) {
+        return {
+          ageGroup: row.dataset.age || '',
+          dimensionKey: row.dataset.dimension || '',
+          title: row.querySelector('.age-title')?.value || '',
+          body: row.querySelector('.age-body')?.value || '',
+          actionText: row.querySelector('.age-action')?.value || '',
+          sortOrder: (index + 1) * 10
+        };
+      });
+    }
+
     function renderReportEditor(res) {
       const versions = (res.versions || []).map(function (v) { return '<option value="' + escapeHtml(v.version_code) + '"' + (v.version_code === res.versionCode ? ' selected' : '') + '>' + escapeHtml(v.name || v.version_code) + '</option>'; }).join('') || '<option value="A">A</option>';
       const versionSelect = document.getElementById('reportVersion');
@@ -2904,7 +2975,7 @@
               '<div class="col-3"><label>CTA 文字</label><input id="reportCtaLabel" value="' + escapeHtml(settings.booking_cta_label || '預約一對一諮詢') + '"></div>' +
             '</div></div>' +
             '<div class="actions"><button type="button" onclick="addReportBlock()">新增區塊</button><button class="secondary" type="button" onclick="refreshReportPreview()">更新預覽</button><button class="green" type="button" onclick="saveReportEditor()">儲存報告</button></div>' +
-            '<div class="list" id="reportBlocks" style="margin-top:12px;">' + blocks.map(reportBlockForm).join('') + '</div>' +
+            '<div class="list" id="reportBlocks" style="margin-top:12px;">' + blocks.map(reportBlockForm).join('') + '</div>' + renderAgeContentEditor(res) +
           '</div>' +
           '<div class="panel" style="margin:0;"><div class="row"><div class="col-7"><h2>預覽</h2></div><div class="col-5"><select id="reportPreviewMode" onchange="refreshReportPreview()"><option value="desktop">電腦版</option><option value="mobile">手機版</option></select></div></div><div id="reportPreview" class="preview-frame"></div></div>' +
         '</div>';
@@ -2980,7 +3051,8 @@
           showScoreTable: field('reportShowTable') !== 'false',
           bookingCtaLabel: field('reportCtaLabel') || '預約一對一諮詢'
         },
-        blocks: Array.from(document.querySelectorAll('.report-block-row')).map(collectReportBlock)
+        blocks: Array.from(document.querySelectorAll('.report-block-row')).map(collectReportBlock),
+        ageContents: collectAgeContents()
       };
     }
 

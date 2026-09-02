@@ -31,6 +31,10 @@
     .meter { height:8px; background:#e8eaed; border-radius:999px; overflow:hidden; margin-top:10px; }
     .meter span { display:block; height:100%; background:var(--green); width:0; }
     .content { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
+    .age-content { margin-top:16px; padding:14px 16px; border-left:4px solid var(--blue); background:#f8fbff; border-radius:8px; }
+    .age-content h4 { margin:4px 0 8px; font-size:18px; }
+    .age-content p:last-child { margin-bottom:0; }
+    .age-kicker { color:var(--blue); font-size:13px; font-weight:700; margin:0 0 4px; }
     .report-block { background:#fff; border:1px solid var(--line); border-radius:8px; padding:22px; box-shadow:0 8px 28px rgba(60,64,67,.08); margin-bottom:16px; }
     .content strong, .report-block strong { color:#174ea6; font-weight:800; }
     .report-highlight { background:linear-gradient(transparent 58%, rgba(251,188,5,.35) 58%); padding:0 2px; }
@@ -234,6 +238,16 @@
       return '<article class="content score-chart"><h2>' + escapeHtml(config.title || '多面向分數圖') + '</h2><div class="chart-wrap"><svg class="radar" viewBox="0 0 320 320" role="img" aria-label="多面向分數雷達圖">' + rings + axes + '<polygon class="radar-shape" points="' + shape + '"></polygon>' + dots + labels + '</svg></div></article>';
     }
 
+    function renderAgeContent(ageContent) {
+      if (!ageContent || (!ageContent.title && !ageContent.body && !ageContent.actionText)) return '';
+      return '<div class="age-content">' +
+        '<p class="age-kicker">' + escapeHtml(ageContent.ageGroupLabel || '目前年齡層') + '補充</p>' +
+        (ageContent.title ? '<h4>' + escapeHtml(ageContent.title) + '</h4>' : '') +
+        renderRichText(ageContent.body || '') +
+        (ageContent.actionText ? '<p><strong>下一步：</strong>' + renderInlineText(ageContent.actionText) + '</p>' : '') +
+      '</div>';
+    }
+
     function renderMatchedContent(items) {
       if (!Array.isArray(items) || !items.length) return;
       document.getElementById('contentSection').classList.remove('hidden');
@@ -244,6 +258,7 @@
           (item.imageUrl ? '<img class="report-image" src="' + escapeHtml(item.imageUrl) + '" alt="">' : '') +
           (item.subtitle ? '<p><strong>' + escapeHtml(item.subtitle) + '</strong></p>' : '') +
           renderRichText(item.body || '') +
+          renderAgeContent(item.ageContent) +
           '</article>';
       }).join('');
     }
