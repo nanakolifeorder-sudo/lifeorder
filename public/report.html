@@ -31,11 +31,23 @@
     .meter { height:8px; background:#e8eaed; border-radius:999px; overflow:hidden; margin-top:10px; }
     .meter span { display:block; height:100%; background:var(--green); width:0; }
     .content { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
-    .diagnosis-group { border-top:1px solid var(--line); padding-top:18px; margin-top:18px; }
+    .diagnosis-group { border-top:1px solid var(--line); padding-top:20px; margin-top:22px; }
     .diagnosis-group:first-child { border-top:0; padding-top:0; margin-top:0; }
-    .diagnosis-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-    .diagnosis-card { border:1px solid var(--line); border-radius:8px; padding:16px; background:#fff; }
+    .diagnosis-group h3 { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:#eef4ff; color:#174ea6; font-size:16px; }
+    .diagnosis-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:14px; }
+    .diagnosis-card { border:1px solid var(--line); border-radius:8px; padding:0; background:#fff; overflow:hidden; }
+    .diagnosis-card.low { border-color:#f4c7c3; }
+    .diagnosis-card.mid { border-color:#fdd663; }
+    .diagnosis-card.high { border-color:#b7dfc3; }
+    .diagnosis-card-top { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:12px 14px; background:#f8fafc; border-bottom:1px solid var(--line); }
+    .diagnosis-card.low .diagnosis-card-top { background:#fff7f6; }
+    .diagnosis-card.mid .diagnosis-card-top { background:#fffaf0; }
+    .diagnosis-card.high .diagnosis-card-top { background:#f3fbf5; }
+    .dimension-pill { color:#174ea6; font-size:13px; font-weight:800; letter-spacing:0; }
+    .score-badge { min-width:58px; text-align:center; border-radius:999px; padding:3px 8px; color:#174ea6; background:#eef4ff; font-weight:800; font-size:13px; }
+    .diagnosis-card-body { padding:14px 16px 16px; }
     .diagnosis-card h4 { margin:0 0 8px; font-size:17px; }
+    .diagnosis-card p { margin-bottom:8px; }
     .age-content { margin-top:16px; padding:16px 18px; border-left:4px solid var(--blue); background:#f8fbff; border-radius:8px; }
     .age-content h4 { margin:4px 0 8px; font-size:18px; }
     .age-content p:last-child { margin-bottom:0; }
@@ -50,13 +62,23 @@
     .guide-steps { display:grid; gap:10px; }
     .guide-step { display:grid; grid-template-columns:28px 1fr; gap:10px; align-items:start; color:var(--muted); }
     .step-no { width:28px; height:28px; border-radius:999px; background:#eef4ff; color:var(--blue); display:flex; align-items:center; justify-content:center; font-weight:800; }
-    .axis-strip { margin-top:16px; border:1px solid var(--line); border-radius:8px; padding:14px; background:#fff; }
-    .axis-list { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px 12px; margin-top:10px; }
-    .axis-item { color:var(--muted); font-size:14px; }
-    .timeline { display:flex; gap:8px; margin-top:12px; overflow-x:auto; padding-bottom:6px; }
-    .time-item { min-width:126px; border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
-    .time-item strong { display:block; color:var(--ink); }
-    .time-item span { color:var(--muted); font-size:13px; }
+    .timeline-panel { margin-top:16px; border:1px solid #e8d4ad; border-radius:8px; padding:18px; background:linear-gradient(180deg,#fffdf8,#fffaf0); overflow:hidden; }
+    .timeline-panel h3 { margin:0 0 2px; font-size:22px; color:#243b5a; }
+    .timeline-panel .timeline-subtitle { color:#3c4043; margin-bottom:18px; }
+    .timeline-rail { display:grid; grid-template-columns:repeat(6,minmax(130px,1fr)); gap:0; position:relative; min-width:760px; }
+    .timeline-rail::before { content:''; position:absolute; left:18px; right:18px; top:46px; height:4px; background:linear-gradient(90deg,#7aa34a,#3f75b5,#369d92,#e37c21,#8055a0,#df7580); border-radius:999px; }
+    .life-stage { position:relative; padding:0 10px; text-align:center; }
+    .stage-icon { width:42px; height:42px; margin:0 auto 10px; border-radius:999px; background:#fff; border:2px solid currentColor; display:flex; align-items:center; justify-content:center; font-weight:800; }
+    .stage-dot { width:12px; height:12px; border-radius:999px; background:currentColor; margin:0 auto 12px; position:relative; z-index:1; box-shadow:0 0 0 4px #fffaf0; }
+    .life-stage.active .stage-dot { width:18px; height:18px; margin-top:-3px; box-shadow:0 0 0 5px #fffaf0,0 0 0 9px rgba(26,115,232,.2); }
+    .life-stage.active .stage-person { display:block; }
+    .stage-person { display:none; position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:18px; height:30px; color:#1a73e8; }
+    .stage-person::before { content:''; position:absolute; top:0; left:5px; width:8px; height:8px; border-radius:999px; background:currentColor; }
+    .stage-person::after { content:''; position:absolute; top:10px; left:8px; width:3px; height:18px; background:currentColor; box-shadow:-7px 7px 0 -1px currentColor,7px 7px 0 -1px currentColor; }
+    .life-stage strong { display:block; color:var(--ink); font-size:15px; }
+    .life-stage em { display:block; color:currentColor; font-style:normal; font-weight:800; }
+    .life-stage ul { margin:8px 0 0; padding-left:18px; text-align:left; color:var(--muted); font-size:13px; }
+    .stage-focus { margin-top:10px; border:1px solid currentColor; border-radius:8px; padding:7px 8px; background:rgba(255,255,255,.72); color:currentColor; font-size:13px; font-weight:800; }
     .report-block { background:#fff; border:1px solid var(--line); border-radius:8px; padding:22px; box-shadow:0 8px 28px rgba(60,64,67,.08); margin-bottom:16px; }
     .content strong, .report-block strong { color:#174ea6; font-weight:800; }
     .report-highlight { background:linear-gradient(transparent 58%, rgba(251,188,5,.35) 58%); padding:0 2px; }
@@ -69,7 +91,7 @@
     .muted { color:var(--muted); font-size:14px; }
     .error { color:#d93025; font-weight:700; }
     .hidden { display:none !important; }
-    @media (max-width:720px) { main{padding:16px 12px 44px}.hero,.section{padding:18px}.grid,.score-snapshot,.guide,.diagnosis-grid{grid-template-columns:1fr}.axis-list{grid-template-columns:repeat(2,minmax(0,1fr))}.button{width:100%}.radar{max-width:100%} }
+    @media (max-width:720px) { main{padding:16px 12px 44px}.hero,.section{padding:18px}.grid,.score-snapshot,.guide,.diagnosis-grid{grid-template-columns:1fr}.timeline-panel{overflow-x:auto}.button{width:100%}.radar{max-width:100%} }
   </style>
 </head>
 <body>
@@ -222,18 +244,36 @@
       document.getElementById('scores').innerHTML = items.map(function (item) {
         return '<div class="score"><div class="score-head"><h3>' + escapeHtml(item.name) + '</h3><span class="score-value">' + item.displayScore + (item.displayMax ? '/' + item.displayMax : '') + '</span></div><div class="meter"><span style="width:' + Math.round(item.pct * 100) + '%"></span></div><p>' + escapeHtml(descriptions[item.key] || item.description || '') + '</p></div>';
       }).join('');
-      renderLifeOrderGuide(items);
+      renderLifeOrderGuide(items, summary);
     }
 
 
-    function renderLifeOrderGuide(items) {
+    function renderLifeOrderGuide(items, summary) {
       const target = document.getElementById('lifeOrderGuide');
       if (!target) return;
-      const axisNames = (items || []).map(function (item, index) { return '<span class="axis-item">' + (index + 1) + ' ' + escapeHtml(item.name) + '</span>'; }).join('');
+      const ageGroup = summary && summary.demographics ? summary.demographics.ageGroup : '';
+      const stages = [
+        { key:'under_20', age:'0-20歲', name:'探索期', color:'#6b9238', icon:'芽', points:['認識自己、探索興趣','建立學習能力與習慣','家庭支持與價值觀養成'], focus:'建立自我認同與價值觀基礎' },
+        { key:'20_30', age:'20-30歲', name:'奠基期', color:'#3f75b5', icon:'跑', points:['學習與職涯發展','建立人際關係與社交圈','財務基礎與理財觀念'], focus:'能力累積與生活基礎建立' },
+        { key:'35_45', age:'30-45歲', name:'成長期', color:'#2d9a8a', icon:'山', points:['事業發展與自我實現','家庭經營與關係深化','資產累積與風險規劃'], focus:'平衡工作、家庭與自我成長' },
+        { key:'45_55', age:'45-60歲', name:'收穫期', color:'#d86f1f', icon:'樹', points:['資產穩定與財務優化','培養下一代與傳承準備','生活品質與健康管理'], focus:'人生整合與傳承規劃開始' },
+        { key:'65_75', age:'60-75歲', name:'豐盛期', color:'#8055a0', icon:'椅', points:['享受生活與興趣投入','分享經驗與回饋社會','身後事項重要安排完成'], focus:'持續創造價值與心靈豐盛' },
+        { key:'75_plus', age:'75歲以上', name:'傳承期', color:'#d96f79', icon:'心', points:['生命傳承與精神延續','珍惜當下與陪伴家人','留下愛與祝福'], focus:'安心生活、愛的傳承與祝福' }
+      ];
+      const activeKey = ageGroup === 'under_35' ? '35_45' : ageGroup;
+      const stageHtml = stages.map(function (stage) {
+        const active = stage.key === activeKey;
+        return '<div class="life-stage' + (active ? ' active' : '') + '" style="color:' + stage.color + '">' +
+          '<span class="stage-person" aria-hidden="true"></span><div class="stage-icon">' + escapeHtml(stage.icon) + '</div><div class="stage-dot"></div>' +
+          '<strong>' + escapeHtml(stage.age) + '</strong><em>' + escapeHtml(stage.name) + '</em>' +
+          '<ul>' + stage.points.map(function (point) { return '<li>' + escapeHtml(point) + '</li>'; }).join('') + '</ul>' +
+          '<div class="stage-focus">' + escapeHtml(stage.focus) + '</div>' +
+        '</div>';
+      }).join('');
       target.innerHTML = '<div class="guide">' +
         '<article class="guide-box"><h3>如何閱讀這張圖</h3><div class="guide-steps">' +
           '<div class="guide-step"><span class="step-no">1</span><p><strong>先看形狀。</strong> 雷達圖不是要追求完美圓，而是看哪些面向明顯凹下去，哪些面向已經能支撐你。</p></div>' +
-          '<div class="guide-step"><span class="step-no">2</span><p><strong>再看落差。</strong> 同樣 60 分，有些是已經能用但還沒固定，有些是遇到臨時狀況就會卡住。</p></div>' +
+          '<div class="guide-step"><span class="step-no">2</span><p><strong>再看落差。</strong> 同樣 60 分，放在不同年齡、職業與家庭責任裡，優先順序會不一樣。</p></div>' +
           '<div class="guide-step"><span class="step-no">3</span><p><strong>最後決定順序。</strong> 先處理最容易造成生活摩擦、家人接手困難或長期懸念的那一塊。</p></div>' +
         '</div></article>' +
         '<article class="guide-box"><h3>分數說明</h3><div class="legend">' +
@@ -243,15 +283,7 @@
           '<div class="legend-row"><span class="legend-chip" style="background:#dd6b75"></span><p><strong>0-29</strong> 失序感較高，優先處理最卡的一件事。</p></div>' +
         '</div></article>' +
       '</div>' +
-      '<div class="axis-strip"><h3>11 個面向</h3><div class="axis-list">' + axisNames + '</div></div>' +
-      '<div class="axis-strip"><h3>生命時間軸</h3><div class="timeline">' +
-        '<div class="time-item"><strong>0-20歲</strong><span>探索期</span></div>' +
-        '<div class="time-item"><strong>20-30歲</strong><span>奠基期</span></div>' +
-        '<div class="time-item"><strong>30-45歲</strong><span>成長期</span></div>' +
-        '<div class="time-item"><strong>45-60歲</strong><span>收穫期</span></div>' +
-        '<div class="time-item"><strong>60-75歲</strong><span>豐盛期</span></div>' +
-        '<div class="time-item"><strong>75歲以上</strong><span>傳承期</span></div>' +
-      '</div></div>';
+      '<div class="timeline-panel"><h3>生命時間軸</h3><p class="timeline-subtitle">在人生的不同階段，逐步建立秩序，活出有方向、有價值的人生。</p><div class="timeline-rail">' + stageHtml + '</div></div>';
     }
 
     function polygonPoints(items, radius, center) {
@@ -305,15 +337,17 @@
       if (!Array.isArray(items) || !items.length) return;
       document.getElementById('contentSection').classList.remove('hidden');
       const order = ['low', 'mid', 'high'];
-      const labels = { low: '目前最需要注意', mid: '已有基礎，下一步要固定', high: '狀態清楚，適合整理成可交代' };
+      const labels = { low: '優先整理區', mid: '穩定養成區', high: '可交代優勢區' };
       const groups = order.map(function (key) { return { key: key, items: items.filter(function (item) { return item.rangeKey === key; }) }; }).filter(function (group) { return group.items.length; });
       document.getElementById('matchedContent').innerHTML = groups.map(function (group) {
         const cards = group.items.map(function (item) {
           const heading = item.dimensionName || item.dimensionKey || '診斷';
-          return '<article class="diagnosis-card"><h4>' + escapeHtml(heading) + '</h4>' +
+          const score = item.score === undefined || item.score === null ? '' : '<span class="score-badge">' + escapeHtml(item.score) + '分</span>';
+          return '<article class="diagnosis-card ' + escapeHtml(group.key) + '"><div class="diagnosis-card-top"><span class="dimension-pill">' + escapeHtml(heading) + '</span>' + score + '</div><div class="diagnosis-card-body">' +
+            '<h4>' + escapeHtml(item.title || heading) + '</h4>' +
             (item.subtitle ? '<p><strong>' + escapeHtml(item.subtitle) + '</strong></p>' : '') +
             renderRichText(item.body || '') +
-          '</article>';
+          '</div></article>';
         }).join('');
         return '<section class="diagnosis-group"><h3>' + escapeHtml(labels[group.key] || group.items[0].label || '診斷') + '</h3><div class="diagnosis-grid">' + cards + '</div>' + renderAgeGroupSummary(group) + '</section>';
       }).join('');
