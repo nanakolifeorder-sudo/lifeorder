@@ -54,15 +54,17 @@
           <div class="field"><label for="clientName">姓名 *</label><input id="clientName" autocomplete="name" required></div>
           <div class="field"><label for="clientEmail">Email *</label><input id="clientEmail" type="email" autocomplete="email" required></div>
           <div class="field"><label for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
-          <div class="field"><label for="accessCode">折扣碼 / 重測碼</label><input id="accessCode" autocomplete="off" placeholder="已有代碼再填寫"></div>
+          <div class="field"><label for="clientAge">年齡</label><input id="clientAge" inputmode="numeric" autocomplete="off" placeholder="例：38"></div>
+          <div class="field"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
+          <div class="field" id="accessCodeField"><label for="accessCode">折扣碼 / 重測碼</label><input id="accessCode" autocomplete="off" placeholder="已有代碼再填寫"></div>
         </section>
 
         <div class="progress"><div class="bar" id="bar"></div></div>
         <section id="questionPanel"></section>
         <div class="actions">
-          <button type="button" class="secondary" id="prevBtn">上一階段</button>
-          <button type="button" id="nextBtn">下一階段</button>
-          <button type="submit" id="submitBtn" class="hidden">送出檢測</button>
+          <button type="button" class="secondary hidden" id="prevBtn">上一階段</button>
+          <button type="button" class="hidden" id="nextBtn">下一階段</button>
+          <button type="submit" id="submitBtn">送出檢測</button>
         </div>
       </form>
 
@@ -94,15 +96,20 @@
       return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
     }
 
+    function isFreeVersion() {
+      const code = String(config?.versionCode || versionCode || 'A').trim().toUpperCase();
+      const text = [code, config?.version?.name, config?.version?.description].map(function (value) { return String(value || '').toLowerCase(); }).join(' ');
+      if (['A', 'FREE', 'TRIAL', 'SIMPLE'].includes(code)) return true;
+      return /(免費|簡易|free|trial|simple)/i.test(text) && !/(980|付費|完整版|完整|paid|full|premium|pro)/i.test(text);
+    }
+
     function groupStages() {
-      const byKey = new Map();
-      (config.stages || []).forEach(function (stage) { byKey.set(stage.stage_key || stage.stageKey, Object.assign({}, stage, { questions: [] })); });
-      (config.questions || []).forEach(function (question) {
-        const key = question.stageKey || question.stage_key || '1';
-        if (!byKey.has(key)) byKey.set(key, { stage_key: key, title: '第 ' + key + ' 階段', description: '', questions: [] });
-        byKey.get(key).questions.push(question);
-      });
-      stages = Array.from(byKey.values()).filter(function (stage) { return stage.questions.length; });
+      stages = [{
+        stage_key: '1',
+        title: '測驗題目',
+        description: '',
+        questions: (config.questions || []).slice()
+      }].filter(function (stage) { return stage.questions.length; });
     }
 
     function inputName(question) { return 'q_' + question.id; }
@@ -161,13 +168,15 @@
 
     function renderStage() {
       const stage = stages[currentStage];
-      document.getElementById('identityPanel').classList.toggle('hidden', currentStage !== 0);
-      document.getElementById('bar').style.width = stages.length ? Math.round(((currentStage + 1) / stages.length) * 100) + '%' : '0%';
-      document.getElementById('questionPanel').innerHTML = '<div class="stage-title"><h2>' + escapeHtml(stage.title || ('第 ' + (currentStage + 1) + ' 階段')) + '</h2><p>' + escapeHtml(stage.description || '') + '</p></div>' + stage.questions.map(renderQuestion).join('');
+      document.getElementById('identityPanel').classList.remove('hidden');
+      document.getElementById('accessCodeField').classList.toggle('hidden', isFreeVersion());
+      document.getElementById('bar').style.width = '100%';
+      document.getElementById('questionPanel').innerHTML = '<div class="stage-title"><h2>' + escapeHtml(stage.title || '測驗題目') + '</h2><p>' + escapeHtml(stage.description || '') + '</p></div>' + stage.questions.map(renderQuestion).join('');
       restoreStageAnswers();
-      document.getElementById('prevBtn').disabled = currentStage === 0;
-      document.getElementById('nextBtn').classList.toggle('hidden', currentStage >= stages.length - 1);
-      document.getElementById('submitBtn').classList.toggle('hidden', currentStage < stages.length - 1);
+      document.getElementById('prevBtn').classList.add('hidden');
+      document.getElementById('nextBtn').classList.add('hidden');
+      document.getElementById('submitBtn').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function validateStage() {
@@ -210,7 +219,11 @@
         name: document.getElementById('clientName').value.trim(),
         email: document.getElementById('clientEmail').value.trim(),
         phone: document.getElementById('clientPhone').value.trim(),
-        answers: collectAnswers()
+        accessCode: document.getElementById('accessCode')?.value.trim() || '',
+        answers: Object.assign(collectAnswers(), {
+          _profile_age: document.getElementById('clientAge').value.trim(),
+          _profile_occupation: document.getElementById('clientOccupation').value.trim()
+        })
       }).then(function (res) {
         if (!res.success) {
           if (res.code === 'QUIZ_ALREADY_COMPLETED' && res.existingReportUrl) {

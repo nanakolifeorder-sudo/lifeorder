@@ -1560,10 +1560,18 @@
       try {
         const parsed = JSON.parse(text);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          const entries = Object.entries(parsed).slice(0, 4);
+          const labels = { _profile_age: '年齡', _profile_occupation: '職業' };
+          const entries = Object.entries(parsed)
+            .filter(function (entry) { return entry[1] !== null && entry[1] !== undefined && String(Array.isArray(entry[1]) ? entry[1].join('') : entry[1]).trim(); })
+            .sort(function (a, b) {
+              const order = { _profile_age: 1, _profile_occupation: 2 };
+              return (order[a[0]] || 99) - (order[b[0]] || 99);
+            })
+            .slice(0, 5);
           return entries.map(function (entry) {
             const value = Array.isArray(entry[1]) ? entry[1].join('、') : entry[1];
-            return '<div class="crm-answer-line"><strong>題目 ' + escapeHtml(entry[0]) + '</strong>：' + escapeHtml(value) + '</div>';
+            const label = labels[entry[0]] || ('題目 ' + entry[0]);
+            return '<div class="crm-answer-line"><strong>' + escapeHtml(label) + '</strong>：' + escapeHtml(value) + '</div>';
           }).join('');
         }
       } catch (_err) {}
@@ -3748,8 +3756,4 @@
   </script>
 </body>
 </html>
-
-
-
-
 
