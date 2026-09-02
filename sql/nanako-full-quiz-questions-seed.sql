@@ -215,7 +215,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'external', 7, '🔵數位　你的帳號密碼管理？', '資訊｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"資1","dimensionKey":"information","dimensionName":"資訊","orderName":"外在秩序"}'::jsonb, 70, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'external', 7, '你的帳號密碼管理？', '資訊｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"資1","dimensionKey":"information","dimensionName":"資訊","orderName":"外在秩序"}'::jsonb, 70, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -244,7 +244,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'external', 8, '🔵數位　你的重要檔案與照片（雲端／裝置）？', '資訊｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"資2","dimensionKey":"information","dimensionName":"資訊","orderName":"外在秩序"}'::jsonb, 80, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'external', 8, '你的重要檔案與照片（雲端／裝置）？', '資訊｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"資2","dimensionKey":"information","dimensionName":"資訊","orderName":"外在秩序"}'::jsonb, 80, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -273,7 +273,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'external', 9, '🔵數位　萬一你無法使用手機／電腦，家人進得去你的 email 與重要帳號嗎？', '資訊｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"資3","dimensionKey":"information","dimensionName":"資訊","orderName":"外在秩序"}'::jsonb, 90, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'external', 9, '萬一你無法使用手機／電腦，家人進得去你的 email 與重要帳號嗎？', '資訊｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"資3","dimensionKey":"information","dimensionName":"資訊","orderName":"外在秩序"}'::jsonb, 90, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -302,7 +302,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'external', 10, '🟣AI　你越來越依賴 AI（ChatGPT／Claude 等）處理工作與生活，你清楚這些對話紀錄、自訂指令、上傳資料累積了什麼、又存在哪裡嗎？', '資訊｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"資4","dimensionKey":"information","dimensionName":"資訊","orderName":"外在秩序"}'::jsonb, 100, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'external', 10, '你越來越依賴 AI（ChatGPT／Claude 等）處理工作與生活，你清楚這些對話紀錄、自訂指令、上傳資料累積了什麼、又存在哪裡嗎？', '資訊｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"資4","dimensionKey":"information","dimensionName":"資訊","orderName":"外在秩序"}'::jsonb, 100, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -389,7 +389,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'external', 13, '🔵數位　你的數位金融資產（加密貨幣、比特幣、冷錢包、交易所、私鑰、資產代幣化）整理與保管的狀態？', '資產｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"產3","dimensionKey":"assets","dimensionName":"資產","orderName":"外在秩序"}'::jsonb, 130, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'external', 13, '你的數位金融資產（加密貨幣、比特幣、冷錢包、交易所、私鑰、資產代幣化）整理與保管的狀態？', '資產｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"產3","dimensionKey":"assets","dimensionName":"資產","orderName":"外在秩序"}'::jsonb, 130, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -419,7 +419,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'external', 14, '🔵數位　數位收益與智財（自媒體分潤、線上課程、數位著作）？', '資產｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"產4","dimensionKey":"assets","dimensionName":"資產","orderName":"外在秩序"}'::jsonb, 140, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'external', 14, '數位收益與智財（自媒體分潤、線上課程、數位著作）？', '資產｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"產4","dimensionKey":"assets","dimensionName":"資產","orderName":"外在秩序"}'::jsonb, 140, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -449,7 +449,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'external', 15, '🟣AI　付費 AI 帳號盤點：你清楚自己有幾個付費 AI、各自費用、以及累積的價值（對話、知識庫、API 餘額）嗎？', '資產｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"產5","dimensionKey":"assets","dimensionName":"資產","orderName":"外在秩序"}'::jsonb, 150, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'external', 15, '付費 AI 帳號盤點：你清楚自己有幾個付費 AI、各自費用、以及累積的價值（對話、知識庫、API 餘額）嗎？', '資產｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"產5","dimensionKey":"assets","dimensionName":"資產","orderName":"外在秩序"}'::jsonb, 150, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -1203,7 +1203,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'continuity', 41, '🔵數位　家庭的數位照片、影片、對話記錄，有整理與保存嗎？（避免哪天帳號消失就不見）', '家文化｜延續秩序', 'single', true, 'option_weights', '{"sourceCode":"家4","dimensionKey":"family_culture","dimensionName":"家文化","orderName":"延續秩序"}'::jsonb, 410, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'continuity', 41, '家庭的數位照片、影片、對話記錄，有整理與保存嗎？（避免哪天帳號消失就不見）', '家文化｜延續秩序', 'single', true, 'option_weights', '{"sourceCode":"家4","dimensionKey":"family_culture","dimensionName":"家文化","orderName":"延續秩序"}'::jsonb, 410, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -1319,7 +1319,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'continuity', 45, '🔵數位　你的數位資產（帳號／加密貨幣／雲端／AI）有交代身後由誰、如何處理嗎？', '傳承｜延續秩序', 'single', true, 'option_weights', '{"sourceCode":"傳4","dimensionKey":"legacy","dimensionName":"傳承","orderName":"延續秩序"}'::jsonb, 450, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'continuity', 45, '你的數位資產（帳號／加密貨幣／雲端／AI）有交代身後由誰、如何處理嗎？', '傳承｜延續秩序', 'single', true, 'option_weights', '{"sourceCode":"傳4","dimensionKey":"legacy","dimensionName":"傳承","orderName":"延續秩序"}'::jsonb, 450, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -1348,7 +1348,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'P01', 'B', 'continuity', 46, '🟣AI　AI 聲音克隆、數位分身、你訓練過的 AI——你想過身後怎麼處理嗎？（繼續／封存／授權家人／刪除）', '傳承｜延續秩序', 'single', true, 'option_weights', '{"sourceCode":"傳5","dimensionKey":"legacy","dimensionName":"傳承","orderName":"延續秩序"}'::jsonb, 460, '啟用', now())
+  values('lifeorder', 'P01', 'B', 'continuity', 46, 'AI 聲音克隆、數位分身、你訓練過的 AI——你想過身後怎麼處理嗎？（繼續／封存／授權家人／刪除）', '傳承｜延續秩序', 'single', true, 'option_weights', '{"sourceCode":"傳5","dimensionKey":"legacy","dimensionName":"傳承","orderName":"延續秩序"}'::jsonb, 460, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -1425,4 +1425,5 @@ update quiz_question_options o
    and q.status not in ('deleted')
    and o.status not in ('deleted');
 commit;
+
 
