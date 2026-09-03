@@ -4,11 +4,11 @@ Systeme / ClickFunnels iframe 安裝碼
 請替換：
 1. src 裡的 Vercel 網址，例如 https://dm-booking-saas.vercel.app
 2. tenant：使用者代碼，例如 dm-test
-3. p：專案代碼，例如 P01
+3. p：專案代碼，例如 LO
 -->
 
 <iframe
-  src="https://dm-booking-saas.vercel.app/booking?tenant=dm-test&p=P01"
+  src="https://dm-booking-saas.vercel.app/booking?tenant=dm-test&p=LO"
   title="線上預約"
   width="100%"
   height="900"
@@ -16,3 +16,4 @@ Systeme / ClickFunnels iframe 安裝碼
   style="width:100%;min-height:900px;border:0;display:block;"
   referrerpolicy="strict-origin-when-cross-origin"
 ></iframe>
+

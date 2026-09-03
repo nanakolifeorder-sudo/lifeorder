@@ -379,7 +379,7 @@ alter table tenants add column if not exists zoom_client_id text default '';
 alter table tenants add column if not exists zoom_client_secret text default '';
 alter table consultants add column if not exists max_daily_bookings integer not null default 0;
 
-alter table projects add column if not exists default_quiz_version_code text not null default 'A';
+alter table projects add column if not exists default_quiz_version_code text not null default 'LITE';
 alter table quiz_score_dimensions add column if not exists display_max_score numeric(10,2);
 alter table quiz_score_dimensions add column if not exists display_score_format text not null default 'number';
 alter table quiz_score_dimensions add column if not exists rounding_mode text not null default 'round';
@@ -423,7 +423,7 @@ alter table page_views add column if not exists page_type text not null default 
 alter table page_views add column if not exists metadata jsonb not null default '{}'::jsonb;
 
 insert into quiz_versions(tenant_slug, project_code, version_code, name, status)
-select p.tenant_slug, p.code, coalesce(nullif(p.default_quiz_version_code, ''), 'A'), '預設版本', '啟用'
+select p.tenant_slug, p.code, coalesce(nullif(p.default_quiz_version_code, ''), 'LITE'), '預設版本', '啟用'
   from projects p
 on conflict (tenant_slug, project_code, version_code) do nothing;
 

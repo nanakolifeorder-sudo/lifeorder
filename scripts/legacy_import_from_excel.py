@@ -261,7 +261,7 @@ def main():
         upper = text.upper()
         if any(project["code"] == upper for project in projects):
             return upper
-        return "P01"
+        return "LO"
 
     def record_from(row, kind):
         raw_project = clean(cell(row, 1))
@@ -391,3 +391,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

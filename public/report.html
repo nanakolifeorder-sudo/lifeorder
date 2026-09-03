@@ -129,7 +129,7 @@
     const params = new URLSearchParams(location.search);
     const isLocalPreview = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     const tenant = (params.get('tenant') || params.get('t') || (isLocalPreview ? 'dm-test' : '')).toLowerCase();
-    const projectCode = (params.get('p') || 'P01').toUpperCase();
+    const projectCode = (params.get('p') || 'LO').toUpperCase();
     const qrid = params.get('qrid') || params.get('quizResultId') || params.get('rid') || '';
     const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
 
@@ -479,6 +479,7 @@
   </script>
 </body>
 </html>
+
 
 
 

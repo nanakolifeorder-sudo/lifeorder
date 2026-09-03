@@ -40,7 +40,8 @@ function normalizeTenant(value) {
 }
 
 function normalizeProject(value) {
-  return String(value || 'P01').trim().toUpperCase() || 'P01';
+  const code = String(value || 'LO').trim().toUpperCase() || 'LO';
+  return code === 'P01' ? 'LO' : code;
 }
 
 async function applySql(client, file) {
@@ -60,8 +61,8 @@ async function main() {
   const adminName = env('CLIENT_ADMIN_NAME', 'Life Order 管理員');
   const adminEmail = required('CLIENT_ADMIN_EMAIL');
   const adminPassword = required('CLIENT_ADMIN_PASSWORD');
-  const projectCode = normalizeProject(env('CLIENT_PROJECT_CODE', 'P01'));
-  const projectName = env('CLIENT_PROJECT_NAME', '人生診斷卡點');
+  const projectCode = normalizeProject(env('CLIENT_PROJECT_CODE', 'LO'));
+  const projectName = env('CLIENT_PROJECT_NAME', '人生秩序整理');
   const appBaseUrl = env('APP_URL', '');
   const webhookSecret = env('WEBHOOK_SECRET', crypto.randomBytes(24).toString('hex'));
   const passwordHash = await bcrypt.hash(String(adminPassword), 12);
@@ -94,12 +95,12 @@ async function main() {
 
     await client.query(
       `insert into projects(tenant_slug, code, name, status, quiz_enabled, default_quiz_version_code)
-       values($1,$2,$3,'啟用',true,'A')
+       values($1,$2,$3,'啟用',true,'LITE')
        on conflict(tenant_slug, code) do update set
          name = excluded.name,
          status = excluded.status,
          quiz_enabled = true,
-         default_quiz_version_code = 'A'`,
+         default_quiz_version_code = 'LITE'`,
       [tenant, projectCode, projectName]
     );
 
@@ -142,3 +143,4 @@ main().catch(error => {
   console.error(error.stack || error.message || error);
   process.exit(1);
 });
+

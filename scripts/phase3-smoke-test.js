@@ -37,7 +37,7 @@ async function main() {
   loadEnvFile(path.join(process.cwd(), '.env'));
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set.');
   const tenant = normalizeTenant(process.env.TEST_TENANT || 'dm-test');
-  const projectCode = String(process.env.TEST_PROJECT || 'P01').toUpperCase();
+  const projectCode = String(process.env.TEST_PROJECT || 'LO').toUpperCase();
   const req = { method: 'POST', headers: {}, socket: {} };
 
   const config = await routeAction('getQuizConfig', { projectCode }, req, tenant);
@@ -65,3 +65,4 @@ main().catch(error => {
   console.error(error.message || error);
   process.exit(1);
 });
+

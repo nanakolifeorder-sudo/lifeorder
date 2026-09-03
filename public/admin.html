@@ -987,12 +987,12 @@
       const panel = document.getElementById('accessCodeFormPanel');
       const projects = cache.accessCodes?.projects || [];
       const projectOptions = projects.map(function (p) {
-        const selected = (item?.projectCode || (accessCodeProject !== 'ALL' ? accessCodeProject : 'P01')) === p.code;
+        const selected = (item?.projectCode || (accessCodeProject !== 'ALL' ? accessCodeProject : 'LO')) === p.code;
         return '<option value="' + escapeHtml(p.code) + '"' + (selected ? ' selected' : '') + '>' + escapeHtml(p.name || p.code) + '</option>';
       }).join('');
       panel.innerHTML = '<h3>' + (item ? '編輯代碼' : '新增代碼') + '</h3><div class="row">' +
         '<div class="col-3"><label>專案</label><select id="accessProject">' + projectOptions + '</select></div>' +
-        '<div class="col-2"><label>版本</label><input id="accessVersion" value="' + escapeHtml(item?.versionCode || 'A') + '" placeholder="A"></div>' +
+        '<div class="col-2"><label>版本</label><input id="accessVersion" value="' + escapeHtml(item?.versionCode || 'LITE') + '" placeholder="LITE"></div>' +
         '<div class="col-3"><label>代碼</label><input id="accessCode" value="' + escapeHtml(item?.code || '') + '" placeholder="例如：RETAKE980"></div>' +
         '<div class="col-2"><label>類型</label><select id="accessType">' + accessCodeTypeOptions(item?.codeType || 'retest') + '</select></div>' +
         '<div class="col-2"><label>狀態</label><select id="accessStatus">' + accessCodeStatusOptions(item?.status || '啟用') + '</select></div>' +
@@ -1105,8 +1105,8 @@
 
     function quizVersionLabel(value) {
       const code = String(value || '').trim().toUpperCase();
-      if (code === 'A') return '簡易版';
-      if (code === 'B') return '完整版';
+      if (code === 'LITE' || code === 'A') return '簡易版';
+      if (code === 'FULL' || code === 'B') return '完整版';
       return code || '預設';
     }
 
@@ -1648,7 +1648,7 @@
       const dialog = detailDialog();
       dialog.querySelector('.dialog-body').innerHTML = '<h2>客戶資料卡</h2><p>載入中...</p>';
       dialog.showModal();
-      api('getCRMContactDetail', { contactId: item.crmContactId || 0, email: item.clientEmail || '', projectCode: item.projectCode || 'P01' })
+      api('getCRMContactDetail', { contactId: item.crmContactId || 0, email: item.clientEmail || '', projectCode: item.projectCode || 'LO' })
         .then(renderClientDetail)
         .catch(function (err) { dialog.querySelector('.dialog-body').innerHTML = '<h2>客戶資料卡</h2><p class="bad">' + escapeHtml(err.message || err) + '</p><div class="actions"><button class="secondary" onclick="detailDialog().close()">關閉</button></div>'; });
     }
@@ -2304,7 +2304,7 @@
     function projectForm(row) {
       const bookingUrl = row.bookingUrl || '';
       const baseUrl = bookingUrl ? bookingUrl.split('/booking?')[0] : '';
-      const projectCode = row.code || 'P01';
+      const projectCode = row.code || 'LO';
       const quizUrl = baseUrl ? baseUrl + '/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) : '';
       const bookingInstallCode = bookingUrl ? iframeInstallCode(bookingUrl, '線上預約', 900) : '';
       const quizInstallCode = quizUrl ? iframeInstallCode(quizUrl, '線上測驗', 920) : '';
@@ -2514,7 +2514,7 @@
 
 
     function quizVersionFromData(res) {
-      return (res.versions || []).find(function (item) { return item.version_code === res.versionCode; }) || { version_code: res.versionCode || 'A', name: (res.versionCode || 'A') + ' 版測驗', description: '', traffic_weight: 100 };
+      return (res.versions || []).find(function (item) { return item.version_code === res.versionCode; }) || { version_code: res.versionCode || 'LITE', name: (res.versionCode || 'LITE') + ' 版測驗', description: '', traffic_weight: 100 };
     }
 
     function quizDimensionOptions(current) {
@@ -2533,12 +2533,12 @@
 
     function loadQuizEditor() {
       loading('測驗設定');
-      api('getQuizAdminEditor', { projectCode: scopedProjectCode() === 'ALL' ? 'P01' : scopedProjectCode(), versionCode: 'A' }).then(renderQuizEditor).catch(showError);
+      api('getQuizAdminEditor', { projectCode: scopedProjectCode() === 'ALL' ? 'LO' : scopedProjectCode(), versionCode: 'LITE' }).then(renderQuizEditor).catch(showError);
     }
 
     function loadQuizEditorData() {
-      const projectCode = field('quizProject') || 'P01';
-      const versionCode = field('quizVersion') || field('quizVersionCode') || 'A';
+      const projectCode = field('quizProject') || 'LO';
+      const versionCode = field('quizVersion') || field('quizVersionCode') || 'LITE';
       api('getQuizAdminEditor', { projectCode: projectCode, versionCode: versionCode }).then(renderQuizEditor).catch(showError);
     }
 
@@ -2561,7 +2561,7 @@
       const currentVersion = quizVersionFromData(res);
       const projectRows = isSystemOwner() && ownerProject !== 'ALL' ? (res.projects || []).filter(function (p) { return p.code === ownerProject; }) : (res.projects || []);
       const projectOptions = projectRows.map(function (p) { return '<option value="' + escapeHtml(p.code) + '"' + (p.code === res.projectCode ? ' selected' : '') + '>' + escapeHtml(p.name || p.code) + '</option>'; }).join('');
-      const versionOptions = (res.versions || []).map(function (v) { return '<option value="' + escapeHtml(v.version_code) + '"' + (v.version_code === res.versionCode ? ' selected' : '') + '>' + escapeHtml(v.version_code + '｜' + (v.name || '未命名')) + '</option>'; }).join('') || '<option value="A">A｜預設版本</option>';
+      const versionOptions = (res.versions || []).map(function (v) { return '<option value="' + escapeHtml(v.version_code) + '"' + (v.version_code === res.versionCode ? ' selected' : '') + '>' + escapeHtml(v.version_code + '｜' + (v.name || '未命名')) + '</option>'; }).join('') || '<option value="LITE">LITE｜簡易版</option>';
       const tabBar = '<div class="module-tabs">' +
         quizEditorTabButton('questions', '題目與加分選項') +
         quizEditorTabButton('stages', '題目階段') +
@@ -2569,7 +2569,7 @@
         quizEditorTabButton('ranges', '分數區間') +
         quizEditorTabButton('settings', '測驗設定') +
       '</div>';
-      document.getElementById('view').innerHTML = '<div class="panel"><h2>題目管理</h2><div class="row"><div class="col-4"><label>選擇專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>目前版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'A') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button onclick="saveQuizEditor()">儲存設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'P01') + '&version=' + encodeURIComponent(res.versionCode || 'A') + '">開啟前台測驗</a></div></div>' +
+      document.getElementById('view').innerHTML = '<div class="panel"><h2>題目管理</h2><div class="row"><div class="col-4"><label>選擇專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>目前版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'LITE') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button onclick="saveQuizEditor()">儲存設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'LO') + '&version=' + encodeURIComponent(res.versionCode || 'LITE') + '">開啟前台測驗</a></div></div>' +
         '<div class="panel module-section" data-section="settings"><h2>測驗基本設定</h2><label>版本說明</label><textarea id="quizVersionDescription">' + escapeHtml(currentVersion.description || '') + '</textarea></div>' +
         '<div class="panel module-section" data-section="stages"><h2>題目階段</h2><div class="list" id="quizStages">' + (res.stages || []).map(quizStageRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizStage()">新增階段</button></div></div>' +
         '<div class="panel module-section" data-section="dimensions"><h2>分數面向</h2><p>滿分會依照題目選項加分自動計算；後台只需要設定報告頁要顯示的滿分，例如 100。</p><div class="list" id="quizDimensions">' + (res.dimensions || []).map(quizDimensionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizDimension()">新增面向</button></div></div>' +
@@ -2607,8 +2607,8 @@
       const sampleScores = dimensions.map(function (_dim, index) { return index === 0 ? '5' : '0'; });
       const rows = [
         headers,
-        ['1', '第一階段', '目前狀態', '單選', '你目前最想解決的是什麼', '', 'A', '我已經想清楚了'].concat(sampleScores),
-        ['1', '第一階段', '目前狀態', '單選', '你目前最想解決的是什麼', '', 'B', '知道下一步怎麼做'].concat(dimensions.map(function (_dim, index) { return index === 1 ? '3' : '0'; }))
+        ['1', '第一階段', '目前狀態', '單選', '你目前最想解決的是什麼', '', 'LITE', '我已經想清楚了'].concat(sampleScores),
+        ['1', '第一階段', '目前狀態', '單選', '你目前最想解決的是什麼', '', 'FULL', '知道下一步怎麼做'].concat(dimensions.map(function (_dim, index) { return index === 1 ? '3' : '0'; }))
       ];
       const csv = rows.map(function (row) { return row.map(csvEscape).join(','); }).join('\n');
       const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
@@ -2762,8 +2762,8 @@
       });
       dimensions.forEach(function (dim) { dim.maxScore = Math.max(1, Math.round(maxByDimension[dim.dimensionKey] || dim.maxScore || 1)); });
       return {
-        projectCode: field('quizProject') || 'P01',
-        versionCode: field('quizVersionCode') || 'A',
+        projectCode: field('quizProject') || 'LO',
+        versionCode: field('quizVersionCode') || 'LITE',
         version: { name: field('quizVersionName'), description: field('quizVersionDescription'), trafficWeight: 100 },
         stages: stages,
         dimensions: dimensions,
@@ -2774,8 +2774,8 @@
     function rerenderQuizEditorWith(data) {
       data.projects = (window.quizEditorData && window.quizEditorData.projects) || data.projects || [];
       data.versions = (window.quizEditorData && window.quizEditorData.versions) || data.versions || [];
-      data.projectCode = data.projectCode || field('quizProject') || 'P01';
-      data.versionCode = data.versionCode || field('quizVersionCode') || 'A';
+      data.projectCode = data.projectCode || field('quizProject') || 'LO';
+      data.versionCode = data.versionCode || field('quizVersionCode') || 'LITE';
       renderQuizEditor(data);
     }
 
@@ -2843,7 +2843,7 @@
 
     function loadReportEditorData() {
       const projectCode = field('reportProject');
-      const versionCode = field('reportVersion') || 'A';
+      const versionCode = field('reportVersion') || 'LITE';
       api('getQuizReportEditor', { projectCode: projectCode, versionCode: versionCode }).then(renderReportEditor).catch(showError);
     }
 
@@ -3052,7 +3052,7 @@
     function collectReportEditorPayload() {
       return {
         projectCode: field('reportProject'),
-        versionCode: field('reportVersion') || 'A',
+        versionCode: field('reportVersion') || 'LITE',
         settings: {
           title: field('reportTitle'),
           subtitle: field('reportSubtitle'),
@@ -3763,4 +3763,11 @@
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
 

@@ -210,7 +210,7 @@ GOOGLE_CLIENT_SECRET
 
 專案：
 1. 到「專案」。
-2. P01 是預設專案。
+2. LO 是預設專案。
 3. 可以改名稱、注意事項、婉拒動作。
 4. 新增其他專案可用 P02、P03。
 
@@ -227,7 +227,7 @@ GOOGLE_CLIENT_SECRET
 1. 打開 snippets/systeme_booking_install.txt。
 2. 把 appUrl 換成你的 Vercel 網址。
 3. 把 tenant 換成客戶代碼。
-4. 把 project 換成專案代碼，例如 P01。
+4. 把 project 換成專案代碼，例如 LO。
 5. 複製整段。
 6. 到 Systeme 預約頁，新增 HTML/Custom Code 區塊。
 7. 貼上。
@@ -316,7 +316,7 @@ OWNER_PASSWORD=1111
    每個客戶/測試租戶一列，例如 nicolle-demo。
 
    projects
-   每個預約頁/專案一列，例如 P01。
+   每個預約頁/專案一列，例如 LO。
 
    consultants
    後台登入帳號、顧問資料、Google OAuth 狀態。
@@ -415,3 +415,4 @@ OWNER_PASSWORD=1111
 - 等候名單
 
 如果要重新建立測試帳號，使用最高權限或租戶管理員登入後，到「顧問管理」按「建立測試帳號」。
+

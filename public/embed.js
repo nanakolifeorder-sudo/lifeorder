@@ -2,7 +2,7 @@
   var cfg = window.DM_BOOKING_CONFIG || {};
   var appUrl = (cfg.appUrl || '').replace(/\/$/, '');
   var tenant = cfg.tenant || '';
-  var project = cfg.project || 'P01';
+  var project = cfg.project || 'LO';
   var target = document.getElementById(cfg.containerId || 'dm-booking');
 
   if (!target) {
@@ -33,3 +33,4 @@
   target.innerHTML = '';
   target.appendChild(iframe);
 })();
+

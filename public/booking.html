@@ -258,7 +258,7 @@
       location.hostname === 'localhost' ||
       location.hostname === '127.0.0.1';
     const tenant = (params.get('tenant') || params.get('t') || (isLocalPreview ? 'dm-test' : '')).toLowerCase();
-    const projectCode = (params.get('p') || 'P01').toUpperCase();
+    const projectCode = (params.get('p') || 'LO').toUpperCase();
     const rescheduleToken = params.get('rid') || '';
     const quizResultId = params.get('qrid') || params.get('quizResultId') || ''; 
     const invitationToken = params.get('invite') || '';
@@ -618,4 +618,5 @@
   </script>
 </body>
 </html>
+
 

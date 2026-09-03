@@ -91,7 +91,7 @@
     const params = new URLSearchParams(location.search);
     const isLocalPreview = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     const tenant = (params.get('tenant') || params.get('t') || (isLocalPreview ? 'dm-test' : '')).toLowerCase();
-    const projectCode = (params.get('p') || 'P01').toUpperCase();
+    const projectCode = (params.get('p') || 'LO').toUpperCase();
     const versionCode = params.get('v') || params.get('version') || '';
     const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
     let config = null;
@@ -117,9 +117,10 @@
 
     function quizTitleLabel(res) {
       const code = String(res?.versionCode || versionCode || '').trim().toUpperCase();
+      const normalizedCode = code === 'A' ? 'LITE' : (code === 'B' ? 'FULL' : code);
       const name = String(res?.version?.name || '').trim();
-      if (code === 'B' || /完整版/.test(name)) return '人生秩序完整版｜檢測測驗';
-      if (code === 'A' || /簡易版/.test(name)) return '人生三大秩序｜檢測測驗';
+      if (normalizedCode === 'FULL' || /完整版/.test(name)) return '人生秩序完整版｜檢測測驗';
+      if (normalizedCode === 'LITE' || /簡易版/.test(name)) return '人生三大秩序｜檢測測驗';
       return '檢測測驗';
     }
 
@@ -131,9 +132,10 @@
     }
 
     function isFreeVersion() {
-      const code = String(config?.versionCode || versionCode || 'A').trim().toUpperCase();
+      const rawCode = String(config?.versionCode || versionCode || 'LITE').trim().toUpperCase();
+      const code = rawCode === 'A' ? 'LITE' : (rawCode === 'B' ? 'FULL' : rawCode);
       const text = [code, config?.version?.name, config?.version?.description].map(function (value) { return String(value || '').toLowerCase(); }).join(' ');
-      if (['A', 'FREE', 'TRIAL', 'SIMPLE'].includes(code)) return true;
+      if (['A', 'LITE', 'FREE', 'TRIAL', 'SIMPLE'].includes(code)) return true;
       return /(免費|簡易|free|trial|simple)/i.test(text) && !/(980|付費|完整版|完整|paid|full|premium|pro)/i.test(text);
     }
 
@@ -316,5 +318,8 @@
   </script>
 </body>
 </html>
+
+
+
 
 
