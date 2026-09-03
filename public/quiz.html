@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>檢測測驗</title>
+  <title>人生三大秩序測驗</title>
   <style>
     :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --ink:#202124; --muted:#5f6368; --line:#dadce0; --soft:#f8fafc; --bg:#f5f7fb; }
     * { box-sizing:border-box; }
@@ -21,6 +21,13 @@
     input, textarea { width:100%; border:1px solid var(--line); border-radius:6px; padding:12px; font:inherit; background:#fff; }
     textarea { min-height:96px; resize:vertical; }
     .field { margin:0 0 16px; }
+    .access-toggle { border:0; background:transparent; color:var(--blue); padding:0; min-height:0; font-weight:700; text-decoration:underline; cursor:pointer; }
+    .access-panel { margin-top:10px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--soft); }
+    .access-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:end; }
+    .access-row label { margin-top:0; }
+    .access-row button { min-height:46px; }
+    .access-message { margin:8px 0 0; font-size:14px; }
+    @media (max-width:640px) { .access-row{grid-template-columns:1fr} }
     .choice { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:6px; margin:8px 0; font-weight:400; cursor:pointer; }
     .choice input { width:auto; margin-top:5px; }
     .choice:has(input:checked) { border-color:var(--blue); background:#eef4ff; }
@@ -40,7 +47,7 @@
     <section class="panel">
       <div class="top">
         <div>
-          <h1 id="title">檢測測驗</h1>
+          <h1 id="title">人生三大秩序測驗</h1>
           <p id="subtitle">正在讀取題目...</p>
         </div>
       </div>
@@ -55,7 +62,16 @@
           <div class="field"><label for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
           <div class="field"><label for="clientAge">年齡</label><input id="clientAge" inputmode="numeric" autocomplete="off" placeholder="例：38"></div>
           <div class="field"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
-          <div class="field" id="accessCodeField"><label for="accessCode">折扣碼 / 重測碼</label><input id="accessCode" autocomplete="off" placeholder="已有代碼再填寫"></div>
+          <div class="field" id="accessCodeField">
+            <button class="access-toggle" type="button" id="accessToggle">使用折扣碼</button>
+            <div class="access-panel hidden" id="accessPanel">
+              <div class="access-row">
+                <div><label for="accessCode">折扣碼</label><input id="accessCode" autocomplete="off" placeholder="請輸入折扣碼"></div>
+                <button type="button" id="applyAccessCode">確定</button>
+              </div>
+              <p class="access-message hidden" id="accessMessage"></p>
+            </div>
+          </div>
         </section>
 
         <div class="progress"><div class="bar" id="bar"></div></div>
@@ -97,6 +113,21 @@
 
     function cleanOptionLabel(value) {
       return String(value || '').trim().replace(/[。．.]$/g, '');
+    }
+
+    function quizTitleLabel(res) {
+      const code = String(res?.versionCode || versionCode || '').trim().toUpperCase();
+      const name = String(res?.version?.name || '').trim();
+      if (code === 'B' || /完整版/.test(name)) return '人生秩序完整版｜人生三大秩序測驗';
+      if (code === 'A' || /簡易版/.test(name)) return '人生秩序簡易版｜人生三大秩序測驗';
+      return '人生三大秩序測驗';
+    }
+
+    function setAccessMessage(message, ok) {
+      const target = document.getElementById('accessMessage');
+      if (!target) return;
+      target.textContent = message || '';
+      target.className = 'access-message ' + (message ? '' : 'hidden ') + (ok ? 'success' : 'error');
     }
 
     function isFreeVersion() {
@@ -173,6 +204,11 @@
       const freeVersion = isFreeVersion();
       document.getElementById('identityPanel').classList.remove('hidden');
       document.getElementById('accessCodeField').classList.toggle('hidden', freeVersion);
+      if (freeVersion) {
+        document.getElementById('accessPanel')?.classList.add('hidden');
+        if (document.getElementById('accessCode')) document.getElementById('accessCode').value = '';
+        setAccessMessage('', true);
+      }
       document.getElementById('clientAge').required = !freeVersion;
       document.getElementById('clientOccupation').required = !freeVersion;
       document.getElementById('bar').style.width = '100%';
@@ -214,6 +250,19 @@
         renderStage();
       } catch (error) { alert(error.message); }
     });
+    document.getElementById('accessToggle').addEventListener('click', function () {
+      document.getElementById('accessPanel')?.classList.toggle('hidden');
+      setAccessMessage('', true);
+      if (!document.getElementById('accessPanel')?.classList.contains('hidden')) document.getElementById('accessCode')?.focus();
+    });
+
+    document.getElementById('applyAccessCode').addEventListener('click', function () {
+      const input = document.getElementById('accessCode');
+      const code = input ? input.value.trim() : '';
+      if (!code) { setAccessMessage('請先輸入折扣碼。', false); return; }
+      setAccessMessage('折扣碼已套用，送出時會一併驗證。', true);
+    });
+
     document.getElementById('quizForm').addEventListener('submit', function (event) {
       event.preventDefault();
       try { validateStage(); saveCurrentStageAnswers(); } catch (error) { alert(error.message); return; }
@@ -250,9 +299,9 @@
       api('getQuizConfig', {}).then(function (res) {
         if (!res.success) throw new Error(res.message || '尚未設定測驗。');
         config = res;
-        const displayTitle = res.version?.name || (String(res.versionCode || '').toUpperCase() === 'B' ? '完整版' : (res.projectName || '檢測'));
-        document.getElementById('title').textContent = displayTitle + '｜檢測測驗';
-        document.title = displayTitle + '｜檢測測驗';
+        const displayTitle = quizTitleLabel(res);
+        document.getElementById('title').textContent = displayTitle;
+        document.title = displayTitle;
         document.getElementById('subtitle').textContent = res.resultSettings?.subtitle || '請依照目前狀況作答，完成後會產生檢測報告。';
         groupStages();
         if (!stages.length) throw new Error('此版本尚未建立題目。');
