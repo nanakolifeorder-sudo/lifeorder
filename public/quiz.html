@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>人生三大秩序測驗</title>
+  <title>檢測測驗</title>
   <style>
     :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --ink:#202124; --muted:#5f6368; --line:#dadce0; --soft:#f8fafc; --bg:#f5f7fb; }
     * { box-sizing:border-box; }
@@ -47,7 +47,7 @@
     <section class="panel">
       <div class="top">
         <div>
-          <h1 id="title">人生三大秩序測驗</h1>
+          <h1 id="title">檢測測驗</h1>
           <p id="subtitle">正在讀取題目...</p>
         </div>
       </div>
@@ -63,10 +63,10 @@
           <div class="field"><label for="clientAge">年齡</label><input id="clientAge" inputmode="numeric" autocomplete="off" placeholder="例：38"></div>
           <div class="field"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
           <div class="field" id="accessCodeField">
-            <button class="access-toggle" type="button" id="accessToggle">使用折扣碼</button>
+            <button class="access-toggle" type="button" id="accessToggle">使用重測碼</button>
             <div class="access-panel hidden" id="accessPanel">
               <div class="access-row">
-                <div><label for="accessCode">折扣碼</label><input id="accessCode" autocomplete="off" placeholder="請輸入折扣碼"></div>
+                <div><label for="accessCode">重測碼</label><input id="accessCode" autocomplete="off" placeholder="請輸入重測碼"></div>
                 <button type="button" id="applyAccessCode">確定</button>
               </div>
               <p class="access-message hidden" id="accessMessage"></p>
@@ -118,9 +118,9 @@
     function quizTitleLabel(res) {
       const code = String(res?.versionCode || versionCode || '').trim().toUpperCase();
       const name = String(res?.version?.name || '').trim();
-      if (code === 'B' || /完整版/.test(name)) return '人生秩序完整版｜人生三大秩序測驗';
-      if (code === 'A' || /簡易版/.test(name)) return '人生秩序簡易版｜人生三大秩序測驗';
-      return '人生三大秩序測驗';
+      if (code === 'B' || /完整版/.test(name)) return '人生秩序完整版｜檢測測驗';
+      if (code === 'A' || /簡易版/.test(name)) return '人生三大秩序｜檢測測驗';
+      return '檢測測驗';
     }
 
     function setAccessMessage(message, ok) {
@@ -259,8 +259,8 @@
     document.getElementById('applyAccessCode').addEventListener('click', function () {
       const input = document.getElementById('accessCode');
       const code = input ? input.value.trim() : '';
-      if (!code) { setAccessMessage('請先輸入折扣碼。', false); return; }
-      setAccessMessage('折扣碼已套用，送出時會一併驗證。', true);
+      if (!code) { setAccessMessage('請先輸入重測碼。', false); return; }
+      setAccessMessage('重測碼已套用，送出時會一併驗證。', true);
     });
 
     document.getElementById('quizForm').addEventListener('submit', function (event) {
@@ -316,4 +316,5 @@
   </script>
 </body>
 </html>
+
 
