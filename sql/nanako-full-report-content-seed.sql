@@ -9,6 +9,20 @@ values('lifeorder', 'LO', 'FULL', '完整版', '$980 付費版測驗：11 面向
 on conflict(tenant_slug, project_code, version_code) do update
 set name = excluded.name, description = excluded.description, status = excluded.status, updated_at = now();
 
+insert into quiz_result_settings(tenant_slug, project_code, version_code, report_mode, title, subtitle, show_chart, show_score_cards, show_score_table, booking_cta_label, booking_cta_url, settings, status, updated_at)
+values('lifeorder', 'LO', 'FULL', 'score_ranges', '完整版測驗報告', '這份報告會依照你的作答，整理人生秩序 11 個面向的狀態與下一步方向。', true, true, false, '預約一對一諮詢', '', '{}'::jsonb, '啟用', now())
+on conflict(tenant_slug, project_code, version_code) do update
+set title = excluded.title,
+    subtitle = excluded.subtitle,
+    show_chart = excluded.show_chart,
+    show_score_cards = excluded.show_score_cards,
+    show_score_table = excluded.show_score_table,
+    booking_cta_label = excluded.booking_cta_label,
+    booking_cta_url = excluded.booking_cta_url,
+    settings = excluded.settings,
+    status = excluded.status,
+    updated_at = now();
+
 insert into quiz_score_dimensions(tenant_slug, project_code, version_code, dimension_key, name, description, max_score, display_max_score, display_score_format, rounding_mode, chart_type, sort_order, status, updated_at)
 values
   ('lifeorder', 'LO', 'FULL', 'objects', '物品', '檢視物品定位、去留判斷與整理頻率，讓生活中的實體物件能被找得到、用得上、交代清楚。', 12, 100, 'number', 'round', 'radar', 10, '啟用', now()),

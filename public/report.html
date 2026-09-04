@@ -459,6 +459,14 @@
       }).join('');
     }
 
+    function reportTitleByVersion(res, settings) {
+      const code = String(res && res.versionCode || '').toUpperCase();
+      const titleText = String(settings && settings.title || '');
+      if (code === 'FULL' || /完整版/.test(titleText)) return '完整版測驗報告';
+      if (code === 'LITE' || /簡易|免費/.test(titleText)) return '免費版測驗報告';
+      return titleText || '你的檢測報告';
+    }
+
     function boot() {
       if (!tenant || !qrid) {
         document.getElementById('loading').innerHTML = '<span class="error">報告連結缺少 tenant 或 qrid。</span>';
@@ -471,7 +479,9 @@
         const settings = snapshot.result_settings || {};
         window.__reportSettings = settings;
         const summary = res.scoreSummary || snapshot.score_summary || {};
-        document.getElementById('title').textContent = settings.title || '你的檢測報告';
+        const reportTitle = reportTitleByVersion(res, settings);
+        document.title = reportTitle;
+        document.getElementById('title').textContent = reportTitle;
         document.getElementById('subtitle').textContent = settings.subtitle || (res.clientName ? res.clientName + '，以下是你的檢測結果。' : '以下是你的檢測結果。');
         document.getElementById('meta').textContent = '版本 ' + (res.versionCode || '') + '｜' + new Date(res.submittedAt).toLocaleString('zh-TW', { hour12:false });
         document.getElementById('topActions').innerHTML = '';
