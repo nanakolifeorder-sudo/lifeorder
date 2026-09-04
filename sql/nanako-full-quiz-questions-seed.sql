@@ -389,7 +389,7 @@ set label = excluded.label,
 
 with saved_question as (
   insert into quiz_questions(tenant_slug, project_code, version_code, stage_key, question_no, title, help_text, type, is_required, scoring_mode, settings, sort_order, status, updated_at)
-  values('lifeorder', 'LO', 'FULL', 'external', 13, '你的數位金融資產（加密貨幣、比特幣、冷錢包、交易所、私鑰、資產代幣化）整理與保管的狀態？', '資產｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"產3","dimensionKey":"assets","dimensionName":"資產","orderName":"外在秩序"}'::jsonb, 130, '啟用', now())
+  values('lifeorder', 'LO', 'FULL', 'external', 13, '你的數位金融資產與線上財務工具，例如數位帳戶、行動支付、網路銀行、線上貸款、線上理財、加密貨幣、冷錢包、交易所與私鑰，目前整理與保管的狀態？', '資產｜外在秩序', 'single', true, 'option_weights', '{"sourceCode":"產3","dimensionKey":"assets","dimensionName":"資產","orderName":"外在秩序"}'::jsonb, 130, '啟用', now())
   on conflict(tenant_slug, project_code, version_code, question_no) do update
   set stage_key = excluded.stage_key,
       title = excluded.title,
@@ -1425,6 +1425,7 @@ update quiz_question_options o
    and q.status not in ('deleted')
    and o.status not in ('deleted');
 commit;
+
 
 
 
