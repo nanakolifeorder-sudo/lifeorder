@@ -27,6 +27,8 @@
     .access-row label { margin-top:0; }
     .access-row button { min-height:46px; }
     .access-message { margin:8px 0 0; font-size:14px; }
+    .checkline { display:flex; align-items:center; gap:10px; font-weight:700; margin:0; }
+    .checkline input { width:auto; }
     @media (max-width:640px) { .access-row{grid-template-columns:1fr} }
     .choice { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:6px; margin:8px 0; font-weight:400; cursor:pointer; }
     .choice input { width:auto; margin-top:5px; }
@@ -62,6 +64,7 @@
           <div class="field"><label for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
           <div class="field"><label for="clientAge">年齡</label><input id="clientAge" inputmode="numeric" autocomplete="off" placeholder="例：38"></div>
           <div class="field"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
+          <div class="field hidden" id="petProfileField"><label class="checkline"><input id="hasPets" type="checkbox"> 我目前有寵物需要安排</label></div>
           <div class="field" id="accessCodeField">
             <button class="access-toggle" type="button" id="accessToggle">使用重測碼</button>
             <div class="access-panel hidden" id="accessPanel">
@@ -131,12 +134,43 @@
       target.className = 'access-message ' + (message ? '' : 'hidden ') + (ok ? 'success' : 'error');
     }
 
-    function isFreeVersion() {
+    function normalizedVersionCode() {
       const rawCode = String(config?.versionCode || versionCode || 'LITE').trim().toUpperCase();
-      const code = rawCode === 'A' ? 'LITE' : (rawCode === 'B' ? 'FULL' : rawCode);
+      return rawCode === 'A' ? 'LITE' : (rawCode === 'B' ? 'FULL' : rawCode);
+    }
+
+    function isFullVersion() {
+      const code = normalizedVersionCode();
+      const text = [code, config?.version?.name, config?.version?.description].map(function (value) { return String(value || '').toLowerCase(); }).join(' ');
+      return ['FULL', 'PAID', 'PRO', 'PREMIUM'].includes(code) || /(980|付費|完整版|完整|paid|full|premium|pro)/i.test(text);
+    }
+
+    function isFreeVersion() {
+      const code = normalizedVersionCode();
       const text = [code, config?.version?.name, config?.version?.description].map(function (value) { return String(value || '').toLowerCase(); }).join(' ');
       if (['A', 'LITE', 'FREE', 'TRIAL', 'SIMPLE'].includes(code)) return true;
       return /(免費|簡易|free|trial|simple)/i.test(text) && !/(980|付費|完整版|完整|paid|full|premium|pro)/i.test(text);
+    }
+
+    function isPetQuestion(question) {
+      const settings = question && question.settings ? question.settings : {};
+      const text = [settings.dimensionKey, settings.dimensionName, question?.helpText, question?.title].map(function (value) { return String(value || '').toLowerCase(); }).join(' ');
+      return text.includes('pets') || text.includes('寵物') || text.includes('毛孩');
+    }
+
+    function hasPetsSelected() {
+      const input = document.getElementById('hasPets');
+      return !!input && input.checked;
+    }
+
+    function visibleQuestions() {
+      const showPets = hasPetsSelected();
+      return (config.questions || []).filter(function (question) { return showPets || !isPetQuestion(question); });
+    }
+
+    function clearPetAnswersIfHidden() {
+      if (hasPetsSelected()) return;
+      (config.questions || []).filter(isPetQuestion).forEach(function (question) { delete savedAnswers[answerKey(question)]; });
     }
 
     function groupStages() {
@@ -144,7 +178,7 @@
         stage_key: '1',
         title: '測驗題目',
         description: '',
-        questions: (config.questions || []).slice()
+        questions: visibleQuestions()
       }].filter(function (stage) { return stage.questions.length; });
     }
 
@@ -206,6 +240,9 @@
       const freeVersion = isFreeVersion();
       document.getElementById('identityPanel').classList.remove('hidden');
       document.getElementById('accessCodeField').classList.toggle('hidden', freeVersion);
+      document.getElementById('petProfileField').classList.toggle('hidden', !isFullVersion());
+      clearPetAnswersIfHidden();
+      stage.questions = visibleQuestions();
       if (freeVersion) {
         document.getElementById('accessPanel')?.classList.add('hidden');
         if (document.getElementById('accessCode')) document.getElementById('accessCode').value = '';
@@ -252,6 +289,14 @@
         renderStage();
       } catch (error) { alert(error.message); }
     });
+    document.getElementById('hasPets').addEventListener('change', function () {
+      saveCurrentStageAnswers();
+      clearPetAnswersIfHidden();
+      groupStages();
+      currentStage = 0;
+      renderStage();
+    });
+
     document.getElementById('accessToggle').addEventListener('click', function () {
       document.getElementById('accessPanel')?.classList.toggle('hidden');
       setAccessMessage('', true);
@@ -278,7 +323,8 @@
         accessCode: document.getElementById('accessCode')?.value.trim() || '',
         answers: Object.assign(collectAnswers(), {
           _profile_age: document.getElementById('clientAge').value.trim(),
-          _profile_occupation: document.getElementById('clientOccupation').value.trim()
+          _profile_occupation: document.getElementById('clientOccupation').value.trim(),
+          _profile_has_pets: isFullVersion() ? hasPetsSelected() : null
         })
       }).then(function (res) {
         if (!res.success) {

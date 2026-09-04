@@ -204,6 +204,15 @@
       }).join('');
     }
 
+    function shouldHidePetReport(summary) {
+      return summary && summary.demographics && summary.demographics.hasPets === false;
+    }
+
+    function filterPetReportItems(items, summary) {
+      if (!shouldHidePetReport(summary)) return items;
+      return (items || []).filter(function (item) { return item.key !== 'pets' && item.dimensionKey !== 'pets'; });
+    }
+
     function scoreItems(summary) {
       const scores = summary.scores || {};
       const maxScores = summary.max_scores || {};
@@ -233,7 +242,7 @@
       const chartTarget = document.getElementById('scoreChart');
       if (chartTarget) chartTarget.innerHTML = !settings || settings.show_chart !== false ? renderRadarChart(summary, { title: '人生秩序雷達圖' }) : '';
       if (settings && settings.show_score_cards === false) return;
-      const items = scoreItems(summary);
+      const items = filterPetReportItems(scoreItems(summary), summary);
       if (!items.length) return;
       document.getElementById('scoreSection').classList.remove('hidden');
       const descriptions = {
@@ -333,8 +342,9 @@
       '</div>';
     }
 
-    function renderMatchedContent(items) {
-      if (!Array.isArray(items) || !items.length) return;
+    function renderMatchedContent(items, summary) {
+      items = filterPetReportItems(Array.isArray(items) ? items : [], summary);
+      if (!items.length) return;
       document.getElementById('contentSection').classList.remove('hidden');
       const order = ['low', 'mid', 'high'];
       const labels = { low: '優先整理區', mid: '穩定養成區', high: '可交代優勢區' };
@@ -468,7 +478,7 @@
         window.__scoreSummary = summary;
         const reportBlocks = (snapshot.blocks || []).slice();
         renderScores(summary, settings);
-        renderMatchedContent(snapshot.matched_content || []);
+        renderMatchedContent(snapshot.matched_content || [], summary);
         renderBlocks(reportBlocks);
         document.getElementById('loading').classList.add('hidden');
       }).catch(function (error) {
