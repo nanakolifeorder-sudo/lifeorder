@@ -18,7 +18,7 @@
     .progress { height:8px; background:#eef2f7; border-radius:999px; overflow:hidden; margin:18px 0 22px; }
     .bar { width:0; height:100%; background:var(--blue); transition:width .18s ease; }
     label { display:block; font-weight:700; margin:14px 0 6px; }
-    input, textarea { width:100%; border:1px solid var(--line); border-radius:6px; padding:12px; font:inherit; background:#fff; }
+    input, textarea, select { width:100%; border:1px solid var(--line); border-radius:6px; padding:12px; font:inherit; background:#fff; }
     textarea { min-height:96px; resize:vertical; }
     .field { margin:0 0 16px; }
     .access-toggle { border:0; background:transparent; color:var(--blue); padding:0; min-height:0; font-weight:700; text-decoration:underline; cursor:pointer; }
@@ -63,7 +63,23 @@
           <div class="field"><label for="clientEmail">Email *</label><input id="clientEmail" type="email" autocomplete="email" required></div>
           <div class="field"><label for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
           <div class="field"><label for="clientAge">年齡</label><input id="clientAge" inputmode="numeric" autocomplete="off" placeholder="例：38"></div>
-          <div class="field"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
+          <div class="field" id="occupationTextField"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
+          <div class="field hidden" id="occupationIdentityField">
+            <label for="clientOccupationIdentity">職業身分 *</label>
+            <select id="clientOccupationIdentity">
+              <option value="">請選擇職業身分</option>
+              <option value="企業主／負責人">企業主／負責人</option>
+              <option value="公司主管／管理職">公司主管／管理職</option>
+              <option value="上班族／受僱工作者">上班族／受僱工作者</option>
+              <option value="專業人士／顧問">專業人士／顧問</option>
+              <option value="自由工作者／接案者">自由工作者／接案者</option>
+              <option value="家管／家庭照顧者">家管／家庭照顧者</option>
+              <option value="退休／半退休">退休／半退休</option>
+              <option value="學生／進修中">學生／進修中</option>
+              <option value="待業／轉職中">待業／轉職中</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
           <div class="field hidden" id="petProfileField"><label class="checkline"><input id="hasPets" type="checkbox"> 我有養寵物</label></div>
           <div class="field" id="accessCodeField">
             <button class="access-toggle" type="button" id="accessToggle">使用重測碼</button>
@@ -173,6 +189,12 @@
       (config.questions || []).filter(isPetQuestion).forEach(function (question) { delete savedAnswers[answerKey(question)]; });
     }
 
+    function occupationValue() {
+      const identity = document.getElementById('clientOccupationIdentity');
+      const text = document.getElementById('clientOccupation');
+      return isFullVersion() ? (identity ? identity.value.trim() : '') : (text ? text.value.trim() : '');
+    }
+
     function groupStages() {
       stages = [{
         stage_key: '1',
@@ -240,7 +262,10 @@
       const freeVersion = isFreeVersion();
       document.getElementById('identityPanel').classList.remove('hidden');
       document.getElementById('accessCodeField').classList.toggle('hidden', freeVersion);
-      document.getElementById('petProfileField').classList.toggle('hidden', !isFullVersion());
+      const fullVersion = isFullVersion();
+      document.getElementById('occupationTextField').classList.toggle('hidden', fullVersion);
+      document.getElementById('occupationIdentityField').classList.toggle('hidden', !fullVersion);
+      document.getElementById('petProfileField').classList.toggle('hidden', !fullVersion);
       clearPetAnswersIfHidden();
       stage.questions = visibleQuestions();
       if (freeVersion) {
@@ -249,7 +274,8 @@
         setAccessMessage('', true);
       }
       document.getElementById('clientAge').required = !freeVersion;
-      document.getElementById('clientOccupation').required = !freeVersion;
+      document.getElementById('clientOccupation').required = !freeVersion && !fullVersion;
+      document.getElementById('clientOccupationIdentity').required = fullVersion;
       document.getElementById('bar').style.width = '100%';
       document.getElementById('questionPanel').innerHTML = '<div class="stage-title"><h2>' + escapeHtml(stage.title || '測驗題目') + '</h2><p>' + escapeHtml(stage.description || '') + '</p></div>' + stage.questions.map(renderQuestion).join('');
       restoreStageAnswers();
@@ -323,7 +349,7 @@
         accessCode: document.getElementById('accessCode')?.value.trim() || '',
         answers: Object.assign(collectAnswers(), {
           _profile_age: document.getElementById('clientAge').value.trim(),
-          _profile_occupation: document.getElementById('clientOccupation').value.trim(),
+          _profile_occupation: occupationValue(),
           _profile_has_pets: isFullVersion() ? hasPetsSelected() : null
         })
       }).then(function (res) {
