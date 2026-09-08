@@ -410,6 +410,7 @@
     }
 
     function reportBlockVisible(block) {
+      if (block.isVisible === false || block.is_visible === false) return false;
       const rule = block.visibilityRule || block.visibility_rule || {};
       if (!rule || typeof rule !== 'object' || !Object.keys(rule).length) return true;
       const summary = window.__scoreSummary || {};
