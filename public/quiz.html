@@ -157,6 +157,7 @@
 
     function isFullVersion() {
       const code = normalizedVersionCode();
+      if (['LITE', 'FREE', 'TRIAL', 'SIMPLE'].includes(code)) return false;
       const text = [code, config?.version?.name, config?.version?.description].map(function (value) { return String(value || '').toLowerCase(); }).join(' ');
       return ['FULL', 'PAID', 'PRO', 'PREMIUM'].includes(code) || /(980|付費|完整版|完整|paid|full|premium|pro)/i.test(text);
     }
@@ -274,8 +275,13 @@
         setAccessMessage('', true);
       }
       document.getElementById('clientAge').required = !freeVersion;
-      document.getElementById('clientPhone').required = fullVersion;
-      document.getElementById('clientPhoneLabel').textContent = fullVersion ? '電話 *' : '電話';
+      const phoneInput = document.getElementById('clientPhone');
+      phoneInput.required = fullVersion;
+      phoneInput.inputMode = fullVersion ? 'numeric' : 'tel';
+      phoneInput.maxLength = fullVersion ? 10 : 524288;
+      phoneInput.pattern = fullVersion ? '09[0-9]{8}' : '';
+      phoneInput.placeholder = fullVersion ? '例：0912345678' : '';
+      document.getElementById('clientPhoneLabel').textContent = fullVersion ? '電話（09開頭） *' : '電話';
       document.getElementById('clientOccupation').required = !freeVersion && !fullVersion;
       document.getElementById('clientOccupationIdentity').required = fullVersion;
       document.getElementById('bar').style.width = '100%';
@@ -392,6 +398,12 @@
   </script>
 </body>
 </html>
+
+
+
+
+
+
 
 
 
