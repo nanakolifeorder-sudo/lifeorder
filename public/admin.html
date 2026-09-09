@@ -1961,7 +1961,7 @@
         '</div>';
       }).join('');
       const google = res.googleConnected
-        ? '<span class="ok">Google Calendar、Meet 與 Gmail 已連結：' + escapeHtml(res.googleEmail || 'Google') + '</span>'
+        ? '<span class="ok">Google 授權資料已儲存：' + escapeHtml(res.googleEmail || 'Google') + '</span> <button class="secondary" onclick="connectGoogle(' + res.consultantId + ')">重新連結 Google Calendar / Meet / Gmail</button>'
         : '<button class="secondary" onclick="connectGoogle(' + res.consultantId + ')">連結 Google Calendar / Meet / Gmail</button>';
       const microsoft = res.microsoftEnabled ? (res.microsoftConnected
         ? '<span class="ok">Microsoft Calendar 與 Teams 已連結：' + escapeHtml(res.microsoftEmail || 'Microsoft') + '</span>'
