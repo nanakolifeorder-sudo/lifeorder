@@ -1,4 +1,5 @@
 const { query } = require('../lib/db');
+const { runDueEmails } = require('../lib/service');
 const {
   verifyOauthState,
   exchangeCode,
@@ -35,6 +36,9 @@ module.exports = async function handler(req, res) {
       ]
     );
 
+    // A refreshed Gmail token can immediately release assessment emails that failed only because authorization expired.
+    await runDueEmails({ tenant: parsedState.tenant, limit: 50 });
+
     const returnTo = parsedState.returnTo || `/admin?tenant=${parsedState.tenant}`;
     res.statusCode = 302;
     res.setHeader('Location', `${returnTo}${returnTo.includes('?') ? '&' : '?'}googleConnected=1`);
@@ -49,4 +53,3 @@ module.exports = async function handler(req, res) {
     `);
   }
 };
-
