@@ -61,7 +61,7 @@
           <h2>基本資料</h2>
           <div class="field"><label for="clientName">姓名 *</label><input id="clientName" autocomplete="name" required></div>
           <div class="field"><label for="clientEmail">Email *</label><input id="clientEmail" type="email" autocomplete="email" required></div>
-          <div class="field"><label for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
+          <div class="field"><label id="clientPhoneLabel" for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
           <div class="field"><label for="clientAge">年齡</label><input id="clientAge" inputmode="numeric" autocomplete="off" placeholder="例：38"></div>
           <div class="field" id="occupationTextField"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
           <div class="field hidden" id="occupationIdentityField">
@@ -274,6 +274,8 @@
         setAccessMessage('', true);
       }
       document.getElementById('clientAge').required = !freeVersion;
+      document.getElementById('clientPhone').required = fullVersion;
+      document.getElementById('clientPhoneLabel').textContent = fullVersion ? '電話 *' : '電話';
       document.getElementById('clientOccupation').required = !freeVersion && !fullVersion;
       document.getElementById('clientOccupationIdentity').required = fullVersion;
       document.getElementById('bar').style.width = '100%';
