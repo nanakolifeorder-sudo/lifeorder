@@ -276,12 +276,22 @@
       }
       document.getElementById('clientAge').required = !freeVersion;
       const phoneInput = document.getElementById('clientPhone');
-      phoneInput.required = fullVersion;
-      phoneInput.inputMode = fullVersion ? 'numeric' : 'tel';
-      phoneInput.maxLength = fullVersion ? 10 : 524288;
-      phoneInput.pattern = fullVersion ? '09[0-9]{8}' : '';
-      phoneInput.placeholder = fullVersion ? '請輸入 09xxxxxxxx' : '';
-      document.getElementById('clientPhoneLabel').textContent = fullVersion ? '電話（09開頭） *' : '電話';
+      if (fullVersion) {
+        phoneInput.required = true;
+        phoneInput.inputMode = 'numeric';
+        phoneInput.maxLength = 10;
+        phoneInput.pattern = '09[0-9]{8}';
+        phoneInput.placeholder = '請輸入 09xxxxxxxx';
+        document.getElementById('clientPhoneLabel').textContent = '電話（09開頭） *';
+      } else {
+        phoneInput.required = false;
+        phoneInput.removeAttribute('required');
+        phoneInput.removeAttribute('pattern');
+        phoneInput.removeAttribute('maxlength');
+        phoneInput.inputMode = 'tel';
+        phoneInput.placeholder = '請輸入 09xxxxxxxx';
+        document.getElementById('clientPhoneLabel').textContent = '電話';
+      }
       document.getElementById('clientOccupation').required = !freeVersion && !fullVersion;
       document.getElementById('clientOccupationIdentity').required = fullVersion;
       document.getElementById('bar').style.width = '100%';
