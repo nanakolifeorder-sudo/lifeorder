@@ -280,7 +280,7 @@
       phoneInput.inputMode = fullVersion ? 'numeric' : 'tel';
       phoneInput.maxLength = fullVersion ? 10 : 524288;
       phoneInput.pattern = fullVersion ? '09[0-9]{8}' : '';
-      phoneInput.placeholder = fullVersion ? '例：0912345678' : '';
+      phoneInput.placeholder = fullVersion ? '請輸入 09xxxxxxxx' : '';
       document.getElementById('clientPhoneLabel').textContent = fullVersion ? '電話（09開頭） *' : '電話';
       document.getElementById('clientOccupation').required = !freeVersion && !fullVersion;
       document.getElementById('clientOccupationIdentity').required = fullVersion;
