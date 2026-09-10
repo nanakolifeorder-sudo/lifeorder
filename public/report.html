@@ -346,8 +346,10 @@
       if (!summary || summary.is_full_report !== false) return { shouldShowOne: false, order: '' };
       const scores = summary.display_scores || summary.scores || {};
       const keys = ['external', 'internal', 'continuity'].filter(function (key) { return Number.isFinite(Number(scores[key])); });
-      const levels = summary.levels || {};
-      const scoreLevels = keys.map(function (key) { return levels[key]; }).filter(Boolean);
+      const scoreLevels = keys.map(function (key) {
+        const value = Number(scores[key] || 0);
+        return value >= 60 ? '可維持' : value >= 30 ? '需要關注' : '優先處理';
+      });
       const sameScoreLevel = scoreLevels.length > 1 && new Set(scoreLevels).size === 1;
       const shouldShowOne = summary.lite_single_recommendation === true || sameScoreLevel;
       if (!shouldShowOne) return { shouldShowOne: false, order: '' };

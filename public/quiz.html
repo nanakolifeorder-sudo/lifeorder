@@ -181,12 +181,14 @@
     }
 
     function visibleQuestions() {
+      // Lite includes the pet question for every participant; only Full uses the pet toggle.
+      if (!isFullVersion()) return config.questions || [];
       const showPets = hasPetsSelected();
       return (config.questions || []).filter(function (question) { return showPets || !isPetQuestion(question); });
     }
 
     function clearPetAnswersIfHidden() {
-      if (hasPetsSelected()) return;
+      if (!isFullVersion() || hasPetsSelected()) return;
       (config.questions || []).filter(isPetQuestion).forEach(function (question) { delete savedAnswers[answerKey(question)]; });
     }
 
@@ -274,7 +276,7 @@
         if (document.getElementById('accessCode')) document.getElementById('accessCode').value = '';
         setAccessMessage('', true);
       }
-      document.getElementById('clientAge').required = !freeVersion;
+      document.getElementById('clientAge').required = true;
       const phoneInput = document.getElementById('clientPhone');
       if (fullVersion) {
         phoneInput.required = true;
@@ -368,7 +370,7 @@
         answers: Object.assign(collectAnswers(), {
           _profile_age: document.getElementById('clientAge').value.trim(),
           _profile_occupation: occupationValue(),
-          _profile_has_pets: isFullVersion() ? hasPetsSelected() : null
+          _profile_has_pets: isFullVersion() ? hasPetsSelected() : true
         })
       }).then(function (res) {
         if (!res.success) {
@@ -408,14 +410,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
