@@ -304,6 +304,7 @@ create table if not exists payment_orders (
   client_name text not null,
   client_email text not null,
   client_phone text not null,
+  crm_contact_id bigint references crm_contacts(id) on delete set null,
   status text not null default 'pending' check (status in ('pending', 'paid', 'failed', 'expired', 'refunded')),
   trade_no text default '',
   payment_type text default '',
@@ -316,6 +317,7 @@ create table if not exists payment_orders (
 
 create index if not exists idx_payment_orders_tenant_status on payment_orders(tenant_slug, status, created_at desc);
 create index if not exists idx_payment_orders_client_phone on payment_orders(tenant_slug, client_phone, created_at desc);
+create index if not exists idx_payment_orders_crm_contact on payment_orders(tenant_slug, crm_contact_id, paid_at desc);
 
 create table if not exists checkout_page_settings (
   tenant_slug text primary key references tenants(slug) on delete cascade,
