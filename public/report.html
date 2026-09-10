@@ -34,11 +34,13 @@
     .lite-focus-list { display:grid; gap:12px; }
     .lite-focus-card { border:1px solid #d7e5ff; border-left:4px solid var(--blue); border-radius:8px; padding:16px 18px; background:#f8fbff; }
     .lite-focus-card h3 { color:#174ea6; margin-bottom:6px; }
-    .lite-focus-card p { margin:0; color:#3c4043; font-size:17px; }
+    .lite-focus-card p { margin:0; color:#3c4043; font-size:16px; }
+    .lite-focus-card p + p { margin-top:12px; }
+    .lite-focus-question { color:#174ea6 !important; font-weight:800; }
     .lite-focus-score { color:var(--blue); font-size:14px; font-weight:800; margin-bottom:6px; }
-    .lite-bridge { margin-top:22px; padding:20px; border-radius:8px; background:#16333a; }
+    .lite-bridge { margin-top:22px; padding:22px; border-radius:8px; background:#16333a; }
     .lite-bridge h3 { color:#fff; margin-bottom:8px; }
-    .lite-bridge p { color:#d7e7e4; margin-bottom:16px; }
+    .lite-bridge p { color:#d7e7e4; margin-bottom:12px; }
     .lite-bridge .button { background:#d09b34; color:#16333a; }
     .diagnosis-group { border-top:1px solid var(--line); padding-top:20px; margin-top:22px; }
     .diagnosis-group:first-child { border-top:0; padding-top:0; margin-top:0; }
@@ -409,18 +411,31 @@
       const focusItems = liteFocusItems(summary);
       if (!focusItems.length) return;
       const copy = {
-        external: '你可能已經知道哪些事該整理，只是它們還沒有一個不必再靠記憶的位置。',
-        internal: '你不是沒有在往前走，只是很多該為自己決定的事，可能一直排在所有人和所有責任後面。',
-        continuity: '有些重要的事目前只有你知道；它們還沒有變成別人也接得住的安排。'
+        external: {
+          body: '很多事情平常都還能處理：資料找得到，帳號也記得住，家裡的東西看起來也沒有亂到不能生活。真正耗心力的，是每次需要時都得重新想一次：它放哪裡？誰知道？如果不是我來處理，其他人找得到嗎？',
+          meaning: '這份結果先提醒你，外在秩序不只是收納。它關係到那些重要的事，能不能不用一直壓在你的記憶裡。',
+          question: '你最想先看清楚的，是文件、帳號、資產，還是空間裡那些一直沒處理的東西？'
+        },
+        internal: {
+          body: '你可能一直把日子顧得很好：該回的訊息有回，該扛的責任也沒有少。但當工作、家人和各種事情同時靠近時，自己的願望、關係界線與真正想過的生活，往往就排到了最後。',
+          meaning: '這份結果先提醒你，內在秩序不是要把人生規畫得很完美，而是讓重要的選擇，不再永遠排在最後。',
+          question: '你現在最想釐清的，是一段關係、一直往後放的願望，還是每天被事情推著走的優先順序？'
+        },
+        continuity: {
+          body: '平常日子裡，很多事都還能自己處理，所以不一定覺得需要特別安排。真正讓人不安的，是一旦自己暫時不能處理，家人不知道該找誰、資料在哪裡、哪些事要先做。',
+          meaning: '延續秩序不是為了預想最壞的事，而是讓重要的人在需要時，不必靠猜。',
+          question: '你最想先確認的，是家人接手、照顧安排、重要紀錄，還是那些一直還沒開口談的事？'
+        }
       };
       const target = document.getElementById('contentSection');
       target.classList.remove('hidden');
       target.querySelector('h2').textContent = focusItems.length === 1 ? '你現在最值得留意的方向' : '你現在值得多留意的地方';
       document.getElementById('matchedContent').innerHTML = '<div class="lite-focus-list">' + focusItems.map(function (item) {
         const score = escapeHtml(item.displayScore) + (item.displayMax ? '/' + escapeHtml(item.displayMax) : '');
-        return '<article class="lite-focus-card"><div class="lite-focus-score">' + score + '</div><h3>' + escapeHtml(item.name) + '</h3><p>' + escapeHtml(copy[item.key] || '這個面向值得你再多看一眼。') + '</p></article>';
+        const itemCopy = copy[item.key] || { body: '這個面向值得你再多看一眼。', meaning: '', question: '' };
+        return '<article class="lite-focus-card"><div class="lite-focus-score">' + score + '</div><h3>' + escapeHtml(item.name) + '</h3><p>' + escapeHtml(itemCopy.body) + '</p><p>' + escapeHtml(itemCopy.meaning) + '</p>' + (itemCopy.question ? '<p class="lite-focus-question">' + escapeHtml(itemCopy.question) + '</p>' : '') + '</article>';
       }).join('') + '</div>' +
-        '<aside class="lite-bridge"><h3>你已經看見方向，差的是知道它究竟卡在哪一格。</h3><p>三大秩序能先告訴你從哪個方向看；完整版會再拆成 11 個面向，找出現在還只放在腦中、還沒有被安排好的位置。</p><a class="button" href="https://nanako-lifeorder.systeme.io/0c75e341">查看人生秩序完整版｜NT$980</a></aside>';
+        '<aside class="lite-bridge"><h3>你現在看到的是方向，還不是完整答案。</h3><p>三大秩序先讓你知道哪一塊值得多留意；但它還看不出，真正卡住的是哪一個具體面向。</p><p>完整版會依你的作答拆成 11 個面向，讓你知道哪些事還只放在腦中，哪些安排已經可以開始讓自己和家人接得住。你不需要一次把人生整理完，先知道哪一件事值得被放回生活裡就好。</p><a class="button" href="https://nanako-lifeorder.systeme.io/0c75e341">查看人生秩序完整版｜NT$980</a></aside>';
     }
 
     function renderMatchedContent(items, summary) {
