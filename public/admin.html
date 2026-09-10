@@ -612,6 +612,10 @@
     let crmDateFrom = '';
     let crmDateTo = '';
     let accessCodeProject = 'ALL';
+    let paymentProject = 'ALL';
+    let paymentSearch = '';
+    let paymentDateFrom = '';
+    let paymentDateTo = '';
     let crmSelectedContacts = {};
     let quizLeadProject = 'ALL';
     let quizLeadMode = 'unbooked';
@@ -835,6 +839,7 @@
       return [
         { id: 'crm', group: '客戶管理', mark: '客', label: '客戶 CRM', ok: true },
         { id: 'quizLeads', group: '客戶管理', mark: '測', label: '測驗名單', ok: can('CRM_ALL') },
+        { id: 'payments', group: '客戶管理', mark: '款', label: '交易報表', ok: can('CRM_ALL') },
         { id: 'analytics', group: '客戶管理', mark: '數', label: '作答數據', ok: can('ANALYTICS') },
         { id: 'schedule', group: '預約系統', mark: '排', label: '排班系統', ok: true },
         { id: 'consultants', group: '預約系統', mark: '顧', label: '顧問管理', ok: isAdmin() },
@@ -885,6 +890,7 @@
       const map = {
         crm: loadCrm,
         quizLeads: loadQuizLeads,
+        payments: loadPaymentTransactions,
         schedule: loadSchedule,
         consultants: loadConsultants,
         projects: loadProjects,
@@ -907,6 +913,7 @@
       if (currentView === 'crm') delete cache.crm;
       if (currentView === 'quizLeads') delete cache.quizLeads;
       if (currentView === 'accessCodes') delete cache.accessCodes;
+      if (currentView === 'payments') delete cache.payments;
       showView(currentView);
     }
 
@@ -920,6 +927,61 @@
 
 
 
+    function loadPaymentTransactions() {
+      loading('交易報表');
+      api('getPaymentTransactions', { projectCode: paymentProject, search: paymentSearch, dateFrom: paymentDateFrom, dateTo: paymentDateTo }).then(function (res) {
+        cache.payments = res;
+        renderPaymentTransactions(res);
+      }).catch(showError);
+    }
+
+    function applyPaymentFilters() {
+      paymentProject = field('paymentProject') || 'ALL';
+      paymentSearch = field('paymentSearch');
+      paymentDateFrom = field('paymentDateFrom');
+      paymentDateTo = field('paymentDateTo');
+      delete cache.payments;
+      loadPaymentTransactions();
+    }
+
+    function exportPaymentTransactions() {
+      const rows = cache.payments?.transactions || [];
+      if (!rows.length) { alert('目前沒有可匯出的交易。'); return; }
+      const header = ['付款時間', '姓名', 'Email', '電話', '專案', '版本', '商品', '金額', '付款方式', '藍新交易序號', '商店訂單編號'];
+      const body = rows.map(function (row) {
+        return [compactDate(row.paidAt || row.createdAt), row.clientName, row.clientEmail, row.clientPhone, row.projectCode, row.versionCode, row.productName || row.productCode, row.amount, row.paymentType, row.tradeNo, row.merchantOrderNo].map(csvEscape).join(',');
+      });
+      const blob = new Blob(['\ufeff' + header.join(',') + '\r\n' + body.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'payment-transactions-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function renderPaymentTransactions(res) {
+      const summary = res.summary || {};
+      const projectOptions = ['<option value="ALL">所有專案</option>'].concat((res.projects || []).map(function (project) {
+        return '<option value="' + escapeHtml(project.code) + '"' + (paymentProject === project.code ? ' selected' : '') + '>' + escapeHtml(project.name || project.code) + '</option>';
+      })).join('');
+      const rows = res.transactions || [];
+      document.getElementById('view').innerHTML =
+        '<div class="panel"><div class="row">' +
+          '<div class="col-3"><h2>交易報表</h2><p class="mini">僅列出藍新付款成功交易，可直接匯出對帳。</p></div>' +
+          '<div class="col-2"><label>專案</label><select id="paymentProject">' + projectOptions + '</select></div>' +
+          '<div class="col-2"><label>付款日期起</label><input id="paymentDateFrom" type="date" value="' + escapeHtml(paymentDateFrom) + '"></div>' +
+          '<div class="col-2"><label>付款日期迄</label><input id="paymentDateTo" type="date" value="' + escapeHtml(paymentDateTo) + '"></div>' +
+          '<div class="col-3"><label>搜尋</label><input id="paymentSearch" value="' + escapeHtml(paymentSearch) + '" placeholder="姓名、Email、電話、交易序號"></div>' +
+          '<div class="col-12 actions"><button onclick="applyPaymentFilters()">篩選</button><button class="secondary" onclick="exportPaymentTransactions()">匯出 CSV</button></div>' +
+        '</div></div>' +
+        '<div class="stat-grid">' + statBox('付款成功筆數', summary.paymentCount || 0) + statBox('付款總額', 'NT$' + Number(summary.totalAmount || 0).toLocaleString()) + statBox('平均客單', 'NT$' + Number(summary.averageAmount || 0).toLocaleString()) + statBox('最近付款', compactDate(summary.latestPaidAt) || '尚無') + '</div>' +
+        '<div class="list">' + (rows.length ? rows.map(function (row) {
+          return '<div class="client-card contact"><div class="card-top"><div><div class="crm-card-title"><strong>' + escapeHtml(row.clientName || '未提供姓名') + '</strong><span class="badge">NT$' + escapeHtml(String(row.amount || 0)) + '</span><span class="badge">' + escapeHtml(row.paymentType || '付款方式未提供') + '</span></div><p class="mini">' + escapeHtml(row.clientEmail || '') + (row.clientPhone ? '｜' + escapeHtml(row.clientPhone) : '') + '</p></div><span class="badge">' + escapeHtml(row.projectCode || '') + (row.versionCode ? ' / ' + escapeHtml(row.versionCode) : '') + '</span></div><div class="crm-card-meta">' + crmDetailMeta('付款時間', compactDate(row.paidAt || row.createdAt)) + crmDetailMeta('商品', row.productName || row.productCode || '') + crmDetailMeta('藍新交易序號', row.tradeNo || '無資料') + crmDetailMeta('商店訂單編號', row.merchantOrderNo || '') + '</div></div>';
+        }).join('') : '<div class="panel"><p>目前沒有符合條件的付款成功交易。</p></div>') + '</div>';
+    }
     function loadAccessCodes() {
       loading('優惠 / 重測碼');
       api('getQuizAccessCodeData', { projectCode: accessCodeProject }).then(function (res) {
