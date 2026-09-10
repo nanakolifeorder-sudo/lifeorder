@@ -18,6 +18,14 @@
       "destination": "/booking.html"
     },
     {
+      "source": "/checkout",
+      "destination": "/checkout.html"
+    },
+    {
+      "source": "/payment-success",
+      "destination": "/payment-success.html"
+    },
+    {
       "source": "/admin",
       "destination": "/admin.html"
     },
