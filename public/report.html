@@ -360,7 +360,7 @@
 
     function reportBlockOrderHint(block) {
       const content = block && block.content || {};
-      const text = [block && block.title, content.title, content.heading, content.label].filter(Boolean).join(' ');
+      const text = [block && block.title, content.title, content.heading, content.label, content.text, content.body, content.description].filter(Boolean).join(' ');
       if (/外在秩序/.test(text)) return 'external';
       if (/內在秩序/.test(text)) return 'internal';
       if (/延續秩序/.test(text)) return 'continuity';
