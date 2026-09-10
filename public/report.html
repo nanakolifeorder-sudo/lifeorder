@@ -342,8 +342,35 @@
       '</div>';
     }
 
+    function liteRecommendationSelection(summary) {
+      if (!summary || summary.is_full_report !== false) return { shouldShowOne: false, order: '' };
+      const scores = summary.display_scores || summary.scores || {};
+      const keys = ['external', 'internal', 'continuity'].filter(function (key) { return Number.isFinite(Number(scores[key])); });
+      const levels = summary.levels || {};
+      const scoreLevels = keys.map(function (key) { return levels[key]; }).filter(Boolean);
+      const sameScoreLevel = scoreLevels.length > 1 && new Set(scoreLevels).size === 1;
+      const shouldShowOne = summary.lite_single_recommendation === true || sameScoreLevel;
+      if (!shouldShowOne) return { shouldShowOne: false, order: '' };
+      const age = Number(summary.demographics && summary.demographics.age);
+      const order = Number.isFinite(age) && age > 0
+        ? (age >= 56 ? 'continuity' : age >= 41 ? 'internal' : 'external')
+        : (summary.main_order || 'continuity');
+      return { shouldShowOne: true, order: order };
+    }
+
+    function reportBlockOrderHint(block) {
+      const content = block && block.content || {};
+      const text = [block && block.title, content.title, content.heading, content.label].filter(Boolean).join(' ');
+      if (/外在秩序/.test(text)) return 'external';
+      if (/內在秩序/.test(text)) return 'internal';
+      if (/延續秩序/.test(text)) return 'continuity';
+      return '';
+    }
+
     function renderMatchedContent(items, summary) {
       items = filterPetReportItems(Array.isArray(items) ? items : [], summary);
+      const selection = liteRecommendationSelection(summary);
+      if (selection.shouldShowOne) items = items.filter(function (item) { return item.dimensionKey === selection.order; });
       if (!items.length) return;
       document.getElementById('contentSection').classList.remove('hidden');
       const order = ['low', 'mid', 'high'];
@@ -431,9 +458,14 @@
     }
 
     function renderBlocks(blocks) {
+      const selection = liteRecommendationSelection(window.__scoreSummary || {});
       const filtered = (blocks || [])
         .filter(function (block) { return !['score_table', 'score_range_content'].includes(block.blockType); })
         .filter(reportBlockVisible)
+        .filter(function (block) {
+          const orderHint = reportBlockOrderHint(block);
+          return !selection.shouldShowOne || !orderHint || orderHint === selection.order;
+        })
         .map(prepareReportBlock);
       if (!filtered.length) return;
       document.getElementById('blocksSection').classList.remove('hidden');
@@ -492,7 +524,8 @@
         document.getElementById('topActions').innerHTML = '';
         window.__scoreSummary = summary;
         window.__reportVersionCode = res.versionCode || '';
-        const reportBlocks = (snapshot.blocks || []).slice();
+        const reportBlocks = (snapshot.blocks || []).slice();
+
         renderScores(summary, settings);
         renderMatchedContent(snapshot.matched_content || [], summary);
         renderBlocks(reportBlocks);
