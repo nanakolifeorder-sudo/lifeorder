@@ -31,6 +31,15 @@
     .meter { height:8px; background:#e8eaed; border-radius:999px; overflow:hidden; margin-top:10px; }
     .meter span { display:block; height:100%; background:var(--green); width:0; }
     .content { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
+    .lite-focus-list { display:grid; gap:12px; }
+    .lite-focus-card { border:1px solid #d7e5ff; border-left:4px solid var(--blue); border-radius:8px; padding:16px 18px; background:#f8fbff; }
+    .lite-focus-card h3 { color:#174ea6; margin-bottom:6px; }
+    .lite-focus-card p { margin:0; color:#3c4043; font-size:17px; }
+    .lite-focus-score { color:var(--blue); font-size:14px; font-weight:800; margin-bottom:6px; }
+    .lite-bridge { margin-top:22px; padding:20px; border-radius:8px; background:#16333a; }
+    .lite-bridge h3 { color:#fff; margin-bottom:8px; }
+    .lite-bridge p { color:#d7e7e4; margin-bottom:16px; }
+    .lite-bridge .button { background:#d09b34; color:#16333a; }
     .diagnosis-group { border-top:1px solid var(--line); padding-top:20px; margin-top:22px; }
     .diagnosis-group:first-child { border-top:0; padding-top:0; margin-top:0; }
     .diagnosis-group h3 { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:#eef4ff; color:#174ea6; font-size:16px; }
@@ -105,7 +114,7 @@
 
     <section class="section hidden" id="scoreSection">
       <h2>分數總覽</h2>
-      <p>每一項滿分 100 分。分數越接近 100，代表這一塊的資料、決定與安排越明確；自己處理時比較不需要反覆確認，身邊重要的人在必要時也比較能接手。</p>
+      <p id="scoreDescription">每一項滿分 100 分。分數越接近 100，代表這一塊的資料、決定與安排越明確；自己處理時比較不需要反覆確認，身邊重要的人在必要時也比較能接手。</p>
       <div class="score-snapshot">
         <div id="scoreChart"></div>
         <div class="score-list" id="scores"></div>
@@ -239,13 +248,21 @@
     }
 
     function renderScores(summary, settings) {
+      const isLite = summary && summary.is_full_report === false;
       const chartTarget = document.getElementById('scoreChart');
       if (chartTarget) chartTarget.innerHTML = !settings || settings.show_chart !== false ? renderRadarChart(summary, { title: '人生秩序雷達圖' }) : '';
       if (settings && settings.show_score_cards === false) return;
       const items = filterPetReportItems(scoreItems(summary), summary);
       if (!items.length) return;
       document.getElementById('scoreSection').classList.remove('hidden');
-      const descriptions = {
+      document.getElementById('scoreDescription').textContent = isLite
+        ? '分數越高，代表這個面向目前越有秩序；分數較低的地方，可能就是你現階段最值得關注的卡點。'
+        : '每一項滿分 100 分。分數越接近 100，代表這一塊的資料、決定與安排越明確；自己處理時比較不需要反覆確認，身邊重要的人在必要時也比較能接手。';
+      const descriptions = isLite ? {
+        external: '重要資訊與日常安排，是否已有清楚位置。',
+        internal: '關係、願望與優先順序，是否還留有自己的位置。',
+        continuity: '重要安排，是否已經有人能理解並接得住。'
+      } : {
         external: '外在秩序牽涉物品、空間、文件、帳號、密碼、保單、帳戶與資產資料。這一塊越明確，日常事情越容易一次處理完。',
         internal: '內在秩序牽涉關係、願望、價值觀與優先順序。這一塊越明確，你越容易知道哪些事要先安排，哪些責任需要重新分配。',
         continuity: '延續秩序牽涉家人接手、寵物照顧、百年安排、重要紀錄與想留下的心意。這一塊越明確，臨時變動來臨時，身邊的人越容易照著你的意思處理。'
@@ -253,7 +270,8 @@
       document.getElementById('scores').innerHTML = items.map(function (item) {
         return '<div class="score"><div class="score-head"><h3>' + escapeHtml(item.name) + '</h3><span class="score-value">' + item.displayScore + (item.displayMax ? '/' + item.displayMax : '') + '</span></div><div class="meter"><span style="width:' + Math.round(item.pct * 100) + '%"></span></div><p>' + escapeHtml(descriptions[item.key] || item.description || '') + '</p></div>';
       }).join('');
-      renderLifeOrderGuide(items, summary);
+      if (isLite) document.getElementById('lifeOrderGuide').innerHTML = '';
+      else renderLifeOrderGuide(items, summary);
     }
 
 
@@ -367,6 +385,42 @@
       if (/內在秩序/.test(text)) return 'internal';
       if (/延續秩序/.test(text)) return 'continuity';
       return '';
+    }
+
+    function liteFocusItems(summary) {
+      const items = filterPetReportItems(scoreItems(summary), summary).filter(function (item) {
+        return ['external', 'internal', 'continuity'].includes(item.key);
+      });
+      if (!items.length) return [];
+      const selection = liteRecommendationSelection(summary);
+      if (selection.shouldShowOne && selection.order) {
+        return items.filter(function (item) { return item.key === selection.order; });
+      }
+      const bandFor = function (item) {
+        return Number(item.displayScore || 0) >= 60 ? 2 : Number(item.displayScore || 0) >= 30 ? 1 : 0;
+      };
+      const lowestBand = Math.min.apply(null, items.map(bandFor));
+      return items.filter(function (item) { return bandFor(item) === lowestBand; })
+        .sort(function (a, b) { return Number(a.displayScore) - Number(b.displayScore); })
+        .slice(0, 3);
+    }
+
+    function renderLiteReport(summary) {
+      const focusItems = liteFocusItems(summary);
+      if (!focusItems.length) return;
+      const copy = {
+        external: '你可能已經知道哪些事該整理，只是它們還沒有一個不必再靠記憶的位置。',
+        internal: '你不是沒有在往前走，只是很多該為自己決定的事，可能一直排在所有人和所有責任後面。',
+        continuity: '有些重要的事目前只有你知道；它們還沒有變成別人也接得住的安排。'
+      };
+      const target = document.getElementById('contentSection');
+      target.classList.remove('hidden');
+      target.querySelector('h2').textContent = focusItems.length === 1 ? '你現在最值得留意的方向' : '你現在值得多留意的地方';
+      document.getElementById('matchedContent').innerHTML = '<div class="lite-focus-list">' + focusItems.map(function (item) {
+        const score = escapeHtml(item.displayScore) + (item.displayMax ? '/' + escapeHtml(item.displayMax) : '');
+        return '<article class="lite-focus-card"><div class="lite-focus-score">' + score + '</div><h3>' + escapeHtml(item.name) + '</h3><p>' + escapeHtml(copy[item.key] || '這個面向值得你再多看一眼。') + '</p></article>';
+      }).join('') + '</div>' +
+        '<aside class="lite-bridge"><h3>你已經看見方向，差的是知道它究竟卡在哪一格。</h3><p>三大秩序能先告訴你從哪個方向看；完整版會再拆成 11 個面向，找出現在還只放在腦中、還沒有被安排好的位置。</p><a class="button" href="https://nanako-lifeorder.systeme.io/0c75e341">查看人生秩序完整版｜NT$980</a></aside>';
     }
 
     function renderMatchedContent(items, summary) {
@@ -529,8 +583,14 @@
         const reportBlocks = (snapshot.blocks || []).slice();
 
         renderScores(summary, settings);
-        renderMatchedContent(snapshot.matched_content || [], summary);
-        renderBlocks(reportBlocks);
+        if (summary.is_full_report === false) {
+          renderLiteReport(summary);
+          document.getElementById('blocksSection').classList.add('hidden');
+          document.getElementById('blocks').innerHTML = '';
+        } else {
+          renderMatchedContent(snapshot.matched_content || [], summary);
+          renderBlocks(reportBlocks);
+        }
         document.getElementById('loading').classList.add('hidden');
       }).catch(function (error) {
         document.getElementById('loading').innerHTML = '<span class="error">' + escapeHtml(error.message || '載入失敗') + '</span>';
