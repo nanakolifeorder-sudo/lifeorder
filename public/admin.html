@@ -1742,6 +1742,7 @@
         cache.crm = results[1];
         renderCrm(cache.crm);
         renderClientDetail(results[0]);
+        alert('名單資料已儲存。');
       }).catch(function (err) { alert(err.message); });
     }
     function attendanceOptions(current) {
