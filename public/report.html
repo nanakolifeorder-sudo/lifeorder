@@ -38,6 +38,11 @@
     .lite-focus-card p + p { margin-top:12px; }
     .lite-focus-question { color:#174ea6 !important; font-weight:800; }
     .lite-focus-score { color:var(--blue); font-size:14px; font-weight:800; margin-bottom:6px; }
+    .lite-authority { margin-top:18px; border:1px solid #d8d0be; border-radius:8px; padding:18px 20px; background:#fffdf7; }
+    .lite-authority-kicker { color:#a27319 !important; font-size:13px !important; font-weight:800; margin-bottom:4px !important; }
+    .lite-authority h3 { color:#16333a; margin-bottom:8px; }
+    .lite-authority-source { font-size:13px !important; margin-top:10px !important; margin-bottom:0 !important; }
+    .lite-authority-source a { color:#174ea6; font-weight:800; }
     .lite-bridge { margin-top:22px; padding:22px; border-radius:8px; background:#16333a; }
     .lite-bridge h3 { color:#fff; margin-bottom:8px; }
     .lite-bridge p { color:#d7e7e4; margin-bottom:12px; }
@@ -396,15 +401,15 @@
       if (!items.length) return [];
       const selection = liteRecommendationSelection(summary);
       if (selection.shouldShowOne && selection.order) {
-        return items.filter(function (item) { return item.key === selection.order; });
+        return items.filter(function (item) { return item.key === selection.order; }).slice(0, 1);
       }
-      const bandFor = function (item) {
-        return Number(item.displayScore || 0) >= 60 ? 2 : Number(item.displayScore || 0) >= 30 ? 1 : 0;
-      };
-      const lowestBand = Math.min.apply(null, items.map(bandFor));
-      return items.filter(function (item) { return bandFor(item) === lowestBand; })
-        .sort(function (a, b) { return Number(a.displayScore) - Number(b.displayScore); })
-        .slice(0, 3);
+      const lowestScore = Math.min.apply(null, items.map(function (item) { return Number(item.displayScore || 0); }));
+      const tied = items.filter(function (item) { return Number(item.displayScore || 0) === lowestScore; });
+      const age = Number(summary && summary.demographics && summary.demographics.age);
+      const ageOrder = Number.isFinite(age) && age > 0 ? (age >= 56 ? 'continuity' : age >= 41 ? 'internal' : 'external') : '';
+      const priority = [ageOrder, 'continuity', 'external', 'internal'].filter(Boolean);
+      const chosen = priority.map(function (key) { return tied.find(function (item) { return item.key === key; }); }).find(Boolean) || tied[0];
+      return chosen ? [chosen] : [];
     }
 
     function renderLiteReport(summary) {
@@ -427,14 +432,35 @@
           question: '你最想先確認的，是家人接手、照顧安排、重要紀錄，還是那些一直還沒開口談的事？'
         }
       };
+      const authority = {
+        external: {
+          title: '外在的雜亂，常常不只是看起來不舒服。',
+          body: '美國心理學會整理相關研究指出，雜亂的居家與工作環境可能增加壓力與焦慮，也可能影響專注與生產力。當重要資訊沒有固定位置，耗掉的往往不是時間而已，還有反覆記得與反覆確認的心力。',
+          sourceLabel: 'American Psychological Association｜Why clutter stresses us out',
+          sourceUrl: 'https://www.apa.org/news/podcasts/speaking-of-psychology/clutter'
+        },
+        internal: {
+          title: '關係不是生活裡「有空再處理」的事。',
+          body: '哈佛成人發展研究長期追蹤成人健康與幸福，發現有品質的關係，和較好的身心健康與幸福感有密切關聯。那段一直讓你放不下的關係，或那個總被往後放的願望，可能比你以為的，更影響你怎麼感受自己的生活。',
+          sourceLabel: 'Harvard Study of Adult Development',
+          sourceUrl: 'https://news.harvard.edu/gazette/story/2025/05/things-money-cant-buy-like-happiness-and-better-health/'
+        },
+        continuity: {
+          title: '重要安排被說清楚，身邊的人才不用靠猜。',
+          body: '美國國家老化研究院談預立照護規畫時指出，及早與親友談清楚偏好並留下紀錄，能幫助親友在需要代為決定時減少負擔。這也是為什麼有些事不必等到很急，才開始想要不要整理。',
+          sourceLabel: 'National Institute on Aging｜Advance Care Planning',
+          sourceUrl: 'https://www.nia.nih.gov/health/advance-care-planning/advance-care-planning-and-health-care-decisions-tips-caregivers-and'
+        }
+      };
       const target = document.getElementById('contentSection');
       target.classList.remove('hidden');
-      target.querySelector('h2').textContent = focusItems.length === 1 ? '你現在最值得留意的方向' : '你現在值得多留意的地方';
+      target.querySelector('h2').textContent = '你現在最值得留意的方向';
       document.getElementById('matchedContent').innerHTML = '<div class="lite-focus-list">' + focusItems.map(function (item) {
         const score = escapeHtml(item.displayScore) + (item.displayMax ? '/' + escapeHtml(item.displayMax) : '');
         const itemCopy = copy[item.key] || { body: '這個面向值得你再多看一眼。', meaning: '', question: '' };
         return '<article class="lite-focus-card"><div class="lite-focus-score">' + score + '</div><h3>' + escapeHtml(item.name) + '</h3><p>' + escapeHtml(itemCopy.body) + '</p><p>' + escapeHtml(itemCopy.meaning) + '</p>' + (itemCopy.question ? '<p class="lite-focus-question">' + escapeHtml(itemCopy.question) + '</p>' : '') + '</article>';
       }).join('') + '</div>' +
+        (function () { const item = focusItems[0]; const note = authority[item.key]; return note ? '<aside class="lite-authority"><p class="lite-authority-kicker">研究提醒</p><h3>' + escapeHtml(note.title) + '</h3><p>' + escapeHtml(note.body) + '</p><p class="lite-authority-source"><a href="' + escapeHtml(note.sourceUrl) + '" target="_blank" rel="noopener noreferrer">來源：' + escapeHtml(note.sourceLabel) + '</a></p></aside>' : ''; })() +
         '<aside class="lite-bridge"><h3>你現在看到的是方向，還不是完整答案。</h3><p>三大秩序先讓你知道哪一塊值得多留意；但它還看不出，真正卡住的是哪一個具體面向。</p><p>完整版會依你的作答拆成 11 個面向，讓你知道哪些事還只放在腦中，哪些安排已經可以開始讓自己和家人接得住。你不需要一次把人生整理完，先知道哪一件事值得被放回生活裡就好。</p><a class="button" href="https://nanako-lifeorder.systeme.io/0c75e341">查看人生秩序完整版｜NT$980</a></aside>';
     }
 
