@@ -845,6 +845,7 @@
         { id: 'quizEmails', group: '測驗系統', mark: '追', label: '跟進信管理', ok: can('EMAILS') },
         { id: 'accessCodes', group: '測驗系統', mark: '碼', label: '優惠 / 重測碼', ok: can('CRM_ALL') },
         { id: 'projects', group: '系統設定', mark: '專', label: '專案管理', ok: can('PROJECTS') },
+        { id: 'checkoutSettings', group: '系統設定', mark: '結', label: '結帳頁設定', ok: can('PROJECTS') },
         { id: 'usage', group: '系統設定', mark: '監', label: '總數據監測', ok: isSystemOwner() },
         { id: 'users', group: '系統設定', mark: '帳', label: '帳號 / 權限管理', ok: isSystemOwner() }
       ].filter(function (tab) { return tab.ok; });
@@ -887,6 +888,7 @@
         schedule: loadSchedule,
         consultants: loadConsultants,
         projects: loadProjects,
+        checkoutSettings: loadCheckoutSettings,
         questions: loadQuestions,
         quizEditor: loadQuizEditor,
         reportEditor: loadReportEditor,
@@ -2269,6 +2271,41 @@
       }).catch(function (err) { alert(err.message); });
     }
 
+    function loadCheckoutSettings() {
+      loading('結帳頁設定');
+      api('getCheckoutPageSettings', {}).then(renderCheckoutSettings).catch(showError);
+    }
+
+    function renderCheckoutSettings(res) {
+      const settings = res.settings || {};
+      document.getElementById('view').innerHTML =
+        '<div class="panel"><div class="panel-head"><div><h2>結帳頁設定</h2><p class="mini">可調整付款資料頁與付款完成頁的文案及圖片。付款金額仍由商品設定固定，不會在此頁更動。</p></div></div>' +
+        '<div class="row"><div class="col-12"><h3>付款資料頁</h3></div>' +
+        '<div class="col-6"><label>標題</label><input id="checkoutTitle" maxlength="160" value="' + escapeHtml(settings.checkoutTitle || '') + '"></div>' +
+        '<div class="col-6"><label>說明</label><input id="checkoutDescription" maxlength="500" value="' + escapeHtml(settings.checkoutDescription || '') + '"></div>' +
+        '<div class="col-12"><h3>付款完成頁</h3></div>' +
+        '<div class="col-6"><label>完成標題</label><input id="successTitle" maxlength="160" value="' + escapeHtml(settings.successTitle || '') + '"></div>' +
+        '<div class="col-6"><label>按鈕文字</label><input id="successButtonLabel" maxlength="100" value="' + escapeHtml(settings.successButtonLabel || '') + '"></div>' +
+        '<div class="col-12"><label>完成說明</label><textarea id="successDescription" maxlength="1000">' + escapeHtml(settings.successDescription || '') + '</textarea></div>' +
+        '<div class="col-8"><label>完成頁圖片網址</label><input id="successImageUrl" type="url" placeholder="https://..." value="' + escapeHtml(settings.successImageUrl || '') + '"><div class="mini">請使用可公開讀取的圖片網址；留空則不顯示圖片。</div></div>' +
+        '<div class="col-4"><label>圖片替代文字</label><input id="successImageAlt" maxlength="200" value="' + escapeHtml(settings.successImageAlt || '') + '"></div>' +
+        '<div class="col-12 actions"><button type="button" onclick="saveCheckoutSettings()">儲存結帳頁設定</button></div></div></div>';
+    }
+
+    function saveCheckoutSettings() {
+      api('saveCheckoutPageSettings', {
+        checkoutTitle: field('checkoutTitle'),
+        checkoutDescription: field('checkoutDescription'),
+        successTitle: field('successTitle'),
+        successDescription: field('successDescription'),
+        successButtonLabel: field('successButtonLabel'),
+        successImageUrl: field('successImageUrl'),
+        successImageAlt: field('successImageAlt')
+      }).then(function () {
+        alert('結帳頁設定已儲存');
+        loadCheckoutSettings();
+      }).catch(function (err) { alert(err.message); });
+    }
     function loadProjects() {
       loading('專案管理');
       api('getAdminProjectData', {}).then(renderProjects).catch(showError);
