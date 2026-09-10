@@ -46,6 +46,7 @@
     .lite-bridge { margin-top:22px; padding:22px; border-radius:8px; background:#16333a; }
     .lite-bridge h3 { color:#fff; margin-bottom:8px; }
     .lite-bridge p { color:#d7e7e4; margin-bottom:12px; }
+    .lite-bridge-question { color:#fff4ca !important; font-weight:800; margin-top:16px; }
     .lite-bridge .button { background:#d09b34; color:#16333a; }
     .diagnosis-group { border-top:1px solid var(--line); padding-top:20px; margin-top:22px; }
     .diagnosis-group:first-child { border-top:0; padding-top:0; margin-top:0; }
@@ -470,10 +471,11 @@
         }
       };
       const bridge = {
-        external: { title: '先不用把所有事情整理完，先讓腦中少開幾個視窗。', body: '完整版會幫你分辨：現在最常讓你臨時想起、反覆確認的，是物品、空間、資訊，還是資產資料。先把一件重要的事放到可回看的位置，日常就少一件需要靠大腦撐住的事。', button: '找出我的外在秩序卡點｜NT$980' },
-        internal: { title: '你不需要立刻做出所有決定，先把自己放回優先順序裡。', body: '完整版會幫你分辨：讓你一直內耗的，是關係、願望、價值觀，還是每天被推著走的生活排序。把卡住的位置找出來，才不用再用忙碌替自己做選擇。', button: '找出我的內在秩序卡點｜NT$980' },
-        continuity: { title: '不必一次把所有安排交代完，先讓最重要的一件事有人接得住。', body: '完整版本會幫你分辨：現在最需要補上的，是家人接手、寵物照顧、百年安排，還是想留下的紀錄。把方向整理出來，安心就不用一直延後。', button: '找出我的延續秩序卡點｜NT$980' }
-      };      const target = document.getElementById('contentSection');
+        external: { title: '先不用把所有事情整理完，先讓腦中少開幾個視窗。', body: '完整版會幫你分辨：現在最常讓你臨時想起、反覆確認的，是物品、空間、資訊，還是資產資料。先把一件重要的事放到可回看的位置，日常就少一件需要靠大腦撐住的事。', question: '到底是哪一類事情最常卡在腦中？是行程、資訊、物品，還是資產資料？', button: '找出我的外在秩序卡點｜NT$980' },
+        internal: { title: '你不需要立刻做出所有決定，先把自己放回優先順序裡。', body: '完整版會幫你分辨：讓你一直內耗的，是關係、願望、價值觀，還是每天被推著走的生活排序。把卡住的位置找出來，才不用再用忙碌替自己做選擇。', question: '讓你反覆內耗的，究竟是一段關係、一個願望，還是優先順序？', button: '找出我的內在秩序卡點｜NT$980' },
+        continuity: { title: '不必一次把所有安排交代完，先讓最重要的一件事有人接得住。', body: '完整版本會幫你分辨：現在最需要補上的，是家人接手、寵物照顧、百年安排，還是想留下的紀錄。把方向整理出來，安心就不用一直延後。', question: '家人真正需要知道的，會是哪一份資料、哪一個聯絡方式，或哪一項照顧安排？', button: '找出我的延續秩序卡點｜NT$980' }
+      };
+      const target = document.getElementById('contentSection');
       target.classList.remove('hidden');
       target.querySelector('h2').textContent = '你現在最值得留意的方向';
       document.getElementById('matchedContent').innerHTML = '<div class="lite-focus-list">' + focusItems.map(function (item) {
@@ -483,7 +485,7 @@
       }).join('') + '</div>' +
         (function () { const item = focusItems[0]; const note = research[item.key]; return note ? '<aside class="lite-authority lite-research"><p class="lite-authority-kicker">' + escapeHtml(note.kicker) + '</p><h3>' + escapeHtml(note.title) + '</h3><p>' + escapeHtml(note.body) + '</p><p class="lite-authority-close">' + escapeHtml(note.close) + '</p></aside>' : ''; })() +
         (function () { const item = focusItems[0]; const note = authority[item.key]; return note ? '<aside class="lite-authority"><p class="lite-authority-kicker">你可能已經感覺到的事</p><h3>' + escapeHtml(note.title) + '</h3><p>' + escapeHtml(note.body) + '</p><p class="lite-authority-close">' + escapeHtml(note.close) + '</p></aside>' : ''; })() +
-        (function () { const item = focusItems[0]; const cta = bridge[item.key]; return cta ? '<aside class="lite-bridge"><h3>' + escapeHtml(cta.title) + '</h3><p>' + escapeHtml(cta.body) + '</p><a class="button" href="https://nanako-lifeorder.systeme.io/0c75e341">' + escapeHtml(cta.button) + '</a></aside>' : ''; })();
+        (function () { const item = focusItems[0]; const cta = bridge[item.key]; return cta ? '<aside class="lite-bridge"><h3>' + escapeHtml(cta.title) + '</h3><p>' + escapeHtml(cta.body) + '</p><p class="lite-bridge-question">' + escapeHtml(cta.question) + '</p><a class="button" href="https://nanako-lifeorder.systeme.io/0c75e341">' + escapeHtml(cta.button) + '</a></aside>' : ''; })();
     }
 
     function renderMatchedContent(items, summary) {
