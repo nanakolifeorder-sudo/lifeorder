@@ -1033,8 +1033,8 @@
       return '<div class="client-card contact"><div class="card-top"><div><div class="crm-card-title"><strong>' + escapeHtml(item.code) + '</strong><span class="badge">' + escapeHtml(accessCodeTypeLabel(item.codeType)) + '</span><span class="badge">' + escapeHtml(item.status || '') + '</span></div><p class="mini">' + escapeHtml(item.name || '') + '</p></div><span class="badge">' + escapeHtml(item.projectCode || '') + (item.versionCode ? ' / ' + escapeHtml(item.versionCode) : '') + '</span></div>' +
         '<div class="crm-card-meta">' +
           '<div class="crm-meta-item"><div class="mini">使用次數</div><strong>' + escapeHtml(usageText) + '</strong></div>' +
-          '<div class="crm-meta-item"><div class="mini">使用 Email 數</div><strong>' + escapeHtml(item.uniqueEmailCount || 0) + '</strong></div>' +
-          '<div class="crm-meta-item"><div class="mini">每個 Email 可用</div><strong>' + escapeHtml(item.perEmailLimit || 1) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">使用電話數</div><strong>' + escapeHtml(item.uniquePhoneCount || 0) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">每支電話可用</div><strong>' + escapeHtml(item.perPhoneLimit || 1) + '</strong></div>' +
           '<div class="crm-meta-item"><div class="mini">最後使用</div><strong>' + escapeHtml(compactDate(item.lastUsedAt) || '尚未使用') + '</strong></div>' +
         '</div>' +
         (item.discountLabel ? '<p class="mini">折扣說明：' + escapeHtml(item.discountLabel) + '</p>' : '') +
@@ -1054,16 +1054,17 @@
         const selected = (item?.projectCode || (accessCodeProject !== 'ALL' ? accessCodeProject : 'LO')) === p.code;
         return '<option value="' + escapeHtml(p.code) + '"' + (selected ? ' selected' : '') + '>' + escapeHtml(p.name || p.code) + '</option>';
       }).join('');
+      const versionOptions = ['LITE', 'FULL'].map(function (code) { return '<option value="' + code + '"' + ((item?.versionCode || 'LITE') === code ? ' selected' : '') + '>' + (code === 'FULL' ? '完整版測驗' : '簡易版測驗') + '</option>'; }).join('');
       panel.innerHTML = '<h3>' + (item ? '編輯代碼' : '新增代碼') + '</h3><div class="row">' +
         '<div class="col-3"><label>專案</label><select id="accessProject">' + projectOptions + '</select></div>' +
-        '<div class="col-2"><label>版本</label><input id="accessVersion" value="' + escapeHtml(item?.versionCode || 'LITE') + '" placeholder="LITE"></div>' +
+        '<div class="col-2"><label>版本</label><select id="accessVersion">' + versionOptions + '</select></div>' +
         '<div class="col-3"><label>代碼</label><input id="accessCode" value="' + escapeHtml(item?.code || '') + '" placeholder="例如：RETAKE980"></div>' +
         '<div class="col-2"><label>類型</label><select id="accessType">' + accessCodeTypeOptions(item?.codeType || 'retest') + '</select></div>' +
         '<div class="col-2"><label>狀態</label><select id="accessStatus">' + accessCodeStatusOptions(item?.status || '啟用') + '</select></div>' +
         '<div class="col-4"><label>名稱</label><input id="accessName" value="' + escapeHtml(item?.name || '') + '" placeholder="內部辨識名稱"></div>' +
         '<div class="col-4"><label>折扣說明</label><input id="accessDiscount" value="' + escapeHtml(item?.discountLabel || '') + '" placeholder="例如：完整版 980 重測資格"></div>' +
         '<div class="col-2"><label>總使用上限</label><input id="accessMaxUses" type="number" min="1" value="' + escapeHtml(item?.maxUses || '') + '" placeholder="不填不限"></div>' +
-        '<div class="col-2"><label>每 Email 次數</label><input id="accessPerEmail" type="number" min="1" value="' + escapeHtml(item?.perEmailLimit || 1) + '"></div>' +
+        '<div class="col-2"><label>每支電話次數</label><input id="accessPerPhone" type="number" min="1" value="' + escapeHtml(item?.perPhoneLimit || 1) + '"></div>' +
         '<div class="col-3"><label>開始時間</label><input id="accessStartsAt" type="datetime-local" value="' + escapeHtml(datetimeLocalValue(item?.startsAt)) + '"></div>' +
         '<div class="col-3"><label>結束時間</label><input id="accessEndsAt" type="datetime-local" value="' + escapeHtml(datetimeLocalValue(item?.endsAt)) + '"></div>' +
         '<div class="col-6"><label>備註</label><textarea id="accessNotes">' + escapeHtml(item?.notes || '') + '</textarea></div>' +
@@ -1095,7 +1096,7 @@
         codeType: field('accessType'),
         discountLabel: field('accessDiscount'),
         maxUses: field('accessMaxUses'),
-        perEmailLimit: field('accessPerEmail'),
+        perPhoneLimit: field('accessPerPhone'),
         startsAt: field('accessStartsAt') ? new Date(field('accessStartsAt')).toISOString() : null,
         endsAt: field('accessEndsAt') ? new Date(field('accessEndsAt')).toISOString() : null,
         status: field('accessStatus'),
@@ -2975,7 +2976,15 @@
       if (type === 'score_chart') return '<div class="col-6"><label>圖表類型</label><select class="rb-chart"><option value="radar"' + (content.chartType !== 'bar' ? ' selected' : '') + '>雷達圖</option><option value="bar"' + (content.chartType === 'bar' ? ' selected' : '') + '>長條圖</option></select></div>';
       if (type === 'score_table') return '<div class="col-12"><p class="mini">分數表會依目前測驗面向自動產生。</p></div>';
       if (type === 'button' || type === 'link') return '<div class="col-4"><label>文字</label><input class="rb-label" value="' + escapeHtml(content.label || block.title || '') + '"></div><div class="col-5"><label>網址</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '"></div><div class="col-3"><label>附加資料參數</label><select class="rb-append"><option value="false"' + (content.appendParams ? '' : ' selected') + '>否</option><option value="true"' + (content.appendParams ? ' selected' : '') + '>是</option></select></div>' + reportAppendFields(content);
-      if (type === 'booking_cta') return '<div class="col-3"><label>按鈕文字</label><input class="rb-label" value="' + escapeHtml(content.label || '預約一對一諮詢') + '"></div><div class="col-3"><label>連結模式</label><select class="rb-url-mode"><option value="system"' + (content.urlMode === 'custom' ? '' : ' selected') + '>系統預約頁</option><option value="custom"' + (content.urlMode === 'custom' ? ' selected' : '') + '>自訂網址</option></select></div><div class="col-4"><label>自訂 CTA URL</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '" placeholder="https://..."></div><div class="col-2"><label>附加資料參數</label><select class="rb-append"><option value="false"' + (content.appendParams ? '' : ' selected') + '>否</option><option value="true"' + (content.appendParams ? ' selected' : '') + '>是</option></select></div>' + reportAppendFields(content);
+      if (type === 'booking_cta') {
+        const isCustom = content.urlMode === 'custom';
+        const description = '<div class="col-12"><label>CTA 說明</label><textarea class="rb-description" placeholder="說明這堂課可帶來什麼，以及是否已包含在方案中">' + escapeHtml(content.description || '') + '</textarea></div>';
+        const label = '<div class="col-3"><label>按鈕文字</label><input class="rb-label" value="' + escapeHtml(content.label || '預約一對一諮詢') + '"></div>';
+        const mode = '<div class="col-3"><label>連結模式</label><select class="rb-url-mode"><option value="system"' + (isCustom ? '' : ' selected') + '>系統預約頁</option><option value="custom"' + (isCustom ? ' selected' : '') + '>自訂網址</option></select></div>';
+        const url = '<div class="col-4"><label>自訂 CTA URL</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '" placeholder="https://..."></div>';
+        const append = '<div class="col-2"><label>附加資料參數</label><select class="rb-append"><option value="false"' + (content.appendParams ? '' : ' selected') + '>否</option><option value="true"' + (content.appendParams ? ' selected' : '') + '>是</option></select></div>';
+        return description + label + mode + url + append + reportAppendFields(content);
+      }
       return '<div class="col-12"><p class="mini">此區塊會依分數區間自動顯示後台設定內容。</p></div>';
     }
 
@@ -3135,6 +3144,7 @@
       }
       if (type === 'booking_cta') {
         content.label = row.querySelector('.rb-label')?.value || '預約一對一諮詢';
+        content.description = row.querySelector('.rb-description')?.value || '';
         content.urlMode = row.querySelector('.rb-url-mode')?.value || 'system';
         content.url = row.querySelector('.rb-url')?.value || '';
         content.appendParams = row.querySelector('.rb-append')?.value === 'true';
@@ -3189,7 +3199,7 @@
         if (block.blockType === 'booking_cta') {
           const fallbackUrl = payload.settings.bookingCtaUrl || '';
           const targetText = c.urlMode === 'custom' ? (c.url || '尚未設定自訂網址') : (fallbackUrl || '系統預約頁');
-          return '<p><a class="preview-cta">' + escapeHtml(c.label || payload.settings.bookingCtaLabel || '我要做完整版測驗') + '</a></p><p class="mini">' + escapeHtml(targetText) + (c.appendParams ? '｜會附加追蹤參數' : '') + '</p>';
+          return (c.description ? '<p>' + escapeHtml(c.description) + '</p>' : '') + '<p><a class="preview-cta">' + escapeHtml(c.label || payload.settings.bookingCtaLabel || '我要做完整版測驗') + '</a></p><p class="mini">' + escapeHtml(targetText) + (c.appendParams ? '｜會附加追蹤參數' : '') + '</p>';
         }
         return '<p class="mini">分數區間內容會依作答結果自動顯示。</p>';
       }).join('');

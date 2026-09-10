@@ -186,6 +186,7 @@ create table if not exists quiz_access_codes (
   max_uses integer,
   used_count integer not null default 0,
   per_email_limit integer not null default 1,
+  per_phone_limit integer not null default 1,
   starts_at timestamptz,
   ends_at timestamptz,
   status text not null default '啟用',
@@ -205,6 +206,7 @@ create table if not exists quiz_access_code_usages (
   quiz_response_id bigint,
   client_email text not null,
   client_email_normalized text generated always as (lower(client_email)) stored,
+  client_phone text not null default '',
   code text not null,
   usage_type text not null default 'quiz_submit',
   metadata jsonb not null default '{}'::jsonb,
@@ -285,6 +287,10 @@ create index if not exists idx_questions_project on questions(tenant_slug, proje
 create index if not exists idx_rules_consultant on availability_rules(tenant_slug, consultant_id);
 create index if not exists idx_leads_project_email on leads(tenant_slug, project_code, client_email);
 create index if not exists idx_quiz_access_codes_lookup on quiz_access_codes(tenant_slug, project_code, version_code, code_normalized);
+create index if not exists idx_quiz_access_code_usages_phone on quiz_access_code_usages(access_code_id, client_phone, used_at desc);
+alter table quiz_access_codes add column if not exists per_phone_limit integer not null default 1;
+update quiz_access_codes set per_phone_limit = coalesce(per_phone_limit, per_email_limit, 1) where per_phone_limit is null;
+alter table quiz_access_code_usages add column if not exists client_phone text not null default '';
 create index if not exists idx_quiz_access_code_usages_code_used on quiz_access_code_usages(access_code_id, used_at desc);
 create index if not exists idx_email_queue_due on email_queue(status, scheduled_at);
 create index if not exists idx_email_queue_retry on email_queue(status, scheduled_at, retry_count);

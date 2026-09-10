@@ -251,6 +251,7 @@ create table if not exists quiz_access_codes (
   max_uses integer,
   used_count integer not null default 0,
   per_email_limit integer not null default 1,
+  per_phone_limit integer not null default 1,
   starts_at timestamptz,
   ends_at timestamptz,
   status text not null default '啟用',
@@ -270,6 +271,7 @@ create table if not exists quiz_access_code_usages (
   quiz_response_id bigint,
   client_email text not null,
   client_email_normalized text generated always as (lower(client_email)) stored,
+  client_phone text not null default '',
   code text not null,
   usage_type text not null default 'quiz_submit',
   metadata jsonb not null default '{}'::jsonb,
@@ -288,6 +290,7 @@ create table if not exists quiz_responses (
   client_name text not null default '',
   client_email text not null,
   client_email_normalized text generated always as (lower(client_email)) stored,
+  client_phone text not null default '',
   client_phone text default '',
   raw_answers jsonb not null default '{}'::jsonb,
   score_summary jsonb not null default '{}'::jsonb,
@@ -785,5 +788,3 @@ select a.tenant_slug,
         and e.appointment_id = a.id
         and e.event_type in ('booking_created', 'booking_cancelled')
    );
-
-

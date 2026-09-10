@@ -452,9 +452,13 @@
         } else if (block.blockType === 'booking_cta') {
           const reportSettings = window.__reportSettings || {};
           const label = content.label || reportSettings.booking_cta_label || '預約一對一諮詢';
+          const defaultDescription = String(window.__reportVersionCode || '').toUpperCase() === 'FULL'
+            ? '這堂 90 分鐘人生秩序體驗課，會陪你一起讀懂這份個人報告，整理出可以開始安排的下一步。課程為完整版測驗加贈內容，費用已包含在完整方案中，無須額外付費。'
+            : '';
+          const description = content.description || defaultDescription;
           const customUrl = content.urlMode === 'custom' && content.url ? content.url : (reportSettings.booking_cta_url || '');
           const href = customUrl ? appendReportParams(customUrl, content) : bookingUrl();
-          html = '<p><a class="button"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
+          html = (description ? '<p>' + escapeHtml(description) + '</p>' : '') + '<p><a class="button"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
         }
         return html ? '<article class="report-block">' + html + '</article>' : '';
       }).join('');
@@ -487,6 +491,7 @@
         document.getElementById('meta').textContent = '版本 ' + (res.versionCode || '') + '｜' + new Date(res.submittedAt).toLocaleString('zh-TW', { hour12:false });
         document.getElementById('topActions').innerHTML = '';
         window.__scoreSummary = summary;
+        window.__reportVersionCode = res.versionCode || '';
         const reportBlocks = (snapshot.blocks || []).slice();
         renderScores(summary, settings);
         renderMatchedContent(snapshot.matched_content || [], summary);
@@ -500,8 +505,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
