@@ -449,7 +449,26 @@
           close: '完整版會把延續秩序拆成家人接手、寵物照顧、百年安排與想留下的紀錄，讓你知道哪一件安排最值得先說清楚。'
         }
       };
-      const bridge = {
+      const research = {
+        external: {
+          kicker: '研究觀點',
+          title: '雜亂消耗的，往往不只是整理時間。',
+          body: '美國心理學會整理相關研究指出，雜亂的居家與工作環境，可能增加壓力與焦慮，也會影響專注與工作效率。這也說明了，當重要物品、資料與帳號沒有固定位置時，你感覺到的累，不只是東西多，而是大腦一直在替每一件事保留一個「等一下還要記得」的位置。',
+          close: '你不需要從零開始，也不必把全部都整理好。先找出那一類最常讓你反覆確認的事，生活就會先鬆一點。'
+        },
+        internal: {
+          kicker: '研究觀點',
+          title: '關係與內心在意的事，並不是「有空再處理」的小事。',
+          body: '哈佛成人發展研究長期追蹤成人的健康與幸福，發現有品質的關係，和較好的身心健康與幸福感有密切關聯。這不表示你必須立刻處理所有關係，而是那些一直讓你放不下、一直往後排的事，確實會默默影響你怎麼感受自己的生活。',
+          close: '有些卡點之所以一直在，不是因為你不夠努力，而是它還沒有被看清楚：你真正想要留下的，是關係、願望，還是自己的位置。'
+        },
+        continuity: {
+          kicker: '研究觀點',
+          title: '重要安排先說清楚，能讓家人少一點慌張。',
+          body: '美國國家老化研究院在預立照護規畫的建議中提到，及早與親友談清楚偏好並留下紀錄，能幫助親友在需要代為決定時減少負擔。這也是為什麼有些安排平常看起來不急，卻值得趁日子還平穩時慢慢整理。',
+          close: '你不必把未來全部想完，只要先讓最重要的一件事，不再只有你一個人知道。'
+        }
+      };      const bridge = {
         external: { title: '先不用把家裡全部整理完，先找出最耗你心力的那一格。', body: '完整版本會幫你分辨：現在讓你一直反覆確認的，是物品、空間、資訊，還是資產資料。看懂之後，你就能先讓一件重要的事不再只靠自己記得。', button: '找出我的外在秩序卡點｜NT$980' },
         internal: { title: '你不需要立刻做出所有決定，先把自己放回優先順序裡。', body: '完整版本會幫你分辨：現在真正佔住你的，是關係、願望、價值觀，還是每天被推著走的生活排序。先看懂卡住的位置，才不用再用忙碌替自己做選擇。', button: '找出我的內在秩序卡點｜NT$980' },
         continuity: { title: '不必一次把所有安排交代完，先讓最重要的一件事有人接得住。', body: '完整版本會幫你分辨：現在最需要補上的，是家人接手、寵物照顧、百年安排，還是想留下的紀錄。把方向看清楚，安心才不必一直延後。', button: '找出我的延續秩序卡點｜NT$980' }
@@ -463,6 +482,7 @@
         return '<article class="lite-focus-card"><div class="lite-focus-score">' + score + '</div><h3>' + escapeHtml(item.name) + '</h3><p>' + escapeHtml(itemCopy.body) + '</p><p>' + escapeHtml(itemCopy.meaning) + '</p>' + (itemCopy.question ? '<p class="lite-focus-question">' + escapeHtml(itemCopy.question) + '</p>' : '') + '</article>';
       }).join('') + '</div>' +
         (function () { const item = focusItems[0]; const note = authority[item.key]; return note ? '<aside class="lite-authority"><p class="lite-authority-kicker">你可能已經感覺到的事</p><h3>' + escapeHtml(note.title) + '</h3><p>' + escapeHtml(note.body) + '</p><p class="lite-authority-close">' + escapeHtml(note.close) + '</p></aside>' : ''; })() +
+        (function () { const item = focusItems[0]; const note = research[item.key]; return note ? '<aside class="lite-authority lite-research"><p class="lite-authority-kicker">' + escapeHtml(note.kicker) + '</p><h3>' + escapeHtml(note.title) + '</h3><p>' + escapeHtml(note.body) + '</p><p class="lite-authority-close">' + escapeHtml(note.close) + '</p></aside>' : ''; })() +
         (function () { const item = focusItems[0]; const cta = bridge[item.key]; return cta ? '<aside class="lite-bridge"><h3>' + escapeHtml(cta.title) + '</h3><p>' + escapeHtml(cta.body) + '</p><a class="button" href="https://nanako-lifeorder.systeme.io/0c75e341">' + escapeHtml(cta.button) + '</a></aside>' : ''; })();
     }
 
