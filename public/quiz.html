@@ -21,6 +21,10 @@
     input, textarea, select { width:100%; border:1px solid var(--line); border-radius:6px; padding:12px; font:inherit; background:#fff; }
     textarea { min-height:96px; resize:vertical; }
     .field { margin:0 0 16px; }
+    .field.is-invalid { border:2px solid var(--red); border-radius:8px; padding:10px 12px; background:#fff8f7; }
+    .field.is-invalid > label { color:var(--red); }
+    .field-error { color:var(--red); font-size:14px; font-weight:700; margin:6px 0 0; }
+    .phone-row { display:grid; grid-template-columns:148px minmax(0,1fr); gap:10px; }
     .access-toggle { border:0; background:transparent; color:var(--blue); padding:0; min-height:0; font-weight:700; text-decoration:underline; cursor:pointer; }
     .access-panel { margin-top:10px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--soft); }
     .access-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:end; }
@@ -29,7 +33,7 @@
     .access-message { margin:8px 0 0; font-size:14px; }
     .checkline { display:flex; align-items:center; gap:10px; font-weight:700; margin:0; }
     .checkline input { width:auto; }
-    @media (max-width:640px) { .access-row{grid-template-columns:1fr} }
+    @media (max-width:640px) { .access-row,.phone-row{grid-template-columns:1fr} }
     .choice { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:6px; margin:8px 0; font-weight:400; cursor:pointer; }
     .choice input { width:auto; margin-top:5px; }
     .choice:has(input:checked) { border-color:var(--blue); background:#eef4ff; }
@@ -61,7 +65,7 @@
           <h2>基本資料</h2>
           <div class="field"><label for="clientName">姓名 *</label><input id="clientName" autocomplete="name" required></div>
           <div class="field"><label for="clientEmail">Email *</label><input id="clientEmail" type="email" autocomplete="email" required></div>
-          <div class="field"><label id="clientPhoneLabel" for="clientPhone">電話</label><input id="clientPhone" autocomplete="tel"></div>
+          <div class="field"><label id="clientPhoneLabel" for="clientPhone">電話</label><div class="phone-row"><select id="clientPhoneCountry" aria-label="電話國碼"><option value="+886">台灣 +886</option><option value="+852">香港 +852</option><option value="+86">中國 +86</option><option value="+65">新加坡 +65</option><option value="+60">馬來西亞 +60</option></select><input id="clientPhone" inputmode="tel" autocomplete="tel-national" placeholder="請輸入 9xxxxxxxx"></div><p class="field-error hidden" id="clientPhoneError"></p></div>
           <div class="field"><label for="clientAge">年齡</label><input id="clientAge" inputmode="numeric" autocomplete="off" placeholder="例：38"></div>
           <div class="field" id="occupationTextField"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
           <div class="field hidden" id="occupationIdentityField">
@@ -117,6 +121,13 @@
     let stages = [];
     let currentStage = 0;
     const savedAnswers = {};
+    const phoneCountries = {
+      '+886': { placeholder: '請輸入 9xxxxxxxx', pattern: /^9\d{8}$/ },
+      '+852': { placeholder: '請輸入 8 碼電話', pattern: /^\d{8}$/ },
+      '+86': { placeholder: '請輸入 1xxxxxxxxxx', pattern: /^1\d{10}$/ },
+      '+65': { placeholder: '請輸入 8 碼電話', pattern: /^[3689]\d{7}$/ },
+      '+60': { placeholder: '請輸入 1xxxxxxxx', pattern: /^1\d{8,9}$/ }
+    };
 
     function api(action, payload) {
       return fetch(apiBase + '?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
@@ -178,6 +189,50 @@
     function hasPetsSelected() {
       const input = document.getElementById('hasPets');
       return !!input && input.checked;
+    }
+
+    function phoneCountryCode() {
+      return document.getElementById('clientPhoneCountry')?.value || '+886';
+    }
+
+    function phoneLocalValue() {
+      return (document.getElementById('clientPhone')?.value || '').replace(/\D/g, '').replace(/^0(?=9\d{8}$)/, '');
+    }
+
+    function internationalPhoneValue() {
+      return phoneCountryCode().replace('+', '') + phoneLocalValue();
+    }
+
+    function updatePhoneField() {
+      const input = document.getElementById('clientPhone');
+      const config = phoneCountries[phoneCountryCode()] || phoneCountries['+886'];
+      if (!input) return;
+      input.placeholder = config.placeholder;
+      input.value = phoneLocalValue();
+      clearPhoneError();
+    }
+
+    function clearPhoneError() {
+      const field = document.getElementById('clientPhone')?.closest('.field');
+      const error = document.getElementById('clientPhoneError');
+      field?.classList.remove('is-invalid');
+      if (error) { error.textContent = ''; error.classList.add('hidden'); }
+    }
+
+    function validatePhone() {
+      const input = document.getElementById('clientPhone');
+      const config = phoneCountries[phoneCountryCode()] || phoneCountries['+886'];
+      if (!isFullVersion() && !input.value.trim()) return true;
+      const valid = config.pattern.test(phoneLocalValue());
+      if (valid) { clearPhoneError(); return true; }
+      const field = input.closest('.field');
+      const error = document.getElementById('clientPhoneError');
+      field.classList.add('is-invalid');
+      error.textContent = '請依所選國碼輸入正確的電話號碼。';
+      error.classList.remove('hidden');
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input.focus({ preventScroll: true });
+      return false;
     }
 
     function visibleQuestions() {
@@ -280,20 +335,19 @@
       const phoneInput = document.getElementById('clientPhone');
       if (fullVersion) {
         phoneInput.required = true;
-        phoneInput.inputMode = 'numeric';
-        phoneInput.maxLength = 10;
-        phoneInput.pattern = '09[0-9]{8}';
-        phoneInput.placeholder = '請輸入 09xxxxxxxx';
-        document.getElementById('clientPhoneLabel').textContent = '電話（09開頭） *';
+        phoneInput.inputMode = 'tel';
+        phoneInput.removeAttribute('maxlength');
+        phoneInput.removeAttribute('pattern');
+        document.getElementById('clientPhoneLabel').textContent = '電話 *';
       } else {
         phoneInput.required = false;
         phoneInput.removeAttribute('required');
         phoneInput.removeAttribute('pattern');
         phoneInput.removeAttribute('maxlength');
         phoneInput.inputMode = 'tel';
-        phoneInput.placeholder = '請輸入 09xxxxxxxx';
         document.getElementById('clientPhoneLabel').textContent = '電話';
       }
+      updatePhoneField();
       document.getElementById('clientOccupation').required = !freeVersion && !fullVersion;
       document.getElementById('clientOccupationIdentity').required = fullVersion;
       document.getElementById('bar').style.width = '100%';
@@ -307,12 +361,30 @@
 
     function validateStage() {
       const stage = stages[currentStage];
+      document.querySelectorAll('.field.is-invalid').forEach(function (field) { field.classList.remove('is-invalid'); });
+      document.querySelectorAll('.field-error').forEach(function (error) { if (error.id !== 'clientPhoneError') error.remove(); });
       for (const question of stage.questions) {
         if (question.isRequired === false) continue;
         const nodes = Array.from(document.querySelectorAll('[name="' + inputName(question) + '"]'));
         const filled = nodes.some(function (node) { return (node.type === 'radio' || node.type === 'checkbox') ? node.checked : node.value.trim(); });
-        if (!filled) throw new Error('請填寫：「' + question.title + '」。');
+        if (!filled) {
+          const field = document.querySelector('[data-question-id="' + question.id + '"]');
+          const error = new Error('請填寫：「' + question.title + '」。');
+          error.field = field;
+          throw error;
+        }
       }
+    }
+
+    function showValidationError(error) {
+      const field = error && error.field;
+      if (!field) { alert(error.message || '請完成必填欄位。'); return; }
+      field.classList.add('is-invalid');
+      let note = field.querySelector('.field-error');
+      if (!note) { note = document.createElement('p'); note.className = 'field-error'; field.appendChild(note); }
+      note.textContent = '這一題尚未作答，請選擇或填寫後再送出。';
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(function () { field.querySelector('input, textarea, select')?.focus({ preventScroll: true }); }, 350);
     }
 
     function collectAnswers() {
@@ -333,7 +405,7 @@
         saveCurrentStageAnswers();
         currentStage += 1;
         renderStage();
-      } catch (error) { alert(error.message); }
+      } catch (error) { showValidationError(error); }
     });
     document.getElementById('hasPets').addEventListener('change', function () {
       saveCurrentStageAnswers();
@@ -358,14 +430,15 @@
 
     document.getElementById('quizForm').addEventListener('submit', function (event) {
       event.preventDefault();
-      try { validateStage(); saveCurrentStageAnswers(); } catch (error) { alert(error.message); return; }
+      try { validateStage(); if (!validatePhone()) return; saveCurrentStageAnswers(); } catch (error) { showValidationError(error); return; }
       const button = document.getElementById('submitBtn');
       button.disabled = true;
       button.textContent = '正在產生報告...';
       api('submitQuiz', {
         name: document.getElementById('clientName').value.trim(),
         email: document.getElementById('clientEmail').value.trim(),
-        phone: document.getElementById('clientPhone').value.trim(),
+        phone: internationalPhoneValue(),
+        phoneCountryCode: phoneCountryCode(),
         accessCode: document.getElementById('accessCode')?.value.trim() || '',
         answers: Object.assign(collectAnswers(), {
           _profile_age: document.getElementById('clientAge').value.trim(),
@@ -387,6 +460,9 @@
         alert(error.message || '送出失敗');
       });
     });
+
+    document.getElementById('clientPhoneCountry').addEventListener('change', updatePhoneField);
+    document.getElementById('clientPhone').addEventListener('input', clearPhoneError);
 
     function boot() {
       if (!tenant) { document.getElementById('loading').innerHTML = '<span class="error">安裝碼缺少 tenant。</span>'; return; }

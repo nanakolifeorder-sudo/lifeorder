@@ -2671,7 +2671,7 @@
         quizEditorTabButton('ranges', '分數區間') +
         quizEditorTabButton('settings', '測驗設定') +
       '</div>';
-      document.getElementById('view').innerHTML = '<div class="panel"><h2>題目管理</h2><div class="row"><div class="col-4"><label>選擇專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>目前版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'LITE') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button onclick="saveQuizEditor()">儲存設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'LO') + '&version=' + encodeURIComponent(res.versionCode || 'LITE') + '">開啟前台測驗</a></div></div>' +
+      document.getElementById('view').innerHTML = '<div class="panel"><h2>題目管理</h2><div class="row"><div class="col-4"><label>選擇專案</label><select id="quizProject" onchange="loadQuizEditorData()">' + projectOptions + '</select></div><div class="col-3"><label>目前版本</label><select id="quizVersion" onchange="document.getElementById(&quot;quizVersionCode&quot;).value=this.value;loadQuizEditorData();">' + versionOptions + '</select></div><div class="col-2"><label>版本代碼</label><input id="quizVersionCode" value="' + escapeHtml(res.versionCode || 'LITE') + '"></div><div class="col-3"><label>版本名稱</label><input id="quizVersionName" value="' + escapeHtml(currentVersion.name || '') + '"></div></div>' + tabBar + '<div class="actions"><button id="quizSaveButton" onclick="saveQuizEditor()">儲存設定</button><button class="secondary" onclick="loadQuizEditorData()">重新載入</button><a class="button secondary" target="_blank" href="/quiz?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(res.projectCode || 'LO') + '&version=' + encodeURIComponent(res.versionCode || 'LITE') + '">開啟前台測驗</a></div><p class="mini" id="quizSaveStatus" role="status" aria-live="polite"></p></div>' +
         '<div class="panel module-section" data-section="settings"><h2>測驗基本設定</h2><label>版本說明</label><textarea id="quizVersionDescription">' + escapeHtml(currentVersion.description || '') + '</textarea></div>' +
         '<div class="panel module-section" data-section="stages"><h2>題目階段</h2><div class="list" id="quizStages">' + (res.stages || []).map(quizStageRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizStage()">新增階段</button></div></div>' +
         '<div class="panel module-section" data-section="dimensions"><h2>分數面向</h2><p>滿分會依照題目選項加分自動計算；後台只需要設定報告頁要顯示的滿分，例如 100。</p><div class="list" id="quizDimensions">' + (res.dimensions || []).map(quizDimensionRow).join('') + '</div><div class="actions"><button class="secondary" onclick="addQuizDimension()">新增面向</button></div></div>' +
@@ -2914,12 +2914,26 @@
       list.insertAdjacentHTML('beforeend', quizOptionRow({ optionKey: String.fromCharCode(65 + next), label: '', description: '', scoreWeights: {} }));
     }
 
+    function setQuizSaveStatus(message, isError) {
+      const status = document.getElementById('quizSaveStatus');
+      if (!status) return;
+      status.textContent = message || '';
+      status.style.color = isError ? 'var(--red, #b42318)' : '';
+    }
+
     function saveQuizEditor() {
       const payload = collectQuizEditorPayload();
+      const button = document.getElementById('quizSaveButton');
+      if (button && button.disabled) return;
+      if (button) { button.disabled = true; button.textContent = '正在儲存…'; }
+      setQuizSaveStatus('正在儲存題目與選項，請不要關閉此頁面。');
       api('saveQuizAdminEditor', payload).then(function (res) {
-        alert(res.message || '測驗設定已儲存。');
-        api('getQuizAdminEditor', { projectCode: payload.projectCode, versionCode: payload.versionCode }).then(renderQuizEditor).catch(showError);
-      }).catch(function (err) { alert(err.message); });
+        setQuizSaveStatus(res.message || '已儲存，前台測驗已同步更新。');
+        if (button) { button.disabled = false; button.textContent = '已儲存'; }
+      }).catch(function (err) {
+        setQuizSaveStatus('儲存失敗：' + (err.message || '請稍後再試。'), true);
+        if (button) { button.disabled = false; button.textContent = '再次儲存'; }
+      });
     }
     function loadReportEditor() {
       loading('報告編輯器');

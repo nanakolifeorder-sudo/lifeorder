@@ -68,6 +68,7 @@
     }
     textarea { min-height: 96px; resize: vertical; }
     .field { margin-bottom: 18px; }
+    .phone-row { display:grid; grid-template-columns:148px minmax(0,1fr); gap:10px; }
     .choice {
       display: flex;
       gap: 10px;
@@ -195,6 +196,7 @@
       .time-panel { min-height: 0; padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--line); }
       .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; }
     }
+    @media (max-width: 480px) { .phone-row { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -219,7 +221,7 @@
         </div>
         <div class="field">
           <label for="clientPhone">電話 *</label>
-          <input id="clientPhone" autocomplete="tel" required>
+          <div class="phone-row"><select id="clientPhoneCountry" aria-label="電話國碼"><option value="+886">台灣 +886</option><option value="+852">香港 +852</option><option value="+86">中國 +86</option><option value="+65">新加坡 +65</option><option value="+60">馬來西亞 +60</option></select><input id="clientPhone" inputmode="tel" autocomplete="tel-national" placeholder="請輸入 9xxxxxxxx" required></div>
         </div>
         <div id="questions"></div>
         <button type="submit">下一步：選擇時間</button>
@@ -399,6 +401,30 @@
       });
     }
 
+    const phoneRules = {
+      '+886': { placeholder: '請輸入 9xxxxxxxx', pattern: /^9\d{8}$/ },
+      '+852': { placeholder: '請輸入 8 碼電話', pattern: /^\d{8}$/ },
+      '+86': { placeholder: '請輸入 1xxxxxxxxxx', pattern: /^1\d{10}$/ },
+      '+65': { placeholder: '請輸入 8 碼電話', pattern: /^[3689]\d{7}$/ },
+      '+60': { placeholder: '請輸入 1xxxxxxxx', pattern: /^1\d{8,9}$/ }
+    };
+    function bookingPhoneLocal() {
+      return document.getElementById('clientPhone').value.replace(/\D/g, '').replace(/^0(?=9\d{8}$)/, '');
+    }
+    function updateBookingPhoneField() {
+      const country = document.getElementById('clientPhoneCountry').value;
+      document.getElementById('clientPhone').placeholder = phoneRules[country].placeholder;
+    }
+    function setBookingPhone(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      const match = ['886', '852', '86', '65', '60'].find(function (code) { return digits.startsWith(code); });
+      const country = match ? '+' + match : '+886';
+      document.getElementById('clientPhoneCountry').value = country;
+      document.getElementById('clientPhone').value = match ? digits.slice(match.length) : digits.replace(/^0(?=9\d{8}$)/, '');
+      updateBookingPhoneField();
+    }
+    document.getElementById('clientPhoneCountry').addEventListener('change', updateBookingPhoneField);
+
     function calendarMonths() {
       return Array.from(new Set(Object.keys(slotGroups).map(function (date) { return date.slice(0, 7); }))).sort();
     }
@@ -469,12 +495,15 @@
         projectCode,
         name: document.getElementById('clientName').value.trim(),
         email: document.getElementById('clientEmail').value.trim(),
-        phone: document.getElementById('clientPhone').value.trim(),
+        phone: document.getElementById('clientPhoneCountry').value.replace('+', '') + bookingPhoneLocal(),
+        phoneCountryCode: document.getElementById('clientPhoneCountry').value,
         invitationToken: invitationToken || '',
         quizResultId: quizResultId || ''
       };
 
       try {
+        const country = document.getElementById('clientPhoneCountry').value;
+        if (!phoneRules[country].pattern.test(bookingPhoneLocal())) throw new Error('請依所選國碼輸入正確的電話號碼。');
         payload.answers = collectAnswers();
       } catch (error) {
         if (error.reject) {
@@ -573,7 +602,7 @@
             };
             document.getElementById('clientName').value = appointment.clientName || '';
             document.getElementById('clientEmail').value = appointment.clientEmail || '';
-            document.getElementById('clientPhone').value = appointment.clientPhone || '';
+            setBookingPhone(appointment.clientPhone || '');
             document.getElementById('rescheduleNotice').classList.remove('hidden');
             document.getElementById('backBtn').classList.add('hidden');
             document.getElementById('loading').classList.add('hidden');
@@ -586,7 +615,7 @@
             if (!invite.success) throw new Error(invite.message || '邀請連結無效');
             document.getElementById('clientName').value = invite.clientName || '';
             document.getElementById('clientEmail').value = invite.clientEmail || '';
-            document.getElementById('clientPhone').value = invite.clientPhone || '';
+            setBookingPhone(invite.clientPhone || '');
             document.getElementById('clientEmail').readOnly = true;
             document.getElementById('loading').classList.add('hidden');
             if (invite.requireForm) {
