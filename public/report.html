@@ -331,7 +331,7 @@
     }
 
     function renderRadarChart(summary, config) {
-      const items = scoreItems(summary);
+      const items = filterPetReportItems(scoreItems(summary), summary);
       if (items.length < 3) return '';
       const center = 160;
       const radius = 104;
