@@ -84,10 +84,6 @@
     .stage-icon { width:54px; height:42px; margin:0 auto 10px; border-radius:999px; background:#fff; border:2px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; white-space:nowrap; }
     .stage-dot { width:12px; height:12px; border-radius:999px; background:currentColor; margin:0 auto 12px; position:relative; z-index:1; box-shadow:0 0 0 4px #fffaf0; }
     .life-stage.active .stage-dot { width:18px; height:18px; margin-top:-3px; box-shadow:0 0 0 5px #fffaf0,0 0 0 9px rgba(26,115,232,.2); }
-    .life-stage.active .stage-person { display:block; }
-    .stage-person { display:none; position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:18px; height:30px; color:#1a73e8; }
-    .stage-person::before { content:''; position:absolute; top:0; left:5px; width:8px; height:8px; border-radius:999px; background:currentColor; }
-    .stage-person::after { content:''; position:absolute; top:10px; left:8px; width:3px; height:18px; background:currentColor; box-shadow:-7px 7px 0 -1px currentColor,7px 7px 0 -1px currentColor; }
     .life-stage strong { display:block; color:var(--ink); font-size:15px; }
     .life-stage em { display:block; color:currentColor; font-style:normal; font-weight:800; }
     .timeline-stage-image { margin-top:18px; padding-top:16px; border-top:1px solid #eadfcb; }
@@ -306,11 +302,11 @@
       const stageHtml = stages.map(function (stage) {
         const active = stage.key === activeKey;
         return '<div class="life-stage' + (active ? ' active' : '') + '" style="color:' + stage.color + '">' +
-          '<span class="stage-person" aria-hidden="true"></span><div class="stage-icon">' + escapeHtml(stage.icon) + '</div><div class="stage-dot"></div>' +
+          '<div class="stage-icon">' + escapeHtml(stage.icon) + '</div><div class="stage-dot"></div>' +
           '<strong>' + escapeHtml(stage.age) + '</strong><em>' + escapeHtml(stage.name) + '</em>' +
         '</div>';
       }).join('');
-      target.innerHTML = '<div class="timeline-panel"><h3>生命時間軸</h3><p class="timeline-subtitle">在人生的不同階段，逐步建立秩序，活出有方向、有價值的人生。</p><div class="timeline-rail">' + stageHtml + '</div><div class="timeline-stage-image"><img src="/assets/life-order-stages.png" alt="人生六個階段：探索自己、建立基礎、平衡發展、整合安排、豐盛投入與傳承心意"></div></div>';
+      target.innerHTML = '<div class="timeline-panel"><h3>生命時間軸</h3><p class="timeline-subtitle">在人生的不同階段，逐步建立秩序，活出有方向、有價值的人生。</p><div class="timeline-rail">' + stageHtml + '</div><div class="timeline-stage-image"><img src="/assets/life-order-stage-details.png" alt="六個人生階段的重點、說明與行動方向"></div></div>';
     }
 
     function polygonPoints(items, radius, center) {
