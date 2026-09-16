@@ -86,10 +86,10 @@
           </div>
           <div class="field hidden" id="petProfileField"><label class="checkline"><input id="hasPets" type="checkbox"> 我有養寵物</label></div>
           <div class="field" id="accessCodeField">
-            <button class="access-toggle" type="button" id="accessToggle">使用重測碼</button>
+            <button class="access-toggle" type="button" id="accessToggle">使用優惠／重測碼</button>
             <div class="access-panel hidden" id="accessPanel">
               <div class="access-row">
-                <div><label for="accessCode">重測碼</label><input id="accessCode" autocomplete="off" placeholder="請輸入重測碼"></div>
+                <div><label for="accessCode">優惠／重測碼</label><input id="accessCode" autocomplete="off" placeholder="請輸入優惠／重測碼"></div>
                 <button type="button" id="applyAccessCode">確定</button>
               </div>
               <p class="access-message hidden" id="accessMessage"></p>
@@ -424,8 +424,8 @@
     document.getElementById('applyAccessCode').addEventListener('click', function () {
       const input = document.getElementById('accessCode');
       const code = input ? input.value.trim() : '';
-      if (!code) { setAccessMessage('請先輸入重測碼。', false); return; }
-      setAccessMessage('重測碼已套用，送出時會一併驗證。', true);
+      if (!code) { setAccessMessage('請先輸入優惠／重測碼。', false); return; }
+      setAccessMessage('代碼已帶入，送出時會一併驗證與記錄使用次數。', true);
     });
 
     document.getElementById('quizForm').addEventListener('submit', function (event) {

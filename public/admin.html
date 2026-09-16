@@ -1020,26 +1020,30 @@
       })).join('');
       document.getElementById('view').innerHTML =
         '<div class="panel"><div class="row">' +
-          '<div class="col-4"><h2>優惠 / 重測碼</h2><p class="mini">同一個 Email 完成同一份檢測後，需要輸入有效代碼才能再次作答。這裡也保留折扣碼使用統計。</p></div>' +
+          '<div class="col-4"><h2>優惠 / 重測碼</h2><p class="mini">管理完整版代碼、使用上限與期限。點開使用紀錄可查看每次實際使用時間與作答者資料。</p></div>' +
           '<div class="col-4"><label>專案篩選</label><select onchange="loadAccessCodesByProject(this.value)">' + projectOptions + '</select></div>' +
           '<div class="col-4"><label>&nbsp;</label><button onclick="openAccessCodeForm()">新增代碼</button></div>' +
         '</div></div>' +
         '<div class="panel hidden" id="accessCodeFormPanel"></div>' +
+        '<div class="panel hidden" id="accessCodeUsagePanel"></div>' +
         '<div class="list">' + (rows.length ? rows.map(accessCodeCard).join('') : '<div class="panel"><p>目前還沒有代碼。</p></div>') + '</div>';
     }
 
     function accessCodeCard(item) {
       const usageText = String(item.usageCount || item.usedCount || 0) + (item.maxUses ? ' / ' + item.maxUses : ' 次');
+      const remainingText = item.remainingUses === null || item.remainingUses === undefined ? '不限' : String(item.remainingUses) + ' 次';
       return '<div class="client-card contact"><div class="card-top"><div><div class="crm-card-title"><strong>' + escapeHtml(item.code) + '</strong><span class="badge">' + escapeHtml(accessCodeTypeLabel(item.codeType)) + '</span><span class="badge">' + escapeHtml(item.status || '') + '</span></div><p class="mini">' + escapeHtml(item.name || '') + '</p></div><span class="badge">' + escapeHtml(item.projectCode || '') + (item.versionCode ? ' / ' + escapeHtml(item.versionCode) : '') + '</span></div>' +
         '<div class="crm-card-meta">' +
+          '<div class="crm-meta-item"><div class="mini">購買人／歸屬</div><strong>' + escapeHtml(item.name || '未填寫') + '</strong></div>' +
           '<div class="crm-meta-item"><div class="mini">使用次數</div><strong>' + escapeHtml(usageText) + '</strong></div>' +
+          '<div class="crm-meta-item"><div class="mini">剩餘次數</div><strong>' + escapeHtml(remainingText) + '</strong></div>' +
           '<div class="crm-meta-item"><div class="mini">使用電話數</div><strong>' + escapeHtml(item.uniquePhoneCount || 0) + '</strong></div>' +
           '<div class="crm-meta-item"><div class="mini">每支電話可用</div><strong>' + escapeHtml(item.perPhoneLimit || 1) + '</strong></div>' +
           '<div class="crm-meta-item"><div class="mini">最後使用</div><strong>' + escapeHtml(compactDate(item.lastUsedAt) || '尚未使用') + '</strong></div>' +
         '</div>' +
         (item.discountLabel ? '<p class="mini">折扣說明：' + escapeHtml(item.discountLabel) + '</p>' : '') +
         (item.notes ? '<div class="answer-box">' + escapeHtml(item.notes) + '</div>' : '') +
-        '<div class="actions"><button class="secondary" onclick="openAccessCodeForm(' + Number(item.rowId || 0) + ')">編輯</button><button class="danger" onclick="deleteAccessCode(' + Number(item.rowId || 0) + ')">刪除</button></div></div>';
+        '<div class="actions"><button class="secondary" onclick="openAccessCodeUsage(' + Number(item.rowId || 0) + ')">使用紀錄</button><button class="secondary" onclick="openAccessCodeForm(' + Number(item.rowId || 0) + ')">編輯</button><button class="danger" onclick="deleteAccessCode(' + Number(item.rowId || 0) + ')">刪除</button></div></div>';
     }
 
     function accessCodeById(rowId) {
@@ -1061,7 +1065,7 @@
         '<div class="col-3"><label>代碼</label><input id="accessCode" value="' + escapeHtml(item?.code || '') + '" placeholder="例如：RETAKE980"></div>' +
         '<div class="col-2"><label>類型</label><select id="accessType">' + accessCodeTypeOptions(item?.codeType || 'retest') + '</select></div>' +
         '<div class="col-2"><label>狀態</label><select id="accessStatus">' + accessCodeStatusOptions(item?.status || '啟用') + '</select></div>' +
-        '<div class="col-4"><label>名稱</label><input id="accessName" value="' + escapeHtml(item?.name || '') + '" placeholder="內部辨識名稱"></div>' +
+        '<div class="col-4"><label>購買人／代碼歸屬</label><input id="accessName" value="' + escapeHtml(item?.name || '') + '" placeholder="例如：王小明／香港合作方"></div>' +
         '<div class="col-4"><label>折扣說明</label><input id="accessDiscount" value="' + escapeHtml(item?.discountLabel || '') + '" placeholder="例如：完整版 980 重測資格"></div>' +
         '<div class="col-2"><label>總使用上限</label><input id="accessMaxUses" type="number" min="1" value="' + escapeHtml(item?.maxUses || '') + '" placeholder="不填不限"></div>' +
         '<div class="col-2"><label>每支電話次數</label><input id="accessPerPhone" type="number" min="1" value="' + escapeHtml(item?.perPhoneLimit || 1) + '"></div>' +
@@ -2919,6 +2923,33 @@
       if (!status) return;
       status.textContent = message || '';
       status.style.color = isError ? 'var(--red, #b42318)' : '';
+    }
+
+    function accessCodeUsageLabel(value) {
+      return value === 'quiz_retake' ? '完成完整版測驗' : (value || '使用代碼');
+    }
+
+    function openAccessCodeUsage(rowId) {
+      const panel = document.getElementById('accessCodeUsagePanel');
+      if (!panel) return;
+      panel.classList.remove('hidden');
+      panel.innerHTML = '<h3>使用紀錄</h3><p class="mini">讀取中...</p>';
+      api('getQuizAccessCodeUsageDetail', { rowId: rowId }).then(function (res) {
+        const code = res.code || {};
+        const rows = res.usages || [];
+        panel.innerHTML = '<div class="card-top"><div><h3>' + escapeHtml(code.code || '') + ' 的使用紀錄</h3><p class="mini">購買人／歸屬：' + escapeHtml(code.buyerName || '未填寫') + '</p></div><button class="secondary" onclick="hideAccessCodeUsage()">收起</button></div>' +
+          (rows.length ? '<div class="list">' + rows.map(function (row) {
+            const identity = row.clientName || '未提供姓名';
+            return '<div class="client-card contact"><div class="card-top"><strong>' + escapeHtml(identity) + '</strong><span class="badge">' + escapeHtml(compactDate(row.usedAt)) + '</span></div><div class="crm-card-meta">' +
+              crmDetailMeta('Email', row.clientEmail || '未提供') + crmDetailMeta('電話', row.clientPhone || '未提供') + crmDetailMeta('使用項目', accessCodeUsageLabel(row.usageType)) +
+              '</div></div>';
+          }).join('') + '</div>' : '<p class="mini">這組代碼目前尚未被使用。</p>');
+      }).catch(function (err) { panel.innerHTML = '<h3>使用紀錄</h3><p class="error">' + escapeHtml(err.message || '無法讀取使用紀錄。') + '</p>'; });
+    }
+
+    function hideAccessCodeUsage() {
+      const panel = document.getElementById('accessCodeUsagePanel');
+      if (panel) panel.classList.add('hidden');
     }
 
     function saveQuizEditor() {

@@ -30,6 +30,10 @@
       "destination": "/admin.html"
     },
     {
+      "source": "/code-status",
+      "destination": "/code-status.html"
+    },
+    {
       "source": "/unsubscribe",
       "destination": "/unsubscribe.html"
     },

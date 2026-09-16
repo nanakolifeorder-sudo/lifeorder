@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>優惠碼查詢｜人生秩序</title>
+  <style>
+    :root { --ink:#16333a; --muted:#617177; --paper:#f7f1e4; --line:#d8d0be; --blue:#2d60b4; --green:#217a57; --amber:#a66a00; --red:#b63834; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink); font-family:Arial,'Noto Sans TC',sans-serif; line-height:1.6; }
+    main { width:min(620px,calc(100% - 32px)); margin:64px auto; }
+    .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:30px; box-shadow:0 10px 28px rgba(22,51,58,.08); }
+    h1 { font-size:28px; margin:0 0 8px; }
+    h2 { font-size:18px; margin:0; }
+    p { color:var(--muted); margin:0 0 16px; }
+    label { display:block; font-weight:700; margin:18px 0 7px; }
+    .lookup { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; }
+    input { width:100%; padding:13px; border:1px solid var(--line); border-radius:6px; color:var(--ink); font:inherit; text-transform:uppercase; }
+    button { border:0; border-radius:6px; padding:13px 17px; background:var(--blue); color:#fff; font:inherit; font-weight:800; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:wait; }
+    .hidden { display:none !important; }
+    .message { margin-top:16px; font-weight:700; }
+    .message.error { color:var(--red); }
+    .result { margin-top:22px; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+    .result-head { display:flex; justify-content:space-between; gap:14px; align-items:center; padding:16px 18px; background:#fbfaf6; border-bottom:1px solid var(--line); }
+    .code { font-size:22px; font-weight:800; letter-spacing:.04em; }
+    .status { display:inline-flex; padding:4px 9px; border-radius:999px; font-size:13px; font-weight:800; background:#e7f5ed; color:var(--green); white-space:nowrap; }
+    .status.warn { background:#fff1d6; color:var(--amber); }
+    .status.error { background:#fce8e6; color:var(--red); }
+    .stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .stat { padding:16px 18px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .stat:nth-child(2n) { border-right:0; }
+    .stat:nth-last-child(-n+2) { border-bottom:0; }
+    .stat-label { color:var(--muted); font-size:13px; }
+    .stat strong { display:block; font-size:20px; margin-top:3px; }
+    .note { margin:14px 2px 0; font-size:13px; }
+    @media (max-width:520px) { main { margin:32px auto; }.panel { padding:22px; }.lookup { grid-template-columns:1fr; }.lookup button { width:100%; }.result-head { display:block; }.status { margin-top:8px; }.stats { grid-template-columns:1fr; }.stat,.stat:nth-child(2n),.stat:nth-last-child(-n+2) { border-right:0; border-bottom:1px solid var(--line); }.stat:last-child { border-bottom:0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <h1>優惠碼查詢</h1>
+      <p>輸入你的完整版測驗優惠碼，查看剩餘使用次數與有效期間。</p>
+      <form id="lookupForm">
+        <label for="code">優惠碼</label>
+        <div class="lookup"><input id="code" autocomplete="off" maxlength="80" placeholder="請輸入優惠碼" required><button id="submitButton" type="submit">查詢</button></div>
+      </form>
+      <div id="message" class="message hidden" role="alert"></div>
+      <section id="result" class="result hidden" aria-live="polite"></section>
+      <p class="note">此頁只顯示代碼本身的使用狀態，不會顯示購買人或其他使用者資料。</p>
+    </section>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const tenant = (params.get('tenant') || 'lifeorder').toLowerCase();
+    const projectCode = (params.get('p') || 'LO').toUpperCase();
+    const versionCode = (params.get('v') || 'FULL').toUpperCase();
+    const form = document.getElementById('lookupForm');
+    const input = document.getElementById('code');
+    const button = document.getElementById('submitButton');
+    const message = document.getElementById('message');
+    const result = document.getElementById('result');
+
+    function escapeHtml(value) { return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
+    function formatDate(value) {
+      if (!value) return '未設定';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '未設定';
+      return new Intl.DateTimeFormat('zh-TW', { year:'numeric', month:'long', day:'numeric' }).format(date);
+    }
+    function setMessage(text, isError) {
+      message.textContent = text || '';
+      message.classList.toggle('hidden', !text);
+      message.classList.toggle('error', Boolean(isError));
+    }
+    function statusClass(status) { return status === 'active' ? '' : (status === 'upcoming' ? 'warn' : 'error'); }
+    function stat(label, value) { return '<div class="stat"><div class="stat-label">' + escapeHtml(label) + '</div><strong>' + escapeHtml(value) + '</strong></div>'; }
+    function render(data) {
+      const remaining = data.remainingUses === null ? '不限次數' : String(data.remainingUses) + ' 次';
+      const limit = data.maxUses === null ? '不限次數' : String(data.maxUses) + ' 次';
+      result.innerHTML = '<div class="result-head"><div><div class="code">' + escapeHtml(data.code) + '</div><div class="stat-label">完整版測驗優惠碼</div></div><span class="status ' + statusClass(data.status) + '">' + escapeHtml(data.statusLabel) + '</span></div>' +
+        '<div class="stats">' +
+          stat('剩餘可使用次數', remaining) +
+          stat('已使用次數', String(data.usedCount) + ' 次') +
+          stat('總使用上限', limit) +
+          stat('有效期限至', formatDate(data.endsAt)) +
+        '</div>';
+      result.classList.remove('hidden');
+    }
+    form.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      setMessage('', false);
+      result.classList.add('hidden');
+      const code = input.value.trim();
+      if (!code) return;
+      button.disabled = true;
+      button.textContent = '查詢中...';
+      try {
+        const response = await fetch('/api?action=lookupQuizAccessCode&tenant=' + encodeURIComponent(tenant), {
+          method: 'POST', headers: { 'Content-Type':'text/plain;charset=utf-8' },
+          body: JSON.stringify({ projectCode, versionCode, code })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.message || '目前無法查詢，請稍後再試。');
+        if (!data.found) { setMessage('查不到這組優惠碼，請確認是否輸入正確。', true); return; }
+        render(data);
+      } catch (error) {
+        setMessage(error.message || '目前無法查詢，請稍後再試。', true);
+      } finally {
+        button.disabled = false;
+        button.textContent = '查詢';
+      }
+    });
+  </script>
+</body>
+</html>
