@@ -1023,7 +1023,7 @@
         '<div class="panel"><div class="row">' +
           '<div class="col-4"><h2>優惠 / 重測碼</h2><p class="mini">管理完整版代碼、使用上限與期限。點開使用紀錄可查看每次實際使用時間與作答者資料。</p></div>' +
           '<div class="col-4"><label>專案篩選</label><select onchange="loadAccessCodesByProject(this.value)">' + projectOptions + '</select></div>' +
-          '<div class="col-4"><label>&nbsp;</label><button onclick="openAccessCodeForm()">新增代碼</button></div>' +
+          '<div class="col-4"><label>&nbsp;</label><div class="actions"><a class="button secondary" target="_blank" href="/code-status?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(accessCodeProject === 'ALL' ? 'LO' : accessCodeProject) + '&v=FULL">優惠碼查詢頁</a><button onclick="openAccessCodeForm()">新增代碼</button></div></div>' +
         '</div></div>' +
         '<div class="panel hidden" id="accessCodeFormPanel"></div>' +
         '<div class="panel hidden" id="accessCodeUsagePanel"></div>' +
