@@ -400,9 +400,12 @@
     function renderStage() {
       const stage = stages[currentStage];
       const freeVersion = isFreeVersion();
+      const fullVersion = isFullVersion();
+      if (!stage || !Array.isArray(stage.questions)) {
+        throw new Error('測驗題目尚未載入，請重新整理頁面後再試一次。');
+      }
       document.getElementById('identityPanel').classList.remove('hidden');
       document.getElementById('accessCodeField').classList.toggle('hidden', freeVersion || fullVersion);
-      const fullVersion = isFullVersion();
       document.getElementById('petProfileField').classList.toggle('hidden', !fullVersion);
       clearPetAnswersIfHidden();
       stage.questions = visibleQuestions();
