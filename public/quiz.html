@@ -68,8 +68,7 @@
           <div class="field"><label for="clientEmail">Email *</label><input id="clientEmail" type="email" autocomplete="email" required></div>
           <div class="field"><label id="clientPhoneLabel" for="clientPhone">電話</label><div class="phone-row"><select id="clientPhoneCountry" aria-label="電話國碼"><option value="+886">台灣 +886</option><option value="+852">香港 +852</option><option value="+86">中國 +86</option><option value="+65">新加坡 +65</option><option value="+60">馬來西亞 +60</option></select><input id="clientPhone" inputmode="tel" autocomplete="tel-national" placeholder="請輸入 9xxxxxxxx"></div><p class="field-error hidden" id="clientPhoneError"></p></div>
           <div class="field"><label for="clientAge">年齡</label><input id="clientAge" inputmode="numeric" autocomplete="off" placeholder="例：38"></div>
-          <div class="field" id="occupationTextField"><label for="clientOccupation">職業</label><input id="clientOccupation" autocomplete="organization-title" placeholder="例：自由工作者、企業主、上班族"></div>
-          <div class="field hidden" id="occupationIdentityField">
+          <div class="field" id="occupationIdentityField">
             <label for="clientOccupationIdentity">職業身分 *</label>
             <select id="clientOccupationIdentity">
               <option value="">請選擇職業身分</option>
@@ -250,8 +249,7 @@
 
     function occupationValue() {
       const identity = document.getElementById('clientOccupationIdentity');
-      const text = document.getElementById('clientOccupation');
-      return isFullVersion() ? (identity ? identity.value.trim() : '') : (text ? text.value.trim() : '');
+      return identity ? identity.value.trim() : '';
     }
 
     function groupStages() {
@@ -322,8 +320,6 @@
       document.getElementById('identityPanel').classList.remove('hidden');
       document.getElementById('accessCodeField').classList.toggle('hidden', freeVersion);
       const fullVersion = isFullVersion();
-      document.getElementById('occupationTextField').classList.toggle('hidden', fullVersion);
-      document.getElementById('occupationIdentityField').classList.toggle('hidden', !fullVersion);
       document.getElementById('petProfileField').classList.toggle('hidden', !fullVersion);
       clearPetAnswersIfHidden();
       stage.questions = visibleQuestions();
@@ -349,8 +345,7 @@
         document.getElementById('clientPhoneLabel').textContent = '電話';
       }
       updatePhoneField();
-      document.getElementById('clientOccupation').required = !freeVersion && !fullVersion;
-      document.getElementById('clientOccupationIdentity').required = fullVersion;
+      document.getElementById('clientOccupationIdentity').required = true;
       document.getElementById('bar').style.width = '100%';
       document.getElementById('questionPanel').innerHTML = '<div class="stage-title"><h2>' + escapeHtml(stage.title || '測驗題目') + '</h2><p>' + escapeHtml(stage.description || '') + '</p></div>' + stage.questions.map(renderQuestion).join('');
       restoreStageAnswers();
