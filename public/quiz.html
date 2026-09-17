@@ -536,6 +536,9 @@
           }
           throw new Error(res.message || '送出失敗');
         }
+        if (res.reportAccessToken) {
+          try { sessionStorage.setItem('lifeorder_report_access_' + tenant + '_' + res.resultId, res.reportAccessToken); } catch (_error) {}
+        }
         location.href = '/report?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode) + '&qrid=' + encodeURIComponent(res.resultId);
       }).catch(function (error) {
         button.disabled = false;
