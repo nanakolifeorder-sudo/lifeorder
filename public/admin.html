@@ -985,7 +985,12 @@
     }
     function loadAccessCodes() {
       loading('優惠 / 重測碼');
-      api('getQuizAccessCodeData', { projectCode: accessCodeProject }).then(function (res) {
+      Promise.all([
+        api('getQuizAccessCodeData', { projectCode: accessCodeProject }),
+        api('getFullQuizEntitlementMonitoring', { projectCode: accessCodeProject })
+      ]).then(function (results) {
+        const res = results[0];
+        res.entitlements = results[1].entitlements || [];
         cache.accessCodes = res;
         renderAccessCodes(res);
       }).catch(showError);
@@ -1016,6 +1021,13 @@
 
     function renderAccessCodes(res) {
       const rows = res.codes || [];
+      const entitlements = res.entitlements || [];
+      const entitlementSummary = {
+        total: entitlements.length,
+        issued: entitlements.filter(function (item) { return item.status === 'issued'; }).length,
+        started: entitlements.filter(function (item) { return item.status === 'started'; }).length,
+        completed: entitlements.filter(function (item) { return item.status === 'completed'; }).length
+      };
       const projectOptions = ['<option value="ALL">所有專案</option>'].concat((res.projects || []).map(function (p) {
         return '<option value="' + escapeHtml(p.code) + '"' + (accessCodeProject === p.code ? ' selected' : '') + '>' + escapeHtml(p.name || p.code) + '</option>';
       })).join('');
@@ -1027,7 +1039,15 @@
         '</div></div>' +
         '<div class="panel hidden" id="accessCodeFormPanel"></div>' +
         '<div class="panel hidden" id="accessCodeUsagePanel"></div>' +
+        '<div class="panel"><h2>完整版授權監測</h2><p class="mini">付款開通與後台邀請的使用狀況。查看報告次數只計已完成完整版報告的開啟紀錄。</p><div class="stat-grid">' + statBox('已建立', entitlementSummary.total) + statBox('尚未使用', entitlementSummary.issued) + statBox('作答中', entitlementSummary.started) + statBox('已完成', entitlementSummary.completed) + '</div><div class="list">' + (entitlements.length ? entitlements.map(fullQuizEntitlementMonitoringCard).join('') : '<p class="mini">目前沒有完整版授權紀錄。</p>') + '</div></div>' +
         '<div class="list">' + (rows.length ? rows.map(accessCodeCard).join('') : '<div class="panel"><p>目前還沒有代碼。</p></div>') + '</div>';
+    }
+
+    function fullQuizEntitlementMonitoringCard(item) {
+      const source = item.source === 'payment' ? '藍新付款' : '後台邀請';
+      const reportLink = item.quizResultId ? '/report?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(item.projectCode || 'LO') + '&qrid=' + encodeURIComponent(item.quizResultId) : '';
+      const actions = (item.grantUrl ? '<button class="secondary" onclick="copyFullQuizEntitlementLink(' + Number(item.id) + ')">複製測驗連結</button>' : '') + (reportLink ? '<a class="secondary" target="_blank" href="' + escapeHtml(reportLink) + '">開啟報告</a>' : '');
+      return '<div class="client-card contact" data-entitlement-id="' + Number(item.id) + '" data-entitlement-url="' + escapeHtml(item.grantUrl || '') + '"><div class="card-top"><div><div class="crm-card-title"><strong>' + escapeHtml(item.contactName || item.clientName || '未提供姓名') + '</strong><span class="badge">' + escapeHtml(source) + '</span><span class="badge">' + escapeHtml(fullQuizEntitlementStatus(item.status)) + '</span></div><p class="mini">' + escapeHtml(item.contactEmail || item.clientEmail || '') + (item.contactPhone || item.clientPhone ? '｜' + escapeHtml(item.contactPhone || item.clientPhone) : '') + '</p></div></div><div class="crm-card-meta">' + crmDetailMeta('建立時間', compactDate(item.createdAt)) + crmDetailMeta('到期日', compactDate(item.expiresAt)) + crmDetailMeta('首次開啟', compactDate(item.firstOpenedAt) || '尚未開啟') + crmDetailMeta('完成時間', compactDate(item.completedAt) || '尚未完成') + crmDetailMeta('查看報告', String(item.reportViewCount || 0) + ' 次') + '</div><div class="actions">' + actions + '</div></div>';
     }
 
     function accessCodeCard(item) {

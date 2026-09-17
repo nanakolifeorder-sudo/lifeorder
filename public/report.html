@@ -98,6 +98,10 @@
     .report-image { width:100%; max-height:320px; object-fit:cover; border-radius:8px; border:1px solid var(--line); margin:8px 0 14px; }
     .button { border:0; border-radius:6px; background:var(--blue); color:#fff; font:inherit; font-weight:700; padding:13px 18px; cursor:pointer; text-decoration:none; display:inline-flex; justify-content:center; align-items:center; min-height:46px; }
     .button.secondary { background:#fff; color:var(--blue); border:1px solid var(--line); }
+    .report-access { max-width:640px; margin:44px auto; }
+    .report-access .phone-row { display:grid; grid-template-columns:150px minmax(0,1fr); gap:10px; }
+    .report-access label { display:block; font-weight:700; margin:14px 0 6px; }
+    .report-access input,.report-access select { width:100%; padding:11px; border:1px solid var(--line); border-radius:6px; font:inherit; }
     .actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:18px; }
     .muted { color:var(--muted); font-size:14px; }
     .error { color:#d93025; font-weight:700; }
@@ -107,6 +111,7 @@
 </head>
 <body>
   <main>
+    <section class="section report-access hidden" id="reportAccessPanel"></section>
     <section class="hero">
       <h1 id="title">檢測報告</h1>
       <p id="subtitle">正在讀取你的檢測結果...</p>
@@ -143,6 +148,14 @@
     const projectCode = (params.get('p') || 'LO').toUpperCase();
     const qrid = params.get('qrid') || params.get('quizResultId') || params.get('rid') || '';
     const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
+    const reportAccessKey = 'lifeorder_report_access_' + tenant + '_' + qrid;
+    const phoneCountries = {
+      '+886': { label: '台灣 +886', placeholder: '請輸入 9xxxxxxxx' },
+      '+852': { label: '香港 +852', placeholder: '請輸入 8 碼電話' },
+      '+86': { label: '中國 +86', placeholder: '請輸入 1xxxxxxxxxx' },
+      '+65': { label: '新加坡 +65', placeholder: '請輸入 8 碼電話' },
+      '+60': { label: '馬來西亞 +60', placeholder: '請輸入 1xxxxxxxx' }
+    };
 
     function escapeHtml(value) {
       return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
@@ -154,6 +167,44 @@
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(Object.assign({ projectCode, qrid }, payload || {}))
       }).then(function (res) { return res.json(); });
+    }
+
+    function reportAccessToken() {
+      try { return sessionStorage.getItem(reportAccessKey) || ''; } catch (_error) { return ''; }
+    }
+
+    function showReportAccessGate(message) {
+      const panel = document.getElementById('reportAccessPanel');
+      document.querySelectorAll('main > section:not(#reportAccessPanel)').forEach(function (node) { node.classList.add('hidden'); });
+      panel.classList.remove('hidden');
+      panel.innerHTML = '<h2>確認你的完整版報告</h2><p>為保護你的測驗結果，請輸入作答時使用的 Email 與電話。</p>' +
+        '<label for="reportAccessEmail">Email</label><input id="reportAccessEmail" type="email" autocomplete="email">' +
+        '<label for="reportAccessPhone">電話</label><div class="phone-row"><select id="reportAccessCountry"><option value="+886">台灣 +886</option><option value="+852">香港 +852</option><option value="+86">中國 +86</option><option value="+65">新加坡 +65</option><option value="+60">馬來西亞 +60</option></select><input id="reportAccessPhone" inputmode="tel" autocomplete="tel-national"></div>' +
+        '<p class="error hidden" id="reportAccessMessage"></p><div class="actions"><button class="button" type="button" id="verifyReportAccess">確認並查看報告</button></div>';
+      const phoneInput = document.getElementById('reportAccessPhone');
+      const countryInput = document.getElementById('reportAccessCountry');
+      function updatePhonePlaceholder() { phoneInput.placeholder = (phoneCountries[countryInput.value] || phoneCountries['+886']).placeholder; }
+      updatePhonePlaceholder();
+      countryInput.addEventListener('change', updatePhonePlaceholder);
+      document.getElementById('verifyReportAccess').addEventListener('click', function () {
+        const button = this;
+        const error = document.getElementById('reportAccessMessage');
+        button.disabled = true;
+        api('verifyFullQuizReportAccess', {
+          email: document.getElementById('reportAccessEmail').value.trim(),
+          phone: phoneInput.value.trim(),
+          phoneCountryCode: countryInput.value
+        }).then(function (res) {
+          if (!res.success || !res.reportAccessToken) throw new Error(res.message || '無法確認這份報告的存取資格。');
+          sessionStorage.setItem(reportAccessKey, res.reportAccessToken);
+          panel.classList.add('hidden');
+          boot();
+        }).catch(function (err) {
+          error.textContent = err.message || message || '資料不符，請確認後再試一次。';
+          error.classList.remove('hidden');
+          button.disabled = false;
+        });
+      });
     }
 
     function bookingUrl() {
@@ -643,8 +694,14 @@
         document.getElementById('loading').innerHTML = '<span class="error">報告連結缺少 tenant 或 qrid。</span>';
         return;
       }
-      api('getQuizResult', {}).then(function (res) {
+      api('getQuizResult', { reportAccessToken: reportAccessToken() }).then(function (res) {
+        if (res.code === 'REPORT_AUTH_REQUIRED' || res.requiresReportVerification) {
+          showReportAccessGate(res.message);
+          return;
+        }
         if (!res.success) throw new Error(res.message || '找不到測驗結果。');
+        document.querySelector('.hero').classList.remove('hidden');
+        document.getElementById('loading').classList.remove('hidden');
         window.__reportResult = res;
         const snapshot = res.reportSnapshot || {};
         const settings = snapshot.result_settings || {};
