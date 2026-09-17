@@ -184,18 +184,29 @@
       }
     }
 
-    function reportLinkAttrs(block, href, label) {
-      return ' href="' + escapeHtml(href || '#') + '" data-block-key="' + escapeHtml(block.blockKey || '') + '" data-block-type="' + escapeHtml(block.blockType || '') + '" data-link-label="' + escapeHtml(label || block.title || '') + '" onclick="return followReportLink(event,this)"';
+    function reportLinkAttrs(block, href, label, options) {
+      const openInNewWindow = options && options.openInNewWindow === true;
+      return ' href="' + escapeHtml(href || '#') + '" data-block-key="' + escapeHtml(block.blockKey || '') + '" data-block-type="' + escapeHtml(block.blockType || '') + '" data-link-label="' + escapeHtml(label || block.title || '') + '"' + (openInNewWindow ? ' data-open-new-window="true" target="_blank" rel="noopener noreferrer"' : '') + ' onclick="return followReportLink(event,this)"';
     }
 
     function followReportLink(event, link) {
-      event.preventDefault();
       const href = link.href;
-      api('trackReportClick', {
+      const trackingPayload = {
         blockKey: link.dataset.blockKey || '',
         blockType: link.dataset.blockType || 'link',
         label: link.dataset.linkLabel || link.textContent || '',
         targetUrl: href
+      };
+      if (link.dataset.openNewWindow === 'true') {
+        api('trackReportClick', trackingPayload).catch(function () {});
+        return true;
+      }
+      event.preventDefault();
+      api('trackReportClick', {
+        blockKey: trackingPayload.blockKey,
+        blockType: trackingPayload.blockType,
+        label: trackingPayload.label,
+        targetUrl: trackingPayload.targetUrl
       }).catch(function () {}).finally(function () {
         location.href = href;
       });
@@ -212,6 +223,18 @@
       return text.split(/\n{2,}/).map(function (part) {
         const paragraph = part.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
         return paragraph ? '<p>' + renderInlineText(paragraph) + '</p>' : '';
+      }).join('');
+    }
+
+    function renderCtaDescription(value) {
+      const text = String(value || '').replace(/\r\n/g, '\n').trim();
+      if (!text) return '';
+      return text.split(/\n{2,}/).map(function (part) {
+        const lines = part.split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+        if (lines.length && lines.every(function (line) { return /^[-・]\s+/.test(line); })) {
+          return '<ul>' + lines.map(function (line) { return '<li>' + renderInlineText(line.replace(/^[-・]\s+/, '')) + '</li>'; }).join('') + '</ul>';
+        }
+        return '<p>' + lines.map(renderInlineText).join('<br>') + '</p>';
       }).join('');
     }
 
@@ -601,7 +624,7 @@
           const description = content.description || defaultDescription;
           const customUrl = content.urlMode === 'custom' && content.url ? content.url : (reportSettings.booking_cta_url || '');
           const href = customUrl ? appendReportParams(customUrl, content) : bookingUrl();
-          html = (description ? '<p>' + escapeHtml(description) + '</p>' : '') + '<p><a class="button"' + reportLinkAttrs(block, href, label) + '>' + escapeHtml(label) + '</a></p>';
+          html = (block.title ? '<h2>' + escapeHtml(block.title) + '</h2>' : '') + renderCtaDescription(description) + '<p><a class="button"' + reportLinkAttrs(block, href, label, content) + '>' + escapeHtml(label) + '</a></p>';
         }
         return html ? '<article class="report-block">' + html + '</article>' : '';
       }).join('');

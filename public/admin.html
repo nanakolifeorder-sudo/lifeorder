@@ -3029,7 +3029,8 @@
         const mode = '<div class="col-3"><label>連結模式</label><select class="rb-url-mode"><option value="system"' + (isCustom ? '' : ' selected') + '>系統預約頁</option><option value="custom"' + (isCustom ? ' selected' : '') + '>自訂網址</option></select></div>';
         const url = '<div class="col-4"><label>自訂 CTA URL</label><input class="rb-url" value="' + escapeHtml(content.url || '') + '" placeholder="https://..."></div>';
         const append = '<div class="col-2"><label>附加資料參數</label><select class="rb-append"><option value="false"' + (content.appendParams ? '' : ' selected') + '>否</option><option value="true"' + (content.appendParams ? ' selected' : '') + '>是</option></select></div>';
-        return description + label + mode + url + append + reportAppendFields(content);
+        const newWindow = '<div class="col-3"><label>開啟方式</label><label class="checkline"><input class="rb-new-window" type="checkbox"' + (content.openInNewWindow ? ' checked' : '') + '> 在新視窗開啟</label></div>';
+        return description + label + mode + url + append + newWindow + reportAppendFields(content);
       }
       return '<div class="col-12"><p class="mini">此區塊會依分數區間自動顯示後台設定內容。</p></div>';
     }
@@ -3195,6 +3196,7 @@
         content.url = row.querySelector('.rb-url')?.value || '';
         content.appendParams = row.querySelector('.rb-append')?.value === 'true';
         content.appendFields = Array.from(row.querySelectorAll('.rb-param:checked')).map(function (input) { return input.value; });
+        content.openInNewWindow = row.querySelector('.rb-new-window')?.checked === true;
       }
       return {
         blockKey: row.dataset.key,
