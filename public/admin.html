@@ -1053,6 +1053,9 @@
     function accessCodeCard(item) {
       const usageText = String(item.usageCount || item.usedCount || 0) + (item.maxUses ? ' / ' + item.maxUses : ' 次');
       const remainingText = item.remainingUses === null || item.remainingUses === undefined ? '不限' : String(item.remainingUses) + ' 次';
+      const fullQuizLinkAction = String(item.versionCode || '').toUpperCase() === 'FULL'
+        ? '<button class="secondary" type="button" onclick="copyAccessCodeQuizLink(' + Number(item.rowId || 0) + ')">複製帶碼測驗連結</button>'
+        : '';
       return '<div class="client-card contact"><div class="card-top"><div><div class="crm-card-title"><strong>' + escapeHtml(item.code) + '</strong><span class="badge">' + escapeHtml(accessCodeTypeLabel(item.codeType)) + '</span><span class="badge">' + escapeHtml(item.status || '') + '</span></div><p class="mini">' + escapeHtml(item.name || '') + '</p></div><span class="badge">' + escapeHtml(item.projectCode || '') + (item.versionCode ? ' / ' + escapeHtml(item.versionCode) : '') + '</span></div>' +
         '<div class="crm-card-meta">' +
           '<div class="crm-meta-item"><div class="mini">購買人／歸屬</div><strong>' + escapeHtml(item.name || '未填寫') + '</strong></div>' +
@@ -1064,7 +1067,26 @@
         '</div>' +
         (item.discountLabel ? '<p class="mini">折扣說明：' + escapeHtml(item.discountLabel) + '</p>' : '') +
         (item.notes ? '<div class="answer-box">' + escapeHtml(item.notes) + '</div>' : '') +
-        '<div class="actions"><button class="secondary" onclick="openAccessCodeUsage(' + Number(item.rowId || 0) + ')">使用紀錄</button><button class="secondary" onclick="openAccessCodeForm(' + Number(item.rowId || 0) + ')">編輯</button><button class="danger" onclick="deleteAccessCode(' + Number(item.rowId || 0) + ')">刪除</button></div></div>';
+        '<div class="actions">' + fullQuizLinkAction + '<button class="secondary" onclick="openAccessCodeUsage(' + Number(item.rowId || 0) + ')">使用紀錄</button><button class="secondary" onclick="openAccessCodeForm(' + Number(item.rowId || 0) + ')">編輯</button><button class="danger" onclick="deleteAccessCode(' + Number(item.rowId || 0) + ')">刪除</button></div></div>';
+    }
+
+    function copyAccessCodeQuizLink(rowId) {
+      const item = accessCodeById(rowId);
+      if (!item || !item.code || String(item.versionCode || '').toUpperCase() !== 'FULL') {
+        alert('找不到可用的完整版優惠碼。');
+        return;
+      }
+      const url = window.location.origin + '/quiz?tenant=' + encodeURIComponent(tenant) +
+        '&p=' + encodeURIComponent(item.projectCode || 'LO') + '&version=FULL&code=' + encodeURIComponent(item.code);
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(url).then(function () {
+          alert('已複製帶入優惠碼的完整版測驗連結。');
+        }).catch(function () {
+          prompt('請複製這個連結：', url);
+        });
+      } else {
+        prompt('請複製這個連結：', url);
+      }
     }
 
     function accessCodeById(rowId) {
