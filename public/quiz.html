@@ -119,6 +119,7 @@
     const projectCode = (params.get('p') || 'LO').toUpperCase();
     const versionCode = params.get('v') || params.get('version') || '';
     const grantToken = params.get('grant') || '';
+    const couponCodeParam = (params.get('code') || params.get('coupon') || '').trim();
     const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
     let config = null;
     let stages = [];
@@ -244,10 +245,10 @@
         return;
       }
       panel.innerHTML = '<h2>取得完整版資格</h2><p>請輸入有效優惠碼。若你已付款或收到邀請，請從付款完成頁或邀請訊息中的專屬連結進入。</p>' +
-        '<label for="fullAccessCode">優惠碼</label><input id="fullAccessCode" autocomplete="off" placeholder="請輸入優惠碼">' +
+        '<label for="fullAccessCode">優惠碼</label><input id="fullAccessCode" autocomplete="off" placeholder="請輸入優惠碼" value="' + escapeHtml(couponCodeParam) + '">' +
         '<p id="fullAccessMessage" class="access-message hidden"></p><div class="actions"><button type="button" id="verifyFullCode">確認並開始測驗</button></div>';
-      document.getElementById('verifyFullCode').addEventListener('click', function () {
-        const button = this;
+      function verifyCode() {
+        const button = document.getElementById('verifyFullCode');
         const code = document.getElementById('fullAccessCode').value.trim();
         const message = document.getElementById('fullAccessMessage');
         if (!code) { message.textContent = '請輸入優惠碼。'; message.className = 'access-message error'; return; }
@@ -260,7 +261,14 @@
           message.className = 'access-message error';
           button.disabled = false;
         });
-      });
+      }
+      document.getElementById('verifyFullCode').addEventListener('click', verifyCode);
+      if (couponCodeParam) {
+        const message = document.getElementById('fullAccessMessage');
+        message.textContent = '正在確認優惠碼資格...';
+        message.className = 'access-message';
+        verifyCode();
+      }
     }
 
     function isPetQuestion(question) {
