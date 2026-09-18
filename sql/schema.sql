@@ -194,7 +194,7 @@ create table if not exists quiz_access_codes (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (tenant_slug, project_code, version_code, code_normalized),
-  check (code_type in ('retest', 'discount', 'free_access'))
+  check (code_type in ('retest', 'discount', 'free_access', 'invite'))
 );
 
 create table if not exists quiz_access_code_usages (
