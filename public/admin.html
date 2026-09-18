@@ -1059,7 +1059,7 @@
       const fullQuizLinkAction = String(item.versionCode || '').toUpperCase() === 'FULL'
         ? '<button class="secondary" type="button" onclick="copyAccessCodeQuizLink(' + Number(item.rowId || 0) + ')">複製帶碼測驗連結</button>'
         : '';
-      return '<div class="client-card contact"><div class="card-top"><div><div class="crm-card-title"><strong>' + escapeHtml(item.code) + '</strong><span class="badge">' + escapeHtml(accessCodeTypeLabel(item.codeType)) + '</span><span class="badge">' + escapeHtml(item.status || '') + '</span></div><p class="mini">' + escapeHtml(item.name || '') + '</p></div><span class="badge">' + escapeHtml(item.projectCode || '') + (item.versionCode ? ' / ' + escapeHtml(item.versionCode) : '') + '</span></div>' +
+      return '<div class="client-card contact" data-access-code-id="' + Number(item.rowId || 0) + '"><div class="card-top"><div><div class="crm-card-title"><strong>' + escapeHtml(item.code) + '</strong><span class="badge">' + escapeHtml(accessCodeTypeLabel(item.codeType)) + '</span><span class="badge">' + escapeHtml(item.status || '') + '</span></div><p class="mini">' + escapeHtml(item.name || '') + '</p></div><span class="badge">' + escapeHtml(item.projectCode || '') + (item.versionCode ? ' / ' + escapeHtml(item.versionCode) : '') + '</span></div>' +
         '<div class="crm-card-meta">' +
           '<div class="crm-meta-item"><div class="mini">購買人／歸屬</div><strong>' + escapeHtml(item.name || '未填寫') + '</strong></div>' +
           '<div class="crm-meta-item"><div class="mini">使用次數</div><strong>' + escapeHtml(usageText) + '</strong></div>' +
@@ -1125,7 +1125,17 @@
 
     function openAccessCodeForm(rowId) {
       const item = rowId ? accessCodeById(rowId) : null;
-      const panel = document.getElementById('accessCodeFormPanel');
+      document.querySelectorAll('.access-code-editor').forEach(function (editor) { editor.remove(); });
+      const defaultPanel = document.getElementById('accessCodeFormPanel');
+      let panel = defaultPanel;
+      if (item) {
+        const card = document.querySelector('[data-access-code-id="' + Number(rowId) + '"]');
+        if (card) {
+          defaultPanel.classList.add('hidden');
+          card.insertAdjacentHTML('afterend', '<div class="panel access-code-editor" id="accessCodeInlineEditor"></div>');
+          panel = document.getElementById('accessCodeInlineEditor');
+        }
+      }
       const projects = cache.accessCodes?.projects || [];
       const projectOptions = projects.map(function (p) {
         const selected = (item?.projectCode || (accessCodeProject !== 'ALL' ? accessCodeProject : 'LO')) === p.code;
@@ -1148,9 +1158,16 @@
         '<div class="col-12"><button onclick="saveAccessCode(' + Number(item?.rowId || 0) + ')">儲存代碼</button> <button class="secondary" onclick="hideAccessCodeForm()">取消</button></div>' +
       '</div>';
       panel.classList.remove('hidden');
+      if (item) {
+        requestAnimationFrame(function () {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          panel.querySelector('#accessCode')?.focus();
+        });
+      }
     }
 
     function hideAccessCodeForm() {
+      document.querySelectorAll('.access-code-editor').forEach(function (editor) { editor.remove(); });
       const panel = document.getElementById('accessCodeFormPanel');
       if (panel) panel.classList.add('hidden');
     }
