@@ -1003,12 +1003,12 @@
     }
 
     function accessCodeTypeLabel(type) {
-      const map = { retest: '重測資格', discount: '折扣碼', free_access: '免費開通' };
+      const map = { retest: '重測資格', discount: '折扣碼', free_access: '免費開通', invite: '單次邀請碼' };
       return map[type] || type || '';
     }
 
     function accessCodeTypeOptions(current) {
-      return [['retest', '重測資格'], ['discount', '折扣碼'], ['free_access', '免費開通']].map(function (item) {
+      return [['retest', '重測資格'], ['discount', '折扣碼'], ['free_access', '免費開通'], ['invite', '單次邀請碼']].map(function (item) {
         return '<option value="' + item[0] + '"' + (current === item[0] ? ' selected' : '') + '>' + item[1] + '</option>';
       }).join('');
     }
@@ -1021,6 +1021,8 @@
 
     function renderAccessCodes(res) {
       const rows = res.codes || [];
+      const singleUseInvites = rows.filter(function (item) { return item.codeType === 'invite'; });
+      const sharedCodes = rows.filter(function (item) { return item.codeType !== 'invite'; });
       const entitlements = res.entitlements || [];
       const entitlementSummary = {
         total: entitlements.length,
@@ -1035,12 +1037,13 @@
         '<div class="panel"><div class="row">' +
           '<div class="col-4"><h2>優惠 / 重測碼</h2><p class="mini">管理完整版代碼、使用上限與期限。點開使用紀錄可查看每次實際使用時間與作答者資料。</p></div>' +
           '<div class="col-4"><label>專案篩選</label><select onchange="loadAccessCodesByProject(this.value)">' + projectOptions + '</select></div>' +
-          '<div class="col-4"><label>&nbsp;</label><div class="actions"><a class="button secondary" target="_blank" href="/code-status?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(accessCodeProject === 'ALL' ? 'LO' : accessCodeProject) + '&v=FULL">優惠碼查詢頁</a><button onclick="openAccessCodeForm()">新增代碼</button></div></div>' +
+          '<div class="col-4"><label>&nbsp;</label><div class="actions"><a class="button secondary" target="_blank" href="/code-status?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(accessCodeProject === 'ALL' ? 'LO' : accessCodeProject) + '&v=FULL">優惠碼查詢頁</a><button class="secondary" onclick="createSingleUseFullQuizInvite()">建立單次邀請碼</button><button onclick="openAccessCodeForm()">新增代碼</button></div></div>' +
         '</div></div>' +
         '<div class="panel hidden" id="accessCodeFormPanel"></div>' +
         '<div class="panel hidden" id="accessCodeUsagePanel"></div>' +
         '<div class="panel"><h2>完整版授權監測</h2><p class="mini">付款開通與後台邀請的使用狀況。查看報告次數只計已完成完整版報告的開啟紀錄。</p><div class="stat-grid">' + statBox('已建立', entitlementSummary.total) + statBox('尚未使用', entitlementSummary.issued) + statBox('作答中', entitlementSummary.started) + statBox('已完成', entitlementSummary.completed) + '</div><div class="list">' + (entitlements.length ? entitlements.map(fullQuizEntitlementMonitoringCard).join('') : '<p class="mini">目前沒有完整版授權紀錄。</p>') + '</div></div>' +
-        '<div class="list">' + (rows.length ? rows.map(accessCodeCard).join('') : '<div class="panel"><p>目前還沒有代碼。</p></div>') + '</div>';
+        '<div class="panel"><h2>單次完整版邀請碼</h2><p class="mini">先建立連結，再交給朋友或客戶作答。每組限一次，完成測驗後會自動建立 CRM 並記錄使用狀況。</p><div class="list">' + (singleUseInvites.length ? singleUseInvites.map(accessCodeCard).join('') : '<p class="mini">目前沒有尚可追蹤的單次邀請碼。</p>') + '</div></div>' +
+        '<div class="panel"><h2>多人優惠／重測碼</h2><div class="list">' + (sharedCodes.length ? sharedCodes.map(accessCodeCard).join('') : '<p class="mini">目前還沒有多人優惠或重測碼。</p>') + '</div></div>';
     }
 
     function fullQuizEntitlementMonitoringCard(item) {
@@ -1087,6 +1090,33 @@
       } else {
         prompt('請複製這個連結：', url);
       }
+    }
+
+    function singleUseInviteDefaultDate() {
+      const value = new Date();
+      value.setDate(value.getDate() + 30);
+      return value.toISOString().slice(0, 10);
+    }
+
+    function createSingleUseFullQuizInvite() {
+      const expiresAt = prompt('請輸入邀請截止日期（YYYY-MM-DD），預設為 30 天後。', singleUseInviteDefaultDate());
+      if (expiresAt === null) return;
+      const note = prompt('備註（選填，例如：香港合作方 9 月邀請）', '');
+      if (note === null) return;
+      api('createSingleUseFullQuizInvite', {
+        projectCode: accessCodeProject === 'ALL' ? 'LO' : accessCodeProject,
+        endsAt: expiresAt.trim() || null,
+        notes: note.trim()
+      }).then(function (res) {
+        const url = res.invite?.url || '';
+        if (!url) throw new Error('邀請連結建立失敗。');
+        const copied = navigator.clipboard?.writeText ? navigator.clipboard.writeText(url).catch(function () {}) : Promise.resolve();
+        return copied.then(function () {
+          alert('單次完整版邀請碼已建立，連結已複製。');
+          delete cache.accessCodes;
+          return loadAccessCodes();
+        });
+      }).catch(function (err) { alert(err.message || '建立單次邀請碼失敗。'); });
     }
 
     function accessCodeById(rowId) {
