@@ -34,6 +34,10 @@
       "destination": "/code-status.html"
     },
     {
+      "source": "/group-codes",
+      "destination": "/group-codes.html"
+    },
+    {
       "source": "/unsubscribe",
       "destination": "/unsubscribe.html"
     },
