@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <script>if(/\.vercel\.app$/i.test(location.hostname)&&location.hostname!=='lifeorder-orpin.vercel.app')location.replace('https://lifeorder-orpin.vercel.app'+location.pathname+location.search+location.hash);</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>團購代碼使用狀況｜人生秩序</title>
+  <style>
+    :root{--ink:#16333a;--muted:#617177;--paper:#f7f1e4;--line:#d8d0be;--blue:#2d60b4;--green:#217a57;--red:#b63834}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--paper);color:var(--ink);font-family:Arial,'Noto Sans TC',sans-serif;line-height:1.6}main{width:min(1000px,calc(100% - 32px));margin:48px auto}.panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:28px;box-shadow:0 10px 28px rgba(22,51,58,.08)}h1{font-size:28px;margin:0 0 8px}h2{font-size:18px;margin:0}p{color:var(--muted);margin:0 0 16px}label{display:block;font-weight:700;margin:18px 0 7px}input{width:100%;padding:13px;border:1px solid var(--line);border-radius:6px;color:var(--ink);font:inherit}button{border:0;border-radius:6px;padding:12px 16px;background:var(--blue);color:#fff;font:inherit;font-weight:800;cursor:pointer}button.secondary{background:#fff;color:var(--blue);border:1px solid var(--blue)}button:disabled{opacity:.6;cursor:wait}.hidden{display:none!important}.message{margin-top:16px;font-weight:700}.message.error{color:var(--red)}.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}.stat{border:1px solid var(--line);border-radius:7px;padding:14px}.stat span{display:block;color:var(--muted);font-size:13px}.stat strong{font-size:22px}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#fbfaf6;font-size:14px}.status{font-weight:800;color:var(--green)}.status.unused{color:var(--muted)}.table-wrap{overflow-x:auto}.note{font-size:13px;margin-top:18px}@media(max-width:620px){main{margin:24px auto}.panel{padding:20px}.summary{grid-template-columns:1fr}th,td{white-space:nowrap;padding:10px 8px}}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <h1>團購完整版測驗代碼</h1>
+      <p>請輸入建立團購時登記的 Email，查看這一批代碼的使用狀況與測驗連結。</p>
+      <form id="verifyForm">
+        <label for="email">團購主 Email</label>
+        <input id="email" type="email" autocomplete="email" required placeholder="請輸入登記 Email">
+        <p><button id="submitButton" type="submit">查看我的代碼</button></p>
+      </form>
+      <div id="message" class="message hidden" role="alert"></div>
+      <section id="result" class="hidden" aria-live="polite"></section>
+    </section>
+  </main>
+  <script>
+    const params=new URLSearchParams(location.search);const tenant=(params.get('tenant')||'lifeorder').toLowerCase();const projectCode=(params.get('p')||'LO').toUpperCase();const batchId=params.get('batch')||'';const token=params.get('token')||'';const form=document.getElementById('verifyForm');const email=document.getElementById('email');const button=document.getElementById('submitButton');const message=document.getElementById('message');const result=document.getElementById('result');
+    function escapeHtml(value){return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')}
+    function formatDate(value){if(!value)return '未使用';const date=new Date(value);return Number.isNaN(date.getTime())?'':new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'}).format(date)}
+    function setMessage(text,error){message.textContent=text||'';message.classList.toggle('hidden',!text);message.classList.toggle('error',Boolean(error))}
+    function copy(url){if(navigator.clipboard?.writeText){navigator.clipboard.writeText(url).then(()=>alert('已複製測驗連結。')).catch(()=>prompt('請複製這個連結：',url));}else prompt('請複製這個連結：',url)}
+    function render(data){const batch=data.batch;const rows=(data.codes||[]).map(item=>'<tr><td>'+item.number+'</td><td><strong>'+escapeHtml(item.code)+'</strong></td><td><span class="status '+(item.used?'':'unused')+'">'+(item.used?'已使用':'未使用')+'</span></td><td>'+escapeHtml(item.clientName||'—')+'</td><td>'+escapeHtml(item.clientEmail||'—')+'</td><td>'+escapeHtml(formatDate(item.usedAt))+'</td><td><button class="secondary" type="button" onclick="copy('+JSON.stringify(item.url).replace(/"/g,'&quot;')+')">複製連結</button></td></tr>').join('');result.innerHTML='<div class="summary"><div class="stat"><span>已使用／總數</span><strong>'+escapeHtml(String(batch.usedCount)+' / '+String(batch.totalCodes))+'</strong></div><div class="stat"><span>剩餘可用</span><strong>'+escapeHtml(String(batch.remainingCount))+' 組</strong></div><div class="stat"><span>有效期限</span><strong>'+escapeHtml(formatDate(batch.endsAt)||'未設定')+'</strong></div></div><h2>'+escapeHtml(batch.label||'我的團購代碼')+'</h2><div class="table-wrap"><table><thead><tr><th>序號</th><th>代碼</th><th>使用狀況</th><th>使用人姓名</th><th>使用人 Email</th><th>使用日期</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">每組代碼限一人使用。將個別連結提供給受邀者，即可直接進入完整版測驗。</p>';result.classList.remove('hidden')}
+    form.addEventListener('submit',async event=>{event.preventDefault();setMessage('',false);result.classList.add('hidden');if(!batchId||!token){setMessage('這個團購查詢連結不完整，請向娜娜子團隊索取正確連結。',true);return}button.disabled=true;button.textContent='查詢中...';try{const response=await fetch('/api?action=getGroupInviteBatchForOwner&tenant='+encodeURIComponent(tenant),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({projectCode,batchId,token,email:email.value.trim()})});const data=await response.json();if(!data.success)throw new Error(data.message||'目前無法查詢，請稍後再試。');render(data)}catch(error){setMessage(error.message||'目前無法查詢，請稍後再試。',true)}finally{button.disabled=false;button.textContent='查看我的代碼'}});
+  </script>
+</body>
+</html>

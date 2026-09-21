@@ -197,6 +197,30 @@ create table if not exists quiz_access_codes (
   check (code_type in ('retest', 'discount', 'free_access', 'invite'))
 );
 
+create table if not exists quiz_access_code_batches (
+  id bigserial primary key,
+  tenant_slug text not null references tenants(slug) on delete cascade,
+  project_code text not null,
+  version_code text not null default 'FULL',
+  buyer_name text not null default '',
+  buyer_email text not null,
+  buyer_email_normalized text generated always as (lower(trim(buyer_email))) stored,
+  label text not null default '',
+  total_codes integer not null check (total_codes > 0),
+  starts_at timestamptz,
+  ends_at timestamptz,
+  status text not null default '啟用',
+  notes text not null default '',
+  portal_token_hash text not null,
+  portal_token_ciphertext text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_slug, portal_token_hash)
+);
+
+alter table quiz_access_codes
+  add column if not exists batch_id bigint references quiz_access_code_batches(id) on delete set null;
+
 create table if not exists quiz_access_code_usages (
   id bigserial primary key,
   tenant_slug text not null references tenants(slug) on delete cascade,
@@ -287,6 +311,8 @@ create index if not exists idx_questions_project on questions(tenant_slug, proje
 create index if not exists idx_rules_consultant on availability_rules(tenant_slug, consultant_id);
 create index if not exists idx_leads_project_email on leads(tenant_slug, project_code, client_email);
 create index if not exists idx_quiz_access_codes_lookup on quiz_access_codes(tenant_slug, project_code, version_code, code_normalized);
+create index if not exists idx_quiz_access_codes_batch on quiz_access_codes(tenant_slug, batch_id, id);
+create index if not exists idx_quiz_access_code_batches_owner on quiz_access_code_batches(tenant_slug, buyer_email_normalized, id);
 create index if not exists idx_quiz_access_code_usages_phone on quiz_access_code_usages(access_code_id, client_phone, used_at desc);
 alter table quiz_access_codes add column if not exists per_phone_limit integer not null default 1;
 update quiz_access_codes set per_phone_limit = coalesce(per_phone_limit, per_email_limit, 1) where per_phone_limit is null;

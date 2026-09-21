@@ -1021,7 +1021,10 @@
 
     function renderAccessCodes(res) {
       const rows = res.codes || [];
-      const singleUseInvites = rows.filter(function (item) { return item.codeType === 'invite'; });
+      const batches = res.batches || [];
+      const singleUseInvites = rows.filter(function (item) { return item.codeType === 'invite' && !item.batchId; });
+      const unusedInvites = singleUseInvites.filter(function (item) { return Number(item.usageCount || 0) === 0; });
+      const usedInvites = singleUseInvites.filter(function (item) { return Number(item.usageCount || 0) > 0; });
       const sharedCodes = rows.filter(function (item) { return item.codeType !== 'invite'; });
       const entitlements = res.entitlements || [];
       const entitlementSummary = {
@@ -1037,13 +1040,26 @@
         '<div class="panel"><div class="row">' +
           '<div class="col-4"><h2>優惠 / 重測碼</h2><p class="mini">管理完整版代碼、使用上限與期限。點開使用紀錄可查看每次實際使用時間與作答者資料。</p></div>' +
           '<div class="col-4"><label>專案篩選</label><select onchange="loadAccessCodesByProject(this.value)">' + projectOptions + '</select></div>' +
-          '<div class="col-4"><label>&nbsp;</label><div class="actions"><a class="button secondary" target="_blank" href="/code-status?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(accessCodeProject === 'ALL' ? 'LO' : accessCodeProject) + '&v=FULL">優惠碼查詢頁</a><button class="secondary" onclick="createSingleUseFullQuizInvite()">建立單次邀請碼</button><button onclick="openAccessCodeForm()">新增代碼</button></div></div>' +
+          '<div class="col-4"><label>&nbsp;</label><div class="actions"><a class="button secondary" target="_blank" href="/code-status?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(accessCodeProject === 'ALL' ? 'LO' : accessCodeProject) + '&v=FULL">優惠碼查詢頁</a><button class="secondary" onclick="createSingleUseFullQuizInvite()">建立單次邀請碼</button><button class="secondary" onclick="createFullQuizInviteBatch()">建立團購批次</button><button onclick="openAccessCodeForm()">新增代碼</button></div></div>' +
         '</div></div>' +
         '<div class="panel hidden" id="accessCodeFormPanel"></div>' +
         '<div class="panel hidden" id="accessCodeUsagePanel"></div>' +
         '<div class="panel"><h2>完整版授權監測</h2><p class="mini">付款開通與後台邀請的使用狀況。查看報告次數只計已完成完整版報告的開啟紀錄。</p><div class="stat-grid">' + statBox('已建立', entitlementSummary.total) + statBox('尚未使用', entitlementSummary.issued) + statBox('作答中', entitlementSummary.started) + statBox('已完成', entitlementSummary.completed) + '</div><div class="list">' + (entitlements.length ? entitlements.map(fullQuizEntitlementMonitoringCard).join('') : '<p class="mini">目前沒有完整版授權紀錄。</p>') + '</div></div>' +
-        '<div class="panel"><h2>單次完整版邀請碼</h2><p class="mini">先建立連結，再交給朋友或客戶作答。每組限一次，完成測驗後會自動建立 CRM 並記錄使用狀況。</p><div class="list">' + (singleUseInvites.length ? singleUseInvites.map(accessCodeCard).join('') : '<p class="mini">目前沒有尚可追蹤的單次邀請碼。</p>') + '</div></div>' +
+        '<div class="panel"><h2>零售｜單次完整版邀請碼</h2><p class="mini">一組連結只提供一位客戶使用。完成測驗後會自動建立 CRM 並記錄使用狀況。</p><details open><summary>未使用（' + unusedInvites.length + '）</summary><div class="list">' + (unusedInvites.length ? unusedInvites.map(accessCodeCard).join('') : '<p class="mini">目前沒有未使用的單次邀請碼。</p>') + '</div></details><details><summary>已使用（' + usedInvites.length + '）</summary><div class="list">' + (usedInvites.length ? usedInvites.map(accessCodeCard).join('') : '<p class="mini">目前沒有已使用的單次邀請碼。</p>') + '</div></details></div>' +
+        '<div class="panel"><h2>團購</h2><p class="mini">每個團購主有一個專屬查詢網址；對方以建立時登記的 Email 驗證後，可查看代碼、使用者與一鍵複製連結。</p><div class="list">' + (batches.length ? batches.map(groupInviteBatchCard).join('') : '<p class="mini">目前沒有團購批次。</p>') + '</div></div>' +
         '<div class="panel"><h2>多人優惠／重測碼</h2><div class="list">' + (sharedCodes.length ? sharedCodes.map(accessCodeCard).join('') : '<p class="mini">目前還沒有多人優惠或重測碼。</p>') + '</div></div>';
+    }
+
+    function groupInviteBatchCard(item) {
+      const buyer = item.buyerName || '未填寫團購主';
+      const label = item.label ? '｜' + item.label : '';
+      return '<details class="client-card contact"><summary><strong>' + escapeHtml(buyer + label) + '</strong> <span class="badge">團購</span> <span class="badge">' + escapeHtml(String(item.usedCount || 0) + ' / ' + String(item.totalCodes || 0)) + '</span></summary><div class="crm-card-meta">' +
+        '<div class="crm-meta-item"><div class="mini">團購主 Email</div><strong>' + escapeHtml(item.buyerEmail || '') + '</strong></div>' +
+        '<div class="crm-meta-item"><div class="mini">已使用／總數</div><strong>' + escapeHtml(String(item.usedCount || 0) + ' / ' + String(item.totalCodes || 0)) + '</strong></div>' +
+        '<div class="crm-meta-item"><div class="mini">剩餘數量</div><strong>' + escapeHtml(String(item.remainingCount || 0)) + '</strong></div>' +
+        '<div class="crm-meta-item"><div class="mini">有效期限</div><strong>' + escapeHtml(compactDate(item.endsAt) || '未設定') + '</strong></div>' +
+        '</div>' + (item.notes ? '<div class="answer-box">' + escapeHtml(item.notes) + '</div>' : '') +
+        '<div class="actions"><button class="secondary" type="button" onclick="copyGroupInvitePortal(' + Number(item.id) + ')">複製團購查詢連結</button></div></details>';
     }
 
     function fullQuizEntitlementMonitoringCard(item) {
@@ -1094,12 +1110,12 @@
 
     function singleUseInviteDefaultDate() {
       const value = new Date();
-      value.setDate(value.getDate() + 30);
+      value.setFullYear(value.getFullYear() + 10);
       return value.toISOString().slice(0, 10);
     }
 
     function createSingleUseFullQuizInvite() {
-      const expiresAt = prompt('請輸入邀請截止日期（YYYY-MM-DD），預設為 30 天後。', singleUseInviteDefaultDate());
+      const expiresAt = prompt('請輸入邀請截止日期（YYYY-MM-DD），預設為 10 年後。', singleUseInviteDefaultDate());
       if (expiresAt === null) return;
       const note = prompt('備註（選填，例如：香港合作方 9 月邀請）', '');
       if (note === null) return;
@@ -1119,6 +1135,43 @@
       }).catch(function (err) { alert(err.message || '建立單次邀請碼失敗。'); });
     }
 
+    function createFullQuizInviteBatch() {
+      const buyerName = prompt('請輸入團購主名稱／單位名稱：', '');
+      if (buyerName === null || !buyerName.trim()) return;
+      const buyerEmail = prompt('請輸入團購主指定的查詢 Email：', '');
+      if (buyerEmail === null || !buyerEmail.trim()) return;
+      const totalCodes = prompt('請輸入要建立的單次邀請碼數量（1-1000）：', '100');
+      if (totalCodes === null) return;
+      const expiresAt = prompt('請輸入邀請截止日期（YYYY-MM-DD），預設為 10 年後。', singleUseInviteDefaultDate());
+      if (expiresAt === null) return;
+      const label = prompt('批次名稱／備註標題（選填）：', '');
+      if (label === null) return;
+      const notes = prompt('內部備註（選填）：', '');
+      if (notes === null) return;
+      api('createFullQuizInviteBatch', {
+        projectCode: accessCodeProject === 'ALL' ? 'LO' : accessCodeProject,
+        buyerName: buyerName.trim(), buyerEmail: buyerEmail.trim(), totalCodes: totalCodes.trim(),
+        endsAt: expiresAt.trim() || null, label: label.trim(), notes: notes.trim()
+      }).then(function (res) {
+        const url = res.batch?.portalUrl || '';
+        if (!url) throw new Error('團購批次建立失敗。');
+        const copied = navigator.clipboard?.writeText ? navigator.clipboard.writeText(url).catch(function () {}) : Promise.resolve();
+        return copied.then(function () {
+          alert('團購批次已建立，團購主查詢連結已複製。');
+          delete cache.accessCodes;
+          return loadAccessCodes();
+        });
+      }).catch(function (err) { alert(err.message || '建立團購批次失敗。'); });
+    }
+
+    function copyGroupInvitePortal(batchId) {
+      const item = (cache.accessCodes?.batches || []).find(function (batch) { return Number(batch.id) === Number(batchId); });
+      if (!item?.portalUrl) return alert('找不到團購查詢連結。');
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(item.portalUrl).then(function () { alert('已複製團購主專屬查詢連結。'); }).catch(function () { prompt('請複製這個連結：', item.portalUrl); });
+      } else prompt('請複製這個連結：', item.portalUrl);
+    }
+
     function accessCodeById(rowId) {
       return (cache.accessCodes?.codes || []).find(function (item) { return Number(item.rowId) === Number(rowId); }) || null;
     }
@@ -1132,8 +1185,10 @@
         const card = document.querySelector('[data-access-code-id="' + Number(rowId) + '"]');
         if (card) {
           defaultPanel.classList.add('hidden');
-          card.insertAdjacentHTML('afterend', '<div class="panel access-code-editor" id="accessCodeInlineEditor"></div>');
-          panel = document.getElementById('accessCodeInlineEditor');
+          panel = document.createElement('div');
+          panel.className = 'panel access-code-editor';
+          panel.id = 'accessCodeInlineEditor';
+          card.insertAdjacentElement('afterend', panel);
         }
       }
       const projects = cache.accessCodes?.projects || [];
@@ -1153,16 +1208,16 @@
         '<div class="col-2"><label>總使用上限</label><input id="accessMaxUses" type="number" min="1" value="' + escapeHtml(item?.maxUses || '') + '" placeholder="不填不限"></div>' +
         '<div class="col-2"><label>每支電話次數</label><input id="accessPerPhone" type="number" min="1" value="' + escapeHtml(item?.perPhoneLimit || 1) + '"></div>' +
         '<div class="col-3"><label>開始時間</label><input id="accessStartsAt" type="datetime-local" value="' + escapeHtml(datetimeLocalValue(item?.startsAt)) + '"></div>' +
-        '<div class="col-3"><label>結束時間</label><input id="accessEndsAt" type="datetime-local" value="' + escapeHtml(datetimeLocalValue(item?.endsAt)) + '"></div>' +
+        '<div class="col-3"><label>結束時間' + (item ? '' : '（預設 10 年後）') + '</label><input id="accessEndsAt" type="datetime-local" value="' + escapeHtml(datetimeLocalValue(item?.endsAt || (item ? null : new Date(new Date().setFullYear(new Date().getFullYear() + 10)).toISOString()))) + '"></div>' +
         '<div class="col-6"><label>備註</label><textarea id="accessNotes">' + escapeHtml(item?.notes || '') + '</textarea></div>' +
         '<div class="col-12"><button onclick="saveAccessCode(' + Number(item?.rowId || 0) + ')">儲存代碼</button> <button class="secondary" onclick="hideAccessCodeForm()">取消</button></div>' +
       '</div>';
       panel.classList.remove('hidden');
       if (item) {
-        requestAnimationFrame(function () {
-          panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          panel.querySelector('#accessCode')?.focus();
-        });
+        setTimeout(function () {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          panel.querySelector('#accessCode')?.focus({ preventScroll: true });
+        }, 50);
       }
     }
 
