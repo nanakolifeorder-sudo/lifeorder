@@ -390,13 +390,15 @@
       return items.map(function (item, index) {
         const angle = -Math.PI / 2 + (Math.PI * 2 * index / count);
         const distance = radius * item.pct;
+        // Left-side labels are right-aligned; keep them close to the grid so longer names stay inside the SVG viewport.
+        const labelRadius = Math.cos(angle) < -0.25 ? radius + 5 : radius + 22;
         return {
           x: center + Math.cos(angle) * distance,
           y: center + Math.sin(angle) * distance,
           axisX: center + Math.cos(angle) * radius,
           axisY: center + Math.sin(angle) * radius,
-          labelX: center + Math.cos(angle) * (radius + 22),
-          labelY: center + Math.sin(angle) * (radius + 22),
+          labelX: center + Math.cos(angle) * labelRadius,
+          labelY: center + Math.sin(angle) * labelRadius,
           value: item
         };
       });
