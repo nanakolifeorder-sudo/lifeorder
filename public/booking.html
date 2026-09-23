@@ -266,6 +266,7 @@
     const quizResultId = params.get('qrid') || params.get('quizResultId') || ''; 
     const invitationToken = params.get('invite') || '';
     const skipForm = params.get('skipForm') === 'true';
+    const previewToken = params.get('preview') || '';
     const apiBase = isLocalPreview ? 'https://dm-booking-saas.vercel.app/api' : '/api';
 
     let questions = [];
@@ -283,7 +284,7 @@
       return fetch(apiBase + '?action=' + encodeURIComponent(action) + '&tenant=' + encodeURIComponent(tenant), {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(Object.assign({ projectCode }, payload || {}))
+        body: JSON.stringify(Object.assign({ projectCode, previewToken }, payload || {}))
       }).then(function (res) { return res.json(); });
     }
 
@@ -594,6 +595,9 @@
         document.title = projectName + '｜預約諮詢';
         if (res.bookingNotice) {
           document.getElementById('noticeText').innerHTML = formatNotice(res.bookingNotice);
+          if (previewToken) {
+            document.getElementById('noticeText').insertAdjacentHTML('afterbegin', '<strong>測試模式：</strong>此頁只供確認預約流程，完成送出不會建立實際 Zoom 會議。<br><br>');
+          }
           document.getElementById('noticePanel').style.display = 'block';
           document.querySelector('.wrap').classList.add('has-notice');
         }
