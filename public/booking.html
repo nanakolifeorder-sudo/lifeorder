@@ -591,6 +591,7 @@
         consultationUrl = res.mainUrl || '';
         questions = res.questions || [];
         document.getElementById('title').textContent = projectName + '｜預約諮詢';
+        document.title = projectName + '｜預約諮詢';
         if (res.bookingNotice) {
           document.getElementById('noticeText').innerHTML = formatNotice(res.bookingNotice);
           document.getElementById('noticePanel').style.display = 'block';
