@@ -296,6 +296,13 @@
         .replace(/'/g, '&#039;');
     }
 
+    function formatNotice(value) {
+      const escaped = escapeHtml(value).replace(/\n/g, '<br>');
+      return escaped.replace(/(https?:\/\/[^\s<]+)/g, function (url) {
+        return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>';
+      });
+    }
+
     function renderQuestions() {
       const box = document.getElementById('questions');
       if (skipForm) {
@@ -585,7 +592,7 @@
         questions = res.questions || [];
         document.getElementById('title').textContent = projectName + '｜預約諮詢';
         if (res.bookingNotice) {
-          document.getElementById('noticeText').innerHTML = escapeHtml(res.bookingNotice).replace(/\n/g, '<br>');
+          document.getElementById('noticeText').innerHTML = formatNotice(res.bookingNotice);
           document.getElementById('noticePanel').style.display = 'block';
           document.querySelector('.wrap').classList.add('has-notice');
         }
