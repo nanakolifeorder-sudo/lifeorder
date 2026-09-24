@@ -108,6 +108,7 @@ create table if not exists appointments (
   calendar_provider text not null default 'google',
   event_id text,
   meet_link text default '',
+  zoom_meeting_id text default '',
   start_at timestamptz,
   end_at timestamptz,
   client_name text not null,
@@ -123,6 +124,7 @@ create table if not exists appointments (
 );
 
 alter table appointments add column if not exists calendar_provider text not null default 'google';
+alter table appointments add column if not exists zoom_meeting_id text default '';
 
 create table if not exists rejected_clients (
   id bigserial primary key,
