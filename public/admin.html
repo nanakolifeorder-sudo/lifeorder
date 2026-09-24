@@ -470,7 +470,7 @@
     .schedule-day-row { display:grid; grid-template-columns:120px minmax(0,1fr) minmax(0,1fr) auto; gap:12px; align-items:end; }
     .schedule-window label { color:var(--muted); font-size:12px; font-weight:800; }
     .schedule-time-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-    .schedule-window-empty { align-self:center; }
+    .schedule-window-empty { align-self:center; display:flex; gap:8px; flex-wrap:wrap; }
     .zoom-settings-box { border:1px solid var(--line); border-radius:8px; padding:14px; background:#1f1f1f; margin-bottom:14px; }
     .panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; }
     .table-scroll { max-height: 288px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
@@ -2225,7 +2225,7 @@
           '<strong>星期' + day + '</strong>' +
           '<div class="schedule-window"><label>第一時段</label><div class="schedule-time-pair"><input type="time" id="w_start_' + i + '" value="' + escapeHtml(rule.start || '') + '"><input type="time" id="w_end_' + i + '" value="' + escapeHtml(rule.end || '') + '"></div></div>' +
           '<div class="schedule-window schedule-second"' + (hasSecond ? '' : ' style="display:none;"') + '><label>第二時段</label><div class="schedule-time-pair"><input type="time" id="w_start2_' + i + '" value="' + escapeHtml(rule.start2 || '') + '"><input type="time" id="w_end2_' + i + '" value="' + escapeHtml(rule.end2 || '') + '"></div></div>' +
-          '<div class="schedule-window-empty"><button class="secondary" type="button" onclick="toggleSecondWeeklySlot(this)">' + (hasSecond ? '移除第二時段' : '+ 第二時段') + '</button></div>' +
+          '<div class="schedule-window-empty"><button class="secondary" type="button" onclick="toggleSecondWeeklySlot(this)">' + (hasSecond ? '移除第二時段' : '+ 第二時段') + '</button><button class="danger" type="button" onclick="clearWeeklySlot(this)">刪除時段</button></div>' +
         '</div>';
       }).join('');
       const specific = (res.specific || []).slice(0, 6);
@@ -2288,6 +2288,15 @@
         const input = second.querySelector('input');
         if (input) input.focus();
       }
+    }
+
+    function clearWeeklySlot(button) {
+      const row = button.closest('.schedule-day-row');
+      row.querySelectorAll('input[type="time"]').forEach(function (input) { input.value = ''; });
+      const second = row.querySelector('.schedule-second');
+      second.style.display = 'none';
+      const secondButton = row.querySelector('.secondary');
+      if (secondButton) secondButton.textContent = '+ 第二時段';
     }
 
     function collectScheduleRules() {
