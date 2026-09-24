@@ -1468,7 +1468,7 @@
             '<div class="col-2"><label>專案篩選</label><select id="crmProject" onchange="loadCrmByProject(this.value)">' + projectOptions + '</select></div>' +
             '<div class="col-2"><label>標籤</label><select id="crmTagFilter" onchange="crmTagFilter=this.value; renderCrm(cache.crm);">' + tagOptions + '</select></div>' +
             '<div class="col-3"><label>名單狀態</label><select id="crmPipelineFilter" onchange="crmPipelineFilter=this.value; renderCrm(cache.crm);">' + crmPipelineOptions(crmPipelineFilter, true) + '</select></div>' +
-            '<div class="col-3"><label>搜尋名單</label><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名、Email、電話、答案或重測碼" oninput="crmSearch=this.value; renderCrm(cache.crm);"></div>' +
+            '<div class="col-3"><label>搜尋名單</label><div class="copy-field"><input id="crmSearch" value="' + escapeHtml(crmSearch) + '" placeholder="姓名、Email、電話、答案或重測碼" onkeydown="if(event.key===\'Enter\' && !event.isComposing){ event.preventDefault(); applyCrmSearch(); }"><button type="button" class="secondary" onclick="applyCrmSearch()">搜尋</button></div></div>' +
             '<div class="col-3"><label>負責顧問</label><select onchange="crmConsultantFilter=this.value; renderCrm(cache.crm);">' + consultantOptions + '</select></div>' +
             '<div class="col-3"><label>折扣 / 重測碼</label><select onchange="crmAccessCodeFilter=this.value; renderCrm(cache.crm);">' + accessCodeOptions + '</select></div>' +
             '<div class="col-3"><label>名單日期起</label><input type="date" value="' + escapeHtml(crmDateFrom) + '" onchange="crmDateFrom=this.value; renderCrm(cache.crm);"></div>' +
@@ -1892,6 +1892,11 @@
 
     function sectionTitle(title, note) {
       return '<div class="section-title-row"><h3>' + escapeHtml(title) + '</h3>' + (note ? '<span class="mini">' + escapeHtml(note) + '</span>' : '') + '</div>';
+    }
+
+    function applyCrmSearch() {
+      crmSearch = field('crmSearch');
+      renderCrm(cache.crm);
     }
 
     function fullQuizEntitlementStatus(value) {
@@ -2737,6 +2742,10 @@
         const projectRows = isSystemOwner() && ownerProject !== 'ALL'
           ? (res.projects || []).filter(function (p) { return p.code === ownerProject; })
           : (res.projects || []);
+        window.questionBookingLinks = projectRows.reduce(function (links, project) {
+          links[project.code] = project.bookingUrl || (window.location.origin + '/booking?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(project.code));
+          return links;
+        }, {});
         const options = projectRows.map(function (p) {
           return '<option value="' + escapeHtml(p.code) + '">' + escapeHtml(p.name) + '</option>';
         }).join('');
@@ -2745,9 +2754,17 @@
           return;
         }
         document.getElementById('view').innerHTML =
-          '<div class="panel"><h2>表單管理</h2><label>專案</label><select id="questionProject" onchange="loadQuestionRows()">' + options + '</select><div id="questionRows" style="margin-top:16px;"></div></div>';
+          '<div class="panel"><h2>表單管理</h2><label>專案</label><select id="questionProject" onchange="loadQuestionRows(); updateQuestionBookingLink();">' + options + '</select><div class="copy-field" style="margin-top:12px;"><input id="questionBookingUrl" readonly><button type="button" class="secondary" onclick="copyBookingUrl(this)">複製預約連結</button></div><div id="questionRows" style="margin-top:16px;"></div></div>';
+        updateQuestionBookingLink();
         loadQuestionRows();
       }).catch(showError);
+    }
+
+    function updateQuestionBookingLink() {
+      const input = document.getElementById('questionBookingUrl');
+      const projectCode = field('questionProject');
+      if (!input || !projectCode) return;
+      input.value = window.questionBookingLinks?.[projectCode] || (window.location.origin + '/booking?tenant=' + encodeURIComponent(tenant) + '&p=' + encodeURIComponent(projectCode));
     }
 
     function loadQuestionRows() {
