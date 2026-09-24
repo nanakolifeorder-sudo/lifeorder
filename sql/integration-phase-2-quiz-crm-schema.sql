@@ -380,6 +380,9 @@ alter table crm_contacts add column if not exists purchase_date date;
 alter table tenants add column if not exists zoom_account_id text default '';
 alter table tenants add column if not exists zoom_client_id text default '';
 alter table tenants add column if not exists zoom_client_secret text default '';
+alter table tenants add column if not exists line_channel_secret_ciphertext text default '';
+alter table tenants add column if not exists line_channel_access_token_ciphertext text default '';
+alter table tenants add column if not exists line_notification_user_id text default '';
 alter table appointments add column if not exists zoom_meeting_id text default '';
 alter table consultants add column if not exists max_daily_bookings integer not null default 0;
 

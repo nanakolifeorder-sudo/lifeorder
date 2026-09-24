@@ -2470,7 +2470,7 @@
       adminProjects = res.projects || [];
       const consultants = (res.consultants || []).filter(projectMatchesScope);
       const newConsultant = consultantForm({ isAccepting: '是', weight: 50, projects: 'ALL', meetTool: 'Google Meet', shiftTZ: 'Asia/Taipei', interval: 60, bufferBefore: 0, bufferAfter: 0, maxDailyBookings: 0 }, adminProjects);
-      const html = '<div class="panel"><div class="panel-head"><div><h2>' + escapeHtml(tenantDisplayName) + '團隊顧問</h2><p class="mini">先查看顧問清單與連線狀態；需要調整時再展開單一顧問。</p></div><div class="actions"><button type="button" onclick="toggleNewConsultantBox()">新增顧問</button><button class="secondary" onclick="ensureDemoAccounts()">建立測試帳號</button></div></div>' + renderConsultantStatusList(consultants) + '<div id="newConsultantBox" class="list hidden" style="margin-top:16px;">' + newConsultant + '</div></div>' + zoomSettingsPanel(res.zoomSettings || {}) + '<div class="panel"><h2>顧問資料</h2><div class="list">' + consultants.map(function (row) { return consultantForm(row, adminProjects); }).join('') + '</div></div>';
+      const html = '<div class="panel"><div class="panel-head"><div><h2>' + escapeHtml(tenantDisplayName) + '團隊顧問</h2><p class="mini">先查看顧問清單與連線狀態；需要調整時再展開單一顧問。</p></div><div class="actions"><button type="button" onclick="toggleNewConsultantBox()">新增顧問</button><button class="secondary" onclick="ensureDemoAccounts()">建立測試帳號</button></div></div>' + renderConsultantStatusList(consultants) + '<div id="newConsultantBox" class="list hidden" style="margin-top:16px;">' + newConsultant + '</div></div>' + zoomSettingsPanel(res.zoomSettings || {}) + lineSettingsPanel(res.lineSettings || {}) + '<div class="panel"><h2>顧問資料</h2><div class="list">' + consultants.map(function (row) { return consultantForm(row, adminProjects); }).join('') + '</div></div>';
       document.getElementById('view').innerHTML = html;
     }
     function toggleNewConsultantBox() {
@@ -2495,6 +2495,28 @@
         zoomClientSecret: field('zoomClientSecret')
       }).then(function () {
         alert('Zoom 金鑰已儲存');
+        loadConsultants();
+      }).catch(function (err) { alert(err.message); });
+    }
+
+    function lineSettingsPanel(settings) {
+      const tokenHint = settings.hasChannelAccessToken ? '已設定；留空代表不變更' : '貼上 LINE Channel access token';
+      return '<div class="panel"><div class="panel-head"><div><h2>LINE 內部通知設定</h2><p class="mini">客戶完成預約並建立 Zoom 會議後，系統會推播通知給指定的 LINE 帳號。</p></div></div>' +
+        '<div class="zoom-settings-box"><div class="row">' +
+          '<div class="col-4"><label>LINE 收件人 User ID</label><input id="lineNotificationUserId" value="' + escapeHtml(settings.recipientUserId || '') + '" placeholder="U 開頭的 33 碼 User ID"></div>' +
+          '<div class="col-4"><label>LINE Channel secret</label><input id="lineChannelSecret" type="password" autocomplete="new-password" placeholder="' + (settings.hasChannelSecret ? '已設定；留空代表不變更' : '貼上 Channel secret') + '"></div>' +
+          '<div class="col-4"><label>LINE Channel access token</label><input id="lineChannelAccessToken" type="password" autocomplete="new-password" placeholder="' + tokenHint + '"></div>' +
+          '<div class="col-12 actions"><button type="button" onclick="saveLineSettings()">儲存 LINE 通知設定</button></div>' +
+        '</div></div></div>';
+    }
+
+    function saveLineSettings() {
+      api('saveTenantLineSettings', {
+        lineNotificationUserId: field('lineNotificationUserId'),
+        lineChannelSecret: field('lineChannelSecret'),
+        lineChannelAccessToken: field('lineChannelAccessToken')
+      }).then(function () {
+        alert('LINE 通知設定已儲存');
         loadConsultants();
       }).catch(function (err) { alert(err.message); });
     }

@@ -17,6 +17,9 @@ alter table tenants add column if not exists webhook_secret text default '';
 alter table tenants add column if not exists zoom_account_id text default '';
 alter table tenants add column if not exists zoom_client_id text default '';
 alter table tenants add column if not exists zoom_client_secret text default '';
+alter table tenants add column if not exists line_channel_secret_ciphertext text default '';
+alter table tenants add column if not exists line_channel_access_token_ciphertext text default '';
+alter table tenants add column if not exists line_notification_user_id text default '';
 
 create table if not exists login_attempts (
   id bigserial primary key,
