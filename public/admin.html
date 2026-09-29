@@ -1275,10 +1275,16 @@
     }
 
     function applyQuizLeadFilters() {
+      quizLeadSearch = field('quizLeadSearch');
       quizLeadDateFrom = field('quizLeadDateFrom');
       quizLeadDateTo = field('quizLeadDateTo');
       delete cache.quizLeads;
       loadQuizLeads();
+    }
+
+    function applyQuizLeadSearch() {
+      quizLeadSearch = field('quizLeadSearch');
+      renderQuizLeads(cache.quizLeads);
     }
 
     function exportQuizLeadRows() {
@@ -1356,7 +1362,7 @@
             '<div class="col-3"><label>專案篩選</label><select onchange="loadQuizLeadsByProject(this.value)">' + projectOptions + '</select></div>' +
             '<div class="col-2"><label>預約狀態</label><select onchange="quizLeadMode=this.value; renderQuizLeads(cache.quizLeads);"><option value="unbooked"' + (quizLeadMode === 'unbooked' ? ' selected' : '') + '>未預約</option><option value="booked"' + (quizLeadMode === 'booked' ? ' selected' : '') + '>已預約</option><option value="ALL"' + (quizLeadMode === 'ALL' ? ' selected' : '') + '>全部</option></select></div>' +
             '<div class="col-2"><label>標籤</label><select onchange="quizLeadTagFilter=this.value; renderQuizLeads(cache.quizLeads);">' + tagOptions + '</select></div>' +
-            '<div class="col-2"><label>搜尋</label><input value="' + escapeHtml(quizLeadSearch) + '" placeholder="姓名、Email、答案" oninput="quizLeadSearch=this.value; renderQuizLeads(cache.quizLeads);"></div>' +
+            '<div class="col-3"><label>搜尋</label><div class="copy-field"><input id="quizLeadSearch" value="' + escapeHtml(quizLeadSearch) + '" placeholder="姓名、Email、答案" onkeydown="if(event.key===\'Enter\' && !event.isComposing){ event.preventDefault(); applyQuizLeadSearch(); }"><button type="button" class="secondary" onclick="applyQuizLeadSearch()">搜尋</button></div></div>' +
             '<div class="col-2"><label>測驗日期起</label><input id="quizLeadDateFrom" type="date" value="' + escapeHtml(quizLeadDateFrom) + '"></div>' +
             '<div class="col-2"><label>測驗日期迄</label><input id="quizLeadDateTo" type="date" value="' + escapeHtml(quizLeadDateTo) + '"></div>' +
             '<div class="col-2 actions"><button type="button" onclick="applyQuizLeadFilters()">篩選</button><button class="secondary" type="button" onclick="exportQuizLeadRows()">匯出 CSV</button></div>' +
