@@ -15,6 +15,10 @@
     .report-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
     .report-heading h1 { min-width:0; }
     .report-heading .actions { margin-top:0; flex-shrink:0; }
+    .report-profile { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px 20px; margin:14px 0 0; padding-top:12px; border-top:1px solid var(--line); }
+    .report-profile div { min-width:0; overflow-wrap:anywhere; }
+    .report-profile dt { color:var(--muted); font-size:13px; }
+    .report-profile dd { margin:0; font-weight:700; }
     h2 { font-size:22px; margin:0 0 12px; }
     h3 { font-size:18px; margin:0 0 6px; }
     p { color:var(--muted); margin:0 0 10px; }
@@ -109,7 +113,7 @@
     .muted { color:var(--muted); font-size:14px; }
     .error { color:#d93025; font-weight:700; }
     .hidden { display:none !important; }
-    @media (max-width:720px) { main{padding:16px 12px 44px}.hero,.section{padding:18px}.grid,.score-snapshot,.diagnosis-grid{grid-template-columns:1fr}.timeline-panel{overflow-x:auto}.button{width:100%}.radar{max-width:100%}.report-heading{flex-direction:column}.report-heading .actions{width:100%} }
+    @media (max-width:720px) { main{padding:16px 12px 44px}.hero,.section{padding:18px}.grid,.score-snapshot,.diagnosis-grid{grid-template-columns:1fr}.timeline-panel{overflow-x:auto}.button{width:100%}.radar{max-width:100%}.report-heading{flex-direction:column}.report-heading .actions{width:100%}.report-profile{grid-template-columns:repeat(2,minmax(0,1fr))} }
     @page { size:A4; margin:12mm; }
     @media print {
       body { background:#fff; font-size:10pt; line-height:1.5; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
@@ -143,6 +147,7 @@
       </div>
       <p id="subtitle">正在讀取你的檢測結果...</p>
       <p class="muted" id="meta"></p>
+      <dl class="report-profile hidden" id="reportProfile"></dl>
     </section>
 
     <section class="section hidden" id="scoreSection">
@@ -729,6 +734,12 @@
 
     let pdfDownloading = false;
 
+    function reportDownloadStatus(status, message) {
+      if (autoDownloadReport && window.parent !== window) {
+        window.parent.postMessage({ type: 'lifeorder-report-download', qrid: qrid, status: status, message: message || '' }, location.origin);
+      }
+    }
+
     function reportPdfFilename() {
       const result = window.__reportResult || {};
       const version = String(result.versionCode || '').toUpperCase() === 'FULL' ? '完整版' : '簡易版';
@@ -808,8 +819,10 @@
           appendCanvasToPdf(pdf, canvas, position);
         }
         await Promise.resolve(pdf.save(reportPdfFilename()));
+        reportDownloadStatus('success');
       } catch (error) {
-        alert('PDF 下載失敗：' + (error.message || error));
+        if (window.parent === window) alert('PDF 下載失敗：' + (error.message || error));
+        reportDownloadStatus('error', error.message || String(error));
       } finally {
         pdfDownloading = false;
         if (button) { button.disabled = false; button.textContent = '下載 PDF'; }
@@ -819,10 +832,12 @@
     function boot() {
       if (!tenant || !qrid) {
         document.getElementById('loading').innerHTML = '<span class="error">報告連結缺少 tenant 或 qrid。</span>';
+        reportDownloadStatus('error', '報告連結缺少必要資料。');
         return;
       }
       api('getQuizResult', { reportAccessToken: reportAccessToken() }).then(function (res) {
         if (res.code === 'REPORT_AUTH_REQUIRED' || res.requiresReportVerification) {
+          reportDownloadStatus('error', res.message || '報告存取資格已失效。');
           showReportAccessGate(res.message);
           return;
         }
@@ -839,6 +854,13 @@
         document.getElementById('title').textContent = reportTitle;
         document.getElementById('subtitle').textContent = settings.subtitle || (res.clientName ? res.clientName + '，以下是你的檢測結果。' : '以下是你的檢測結果。');
         document.getElementById('meta').textContent = '版本 ' + (res.versionCode || '') + '｜' + new Date(res.submittedAt).toLocaleString('zh-TW', { hour12:false });
+        const profile = document.getElementById('reportProfile');
+        if (String(res.versionCode || '').toUpperCase() === 'FULL') {
+          const demographics = summary.demographics || {};
+          const fields = [['姓名', res.clientName], ['年齡', res.profileAge || demographics.age], ['職業', res.profileOccupation || demographics.identity]];
+          profile.innerHTML = fields.map(function (field) { return '<div><dt>' + escapeHtml(field[0]) + '</dt><dd>' + escapeHtml(field[1] || '未提供') + '</dd></div>'; }).join('');
+          profile.classList.remove('hidden');
+        }
         document.getElementById('topActions').innerHTML = '<button class="button secondary" type="button" onclick="downloadReportPdf()">下載 PDF</button>';
         document.getElementById('topActions').classList.remove('hidden');
         window.__scoreSummary = summary;
@@ -864,6 +886,7 @@
         }
       }).catch(function (error) {
         document.getElementById('loading').innerHTML = '<span class="error">' + escapeHtml(error.message || '載入失敗') + '</span>';
+        reportDownloadStatus('error', error.message || '載入失敗');
       });
     }
     boot();

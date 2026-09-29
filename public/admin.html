@@ -1434,8 +1434,38 @@
       });
     }
 
+    const activeReportDownloads = new Set();
+
     function downloadQuizReportPdf(resultId) {
-      openQuizReportFromAdmin(resultId, true);
+      if (!resultId || activeReportDownloads.has(resultId)) return;
+      activeReportDownloads.add(resultId);
+      api('getAdminQuizReportPdfAccess', { qrid: resultId, download: true }).then(function (res) {
+        if (!res.reportUrl) throw new Error('無法取得報告下載連結。');
+        const frame = document.createElement('iframe');
+        frame.title = '下載測驗報告';
+        frame.setAttribute('aria-hidden', 'true');
+        frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:1100px;height:800px;border:0;pointer-events:none;';
+        let timeout;
+        const finish = function () {
+          clearTimeout(timeout);
+          window.removeEventListener('message', onMessage);
+          frame.remove();
+          activeReportDownloads.delete(resultId);
+        };
+        const onMessage = function (event) {
+          if (event.origin !== new URL(res.reportUrl).origin || event.source !== frame.contentWindow ||
+              event.data?.type !== 'lifeorder-report-download' || event.data.qrid !== resultId) return;
+          finish();
+          if (event.data.status !== 'success') alert('PDF 下載失敗：' + (event.data.message || '請稍後再試。'));
+        };
+        window.addEventListener('message', onMessage);
+        timeout = setTimeout(function () { finish(); alert('PDF 下載逾時，請重新按「下載 PDF」。'); }, 120000);
+        document.body.appendChild(frame);
+        frame.src = res.reportUrl;
+      }).catch(function (error) {
+        activeReportDownloads.delete(resultId);
+        alert(error.message || '報告下載失敗。');
+      });
     }
 
     function resendQuizReportEmail(resultId, contactId) {
