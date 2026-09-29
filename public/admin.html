@@ -1392,14 +1392,14 @@
       '</div>';
     }
 
-    function openQuizReportFromAdmin(resultId, print) {
+    function openQuizReportFromAdmin(resultId, download) {
       if (!resultId) return;
       const reportWindow = window.open('about:blank', '_blank');
       if (!reportWindow) {
         alert('瀏覽器封鎖了新視窗，請允許此網站開啟視窗後再試一次。');
         return;
       }
-      api('getAdminQuizReportPdfAccess', { qrid: resultId, print: print === true }).then(function (res) {
+      api('getAdminQuizReportPdfAccess', { qrid: resultId, download: download === true }).then(function (res) {
         if (!res.reportUrl) throw new Error('無法取得報告連結。');
         reportWindow.location.replace(res.reportUrl);
       }).catch(function (error) {

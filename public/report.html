@@ -167,6 +167,8 @@
     <section class="section" id="loading">載入中...</section>
   </main>
 
+  <script src="./vendor/html2canvas.min.js"></script>
+  <script src="./vendor/jspdf.umd.min.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const isLocalPreview = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -177,7 +179,7 @@
     const reportAccessKey = 'lifeorder_report_access_' + tenant + '_' + qrid;
     const initialParams = new URLSearchParams(location.search);
     const incomingPdfAccess = initialParams.get('pdfAccess') || '';
-    const autoPrintReport = initialParams.get('print') === '1';
+    const autoDownloadReport = initialParams.get('download') === '1' || initialParams.get('print') === '1';
     if (incomingPdfAccess) {
       try { sessionStorage.setItem(reportAccessKey, incomingPdfAccess); } catch (_error) {}
       initialParams.delete('pdfAccess');
@@ -725,21 +727,93 @@
       return titleText || '你的檢測報告';
     }
 
-    function downloadReportPdf() {
-      window.print();
+    let pdfDownloading = false;
+
+    function reportPdfFilename() {
+      const result = window.__reportResult || {};
+      const version = String(result.versionCode || '').toUpperCase() === 'FULL' ? '完整版' : '簡易版';
+      const name = String(result.clientName || '').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 24);
+      const date = String(result.submittedAt || '').slice(0, 10) || new Date().toISOString().slice(0, 10);
+      return '人生秩序測驗報告_' + version + (name ? '_' + name : '') + '_' + date + '.pdf';
     }
 
-    function printWhenReady() {
-      const images = Array.from(document.images);
-      Promise.all(images.map(function (image) {
-        if (image.complete) return Promise.resolve();
-        return new Promise(function (resolve) {
-          image.addEventListener('load', resolve, { once:true });
-          image.addEventListener('error', resolve, { once:true });
-        });
-      })).then(function () {
-        requestAnimationFrame(function () { requestAnimationFrame(function () { window.print(); }); });
+    function reportPdfSegments() {
+      const sections = ['.hero', '#scoreSection', '#contentSection'].map(function (selector) { return document.querySelector(selector); });
+      const blocks = Array.from(document.querySelectorAll('#blocks > *'));
+      return sections.concat(blocks).filter(function (element) {
+        return element && !element.classList.contains('hidden') && element.getBoundingClientRect().height > 0;
       });
+    }
+
+    function pdfSliceHeight(canvas, startY, maxHeight) {
+      const end = Math.min(canvas.height, startY + maxHeight);
+      if (end >= canvas.height) return canvas.height - startY;
+      const pixels = canvas.getContext('2d').getImageData(0, Math.max(startY + 1, end - 70), canvas.width, Math.min(70, end - startY - 1)).data;
+      const rows = pixels.length / (canvas.width * 4);
+      for (let row = rows - 1; row >= 0; row -= 1) {
+        let colored = 0;
+        for (let x = 0; x < canvas.width; x += 4) {
+          const offset = (row * canvas.width + x) * 4;
+          if (pixels[offset] < 245 || pixels[offset + 1] < 245 || pixels[offset + 2] < 245) colored += 1;
+        }
+        if (colored < canvas.width / 80) return end - rows + row - startY;
+      }
+      return end - startY;
+    }
+
+    function appendCanvasToPdf(pdf, canvas, position) {
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const contentWidth = pageWidth - margin * 2;
+      const bottom = pageHeight - margin;
+      let offset = 0;
+      while (offset < canvas.height) {
+        if (bottom - position.y < 20) { pdf.addPage(); position.y = margin; }
+        const maxHeight = Math.floor((bottom - position.y) * canvas.width / contentWidth);
+        const sliceHeight = Math.max(1, pdfSliceHeight(canvas, offset, maxHeight));
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = sliceHeight;
+        const context = slice.getContext('2d');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, slice.width, slice.height);
+        context.drawImage(canvas, 0, offset, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+        const heightMm = sliceHeight * contentWidth / canvas.width;
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, position.y, contentWidth, heightMm, undefined, 'FAST');
+        position.y += heightMm;
+        offset += sliceHeight;
+      }
+      position.y += 4;
+    }
+
+    async function downloadReportPdf() {
+      if (pdfDownloading) return;
+      const button = document.querySelector('#topActions button');
+      pdfDownloading = true;
+      if (button) { button.disabled = true; button.textContent = '正在製作 PDF...'; }
+      try {
+        if (typeof html2canvas !== 'function' || !window.jspdf?.jsPDF) throw new Error('PDF 元件未載入，請重新整理後再試。');
+        await Promise.all(Array.from(document.images).map(function (image) { return image.decode().catch(function () {}); }));
+        const segments = reportPdfSegments();
+        if (!segments.length) throw new Error('報告尚未載入完成。');
+        const options = {
+          scale: 1.5, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1100,
+          ignoreElements: function (element) { return element.classList?.contains('actions') || element.classList?.contains('hidden'); }
+        };
+        const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+        const position = { y: 12 };
+        for (const segment of segments) {
+          const canvas = await html2canvas(segment, options);
+          appendCanvasToPdf(pdf, canvas, position);
+        }
+        await Promise.resolve(pdf.save(reportPdfFilename()));
+      } catch (error) {
+        alert('PDF 下載失敗：' + (error.message || error));
+      } finally {
+        pdfDownloading = false;
+        if (button) { button.disabled = false; button.textContent = '下載 PDF'; }
+      }
     }
 
     function boot() {
@@ -781,7 +855,13 @@
           renderBlocks(reportBlocks);
         }
         document.getElementById('loading').classList.add('hidden');
-        if (autoPrintReport) printWhenReady();
+        if (autoDownloadReport) {
+          const cleanUrl = new URL(location.href);
+          cleanUrl.searchParams.delete('download');
+          cleanUrl.searchParams.delete('print');
+          history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+          requestAnimationFrame(function () { downloadReportPdf(); });
+        }
       }).catch(function (error) {
         document.getElementById('loading').innerHTML = '<span class="error">' + escapeHtml(error.message || '載入失敗') + '</span>';
       });
