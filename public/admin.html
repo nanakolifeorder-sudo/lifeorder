@@ -1338,7 +1338,7 @@
     }
 
     function renderQuizLeads(res) {
-      window.crmCardItems = {};
+      window.quizLeadCardItems = {};
       const all = res.responses || [];
       const stats = res.stats || {};
       const rows = all.filter(quizLeadMatchesFilters).sort(function (a, b) { return (b.timeObj || 0) - (a.timeObj || 0); });
@@ -1372,7 +1372,7 @@
 
     function quizLeadCard(item) {
       const key = 'quiz_' + String(item.rowId || item.publicId || item.clientEmail || Math.random());
-      window.crmCardItems[key] = item;
+      window.quizLeadCardItems[key] = item;
       const status = quizLeadStatusValue(item);
       const projectLabel = item.projectName || item.projectCode || '未指定專案';
       const reportLink = item.publicId ? '<button class="secondary" type="button" onclick="openQuizReportFromAdmin(&quot;' + escapeHtml(item.publicId) + '&quot;)">開啟報告</button>' : '';
@@ -1899,7 +1899,7 @@
     }
 
     function openClientDetail(key) {
-      const item = window.crmCardItems ? window.crmCardItems[key] : null;
+      const item = key.startsWith('quiz_') ? window.quizLeadCardItems?.[key] : window.crmCardItems?.[key];
       if (!item) return;
       const dialog = detailDialog();
       dialog.querySelector('.dialog-body').innerHTML = '<h2>客戶資料卡</h2><p>載入中...</p>';
