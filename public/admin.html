@@ -235,6 +235,9 @@
     .crm-answer-line { color:var(--muted); line-height:1.5; }
     .crm-answer-line strong { color:var(--ink); }
     .detail-section { border-top:1px solid var(--line); padding-top:14px; margin-top:14px; }
+    .detail-answer { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; }
+    .detail-record summary { cursor:pointer; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .detail-record[open] summary { margin-bottom:12px; }
     .detail-hero { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:start; }
     .detail-identity { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .detail-contact-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:12px; }
@@ -1372,7 +1375,8 @@
       window.crmCardItems[key] = item;
       const status = quizLeadStatusValue(item);
       const projectLabel = item.projectName || item.projectCode || '未指定專案';
-      const reportLink = item.reportUrl ? '<a class="secondary" target="_blank" href="' + escapeHtml(item.reportUrl) + '">開啟報告</a>' : '';
+      const reportLink = item.publicId ? '<button class="secondary" type="button" onclick="openQuizReportFromAdmin(&quot;' + escapeHtml(item.publicId) + '&quot;)">開啟報告</button>' : '';
+      const reportPdf = item.publicId ? '<button class="secondary" type="button" onclick="downloadQuizReportPdf(&quot;' + escapeHtml(item.publicId) + '&quot;)">下載 PDF</button>' : '';
       return '<div class="client-card ' + escapeHtml(status) + ' quiz-response">' +
         '<div class="card-top"><div><div class="crm-card-title"><button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> <span class="badge">' + escapeHtml(quizLeadStatusLabel(status)) + '</span><span class="badge">' + escapeHtml(quizVersionLabel(item.versionCode)) + '</span></div>' +
         '<p class="mini">' + escapeHtml(compactDate(item.submittedAt)) + ' ｜ ' + escapeHtml(item.clientPhone || '無電話') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p></div><span class="badge">' + escapeHtml(projectLabel) + '</span></div>' +
@@ -1384,8 +1388,42 @@
         '</div>' +
         renderTagPills(item.tags || []) +
         '<div class="answer-box"><div class="mini">作答摘要</div><div class="crm-answer-list">' + crmAnswerPreview(item) + '</div></div>' +
-        '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">打開資料卡</button>' + reportLink + '</div>' +
+        '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">打開資料卡</button>' + reportLink + reportPdf + '</div>' +
       '</div>';
+    }
+
+    function openQuizReportFromAdmin(resultId, print) {
+      if (!resultId) return;
+      const reportWindow = window.open('about:blank', '_blank');
+      if (!reportWindow) {
+        alert('瀏覽器封鎖了新視窗，請允許此網站開啟視窗後再試一次。');
+        return;
+      }
+      api('getAdminQuizReportPdfAccess', { qrid: resultId, print: print === true }).then(function (res) {
+        if (!res.reportUrl) throw new Error('無法取得報告連結。');
+        reportWindow.location.replace(res.reportUrl);
+      }).catch(function (error) {
+        reportWindow.close();
+        alert(error.message || '報告開啟失敗。');
+      });
+    }
+
+    function downloadQuizReportPdf(resultId) {
+      openQuizReportFromAdmin(resultId, true);
+    }
+
+    function resendQuizReportEmail(resultId, contactId) {
+      if (!resultId || !confirm('將測驗報告連結重寄到客戶原本作答的 Email？')) return;
+      api('resendQuizReportEmail', { qrid: resultId }).then(function (res) {
+        const status = res.deliveryStatus;
+        const message = status === 'sent'
+          ? '測驗報告已寄到 ' + res.recipient + '。'
+          : status === 'cancelled'
+            ? '收件人目前無法收信，未寄出。請查看提醒信管理。'
+            : '信件已建立，但尚未確認寄出。請到提醒信管理查看寄送狀態。';
+        alert(message);
+        if (contactId) return refreshCrmDetail(contactId);
+      }).catch(function (error) { alert(error.message || '重寄測驗報告失敗。'); });
     }
     function loadCrm() {
       if (cache.crm) {
@@ -1804,6 +1842,10 @@
         : '';
       const stageValue = crmPipelineValue(item);
       const stageBadge = stageValue ? '<span class="badge">' + escapeHtml(crmPipelineLabel(stageValue)) + '</span>' : '';
+      const reportButtons = item.quizResultId
+        ? '<button class="secondary" type="button" onclick="openQuizReportFromAdmin(&quot;' + escapeHtml(item.quizResultId) + '&quot;)">開啟報告</button>' +
+          '<button class="secondary" type="button" onclick="downloadQuizReportPdf(&quot;' + escapeHtml(item.quizResultId) + '&quot;)">下載 PDF</button>'
+        : '';
       const kindBadge = '';
       const actionButtons = item.kind === 'appointment' && isUpcoming
         ? '<button class="danger" onclick="cancelAppointment(' + item.rowId + ')">取消會議</button>' +
@@ -1834,7 +1876,7 @@
         '<div class="answer-box"><div class="mini">表單/測驗摘要</div><div class="crm-answer-list">' + crmAnswerPreview(item) + '</div></div>' +
         (item.meetLink ? '<p><a href="' + escapeHtml(item.meetLink) + '" target="_blank">開啟會議連結</a></p>' : '') +
         (item.kind === 'appointment' && crmMode === 'past' ? crmEditor(item) : '') +
-        '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">打開資料卡</button>' + actionButtons + '</div>' +
+        '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">打開資料卡</button>' + reportButtons + actionButtons + '</div>' +
       '</div>';
     }
 
@@ -1886,6 +1928,52 @@
       return '<div class="list">' + items.map(rowFn).join('') + '</div>';
     }
 
+    function renderBookingAnswers(items) {
+      return renderHistoryList(items, '沒有預約作答紀錄。', function (item) {
+        return '<div class="item"><strong>' + escapeHtml(compactDate(item.startAt || item.createdAt)) + '</strong>' +
+          '<p class="mini">' + escapeHtml(item.status || '') + (item.consultantName ? '｜' + escapeHtml(item.consultantName) : '') + '</p>' +
+          '<div class="detail-answer">' + escapeHtml(item.answers || '沒有填寫預約表單內容。') + '</div>' +
+          (item.meetLink ? '<p><a target="_blank" rel="noopener" href="' + escapeHtml(item.meetLink) + '">會議連結</a></p>' : '') + '</div>';
+      });
+    }
+
+    function renderQuizAnswers(items, answersByResponse, contactId) {
+      return renderHistoryList(items, '沒有測驗作答紀錄。', function (item, index) {
+        const resultId = escapeHtml(item.resultId || '');
+        const actions = resultId ? '<div class="actions"><button class="secondary" type="button" onclick="openQuizReportFromAdmin(&quot;' + resultId + '&quot;)">開啟報告</button>' +
+          '<button class="secondary" type="button" onclick="downloadQuizReportPdf(&quot;' + resultId + '&quot;)">下載 PDF</button>' +
+          '<button class="secondary" type="button" onclick="resendQuizReportEmail(&quot;' + resultId + '&quot;,' + Number(contactId || 0) + ')">重發測驗報告</button></div>' : '';
+        const matched = renderHistoryList(item.matchedContent || [], '沒有報告區間內容。', function (content) {
+          return '<div class="item"><strong>' + escapeHtml(content.dimensionName || content.dimensionKey || '') + '｜' + escapeHtml(content.label || '') + '</strong><p>' + escapeHtml(content.title || '') + '</p><p>' + escapeHtml(content.body || '') + '</p></div>';
+        });
+        return '<details class="item detail-record"' + (index === 0 ? ' open' : '') + '><summary><strong>' + escapeHtml(item.versionCode || '測驗') + '</strong><span>' + escapeHtml(compactDate(item.submittedAt)) + '</span></summary>' +
+          actions + renderScoreItems(item.scoreItems || []) + '<h4>題目與答案</h4>' + renderAnswerRows((answersByResponse || {})[String(item.id)] || []) +
+          '<h4>報告結果</h4>' + matched + '</details>';
+      });
+    }
+
+    function renderChronologicalHistory(res) {
+      const timeline = (res.normalizedTimeline || []).map(function (item) { return {
+        title: item.title || item.type || '紀錄', body: item.body || '', occurredAt: item.occurredAt || item.createdAt,
+        appointmentId: item.appointmentId, emailQueueId: item.emailQueueId, quizResponseId: item.quizResponseId
+      }; });
+      const hasLinked = function (field, id) { return id && timeline.some(function (item) { return String(item[field] || '') === String(id); }); };
+      (res.appointmentHistory || []).forEach(function (item) {
+        if (!hasLinked('appointmentId', item.id)) timeline.push({ title: '預約｜' + (item.status || '已建立'), body: item.consultantName || '', occurredAt: item.createdAt || item.startAt });
+      });
+      (res.emailHistory || []).forEach(function (item) {
+        if (!hasLinked('emailQueueId', item.id)) timeline.push({ title: 'Email｜' + (item.status || '已排程'), body: item.subject || '', occurredAt: item.sentAt || item.createdAt || item.scheduledAt });
+      });
+      (res.quizHistory || []).forEach(function (item) {
+        if (!hasLinked('quizResponseId', item.id)) timeline.push({ title: '完成測驗', body: item.versionCode || '', occurredAt: item.submittedAt });
+      });
+      timeline.sort(function (a, b) { return new Date(b.occurredAt || 0) - new Date(a.occurredAt || 0); });
+      return renderHistoryList(timeline, '沒有歷程紀錄。', function (item) {
+        return '<div class="item"><strong>' + escapeHtml(item.title) + '</strong>' + (item.body ? '<p class="detail-answer">' + escapeHtml(item.body) + '</p>' : '') +
+          '<p class="mini">' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>';
+      });
+    }
+
     function crmDetailMeta(label, value) {
       return '<div class="crm-meta-item"><div class="mini">' + escapeHtml(label) + '</div><strong>' + escapeHtml(value || '無資料') + '</strong></div>';
     }
@@ -1910,7 +1998,7 @@
       return createButton + '<div class="list">' + items.map(function (item) {
         const meta = crmDetailMeta('來源', item.source === 'payment' ? '藍新付款' : '後台邀請') + crmDetailMeta('狀態', fullQuizEntitlementStatus(item.status)) + crmDetailMeta('到期日', compactDate(item.expiresAt));
         const linkActions = item.grantUrl ? '<button class="secondary" type="button" onclick="copyFullQuizEntitlementLink(' + Number(item.id) + ')">複製連結</button><a class="secondary" target="_blank" href="' + escapeHtml(item.grantUrl) + '">開啟連結</a>' : '';
-        const reportAction = item.quizResultId ? '<a class="secondary" target="_blank" href="/report?tenant=' + encodeURIComponent(tenant) + '&p=LO&qrid=' + encodeURIComponent(item.quizResultId) + '">開啟報告</a>' : '';
+        const reportAction = item.quizResultId ? '<button class="secondary" type="button" onclick="openQuizReportFromAdmin(&quot;' + escapeHtml(item.quizResultId) + '&quot;)">開啟報告</button><button class="secondary" type="button" onclick="downloadQuizReportPdf(&quot;' + escapeHtml(item.quizResultId) + '&quot;)">下載 PDF</button>' : '';
         const revokeAction = ['issued', 'started'].includes(String(item.status || '')) ? '<button class="danger" type="button" onclick="revokeFullQuizEntitlement(' + Number(item.id) + ',' + contactId + ')">撤銷</button>' : '';
         return '<div class="item" data-entitlement-id="' + Number(item.id) + '" data-entitlement-url="' + escapeHtml(item.grantUrl || '') + '"><strong>完整版授權｜' + escapeHtml(fullQuizEntitlementStatus(item.status)) + '</strong><div class="crm-card-meta">' + meta + '</div><p class="mini">建立：' + escapeHtml(compactDate(item.createdAt)) + (item.completedAt ? '｜完成：' + escapeHtml(compactDate(item.completedAt)) : '') + '</p><div class="actions">' + linkActions + reportAction + revokeAction + '</div></div>';
       }).join('') + '</div>';
@@ -1962,8 +2050,6 @@
       const tagChecks = knownTags.length ? '<div class="tag-pick-grid">' + knownTags.map(function (tag) { return '<label class="checkline"><input class="crm-detail-tag-check" type="checkbox" value="' + escapeHtml(tag) + '"' + (contactTags.includes(tag) ? ' checked' : '') + '> ' + escapeHtml(tag) + '</label>'; }).join('') + '</div>' : '<p class="mini">目前尚未建立標籤。</p>';
       const consultantSelect = ['<option value="">尚未指派</option>'].concat((cache.crm?.allConsultants || []).map(function (c) { return '<option value="' + escapeHtml(c.id) + '"' + (String(contact.assigned_consultant_id || '') === String(c.id) ? ' selected' : '') + '>' + escapeHtml(c.name || c.login_email || c.email || c.id) + '</option>'; })).join('');
       const summary = res.crmSummary || {};
-      const latest = res.latestQuiz || null;
-      const answers = latest ? (res.answersByResponse || {})[String(latest.id)] || [] : [];
       const lifecycleLabel = crmPipelineLabel(summary.lifecycleStage || contact.lifecycle_stage || 'lead');
       const projectLabel = summary.projectCode || contact.project_code || '未指定';
       const tagPills = renderTagPills(contact.tags || []);
@@ -1981,13 +2067,9 @@
         '<div class="detail-section">' + sectionTitle('名單分類與購買紀錄', '可指派顧問、套用標籤、更新流程與購買紀錄，匯出時會一併帶出') + '<div class="row"><div class="col-4"><label>指派顧問</label><select id="crmDetailConsultant">' + consultantSelect + '</select></div><div class="col-4"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-4"><label>新增標籤</label><input id="crmDetailNewTags" list="crmKnownTags" placeholder="輸入新標籤，可用逗號分隔"><datalist id="crmKnownTags">' + crmTagOptionsHtml(knownTags) + '</datalist></div><div class="col-12"><label>既有標籤</label>' + tagChecks + '</div><div class="col-4"><label>購買方案</label><input id="crmDetailPurchasePlan" value="' + escapeHtml(contact.purchase_plan || '') + '" placeholder="例如：完整版檢測、諮詢"></div><div class="col-3"><label>購買日期</label><input id="crmDetailPurchaseDate" type="date" value="' + escapeHtml(normalizeDateInput(contact.purchase_date)) + '"></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div><div class="col-12"><div class="actions"><button type="button" onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存名單資料</button></div></div></div></div>' +
         '<div class="detail-section">' + sectionTitle('付款／對帳紀錄', '僅顯示付款成功交易') + renderHistoryList(res.paymentHistory || [], '沒有付款成功紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.productName || item.productCode || '付款商品') + '｜NT$' + escapeHtml(String(item.amount || 0)) + '</strong><p>藍新交易序號：' + escapeHtml(item.tradeNo || '無資料') + '</p><p>商店訂單編號：' + escapeHtml(item.merchantOrderNo || '') + '</p><p>' + escapeHtml(item.paymentType || '付款方式未提供') + '｜' + escapeHtml(compactDate(item.paidAt || item.createdAt)) + '</p></div>'; }) + '</div>' +
         '<div class="detail-section">' + sectionTitle('完整版授權', '付款開通與後台邀請都會顯示在這裡') + renderFullQuizEntitlements(res.fullEntitlements || [], contact) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('測驗紀錄', '') + (latest ? '<p>版本：' + escapeHtml(latest.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(latest.submittedAt)) + '</p><div class="actions"><a target="_blank" href="' + escapeHtml(latest.reportUrl || '') + '">開啟報告連結</a></div>' + renderScoreItems(latest.scoreItems || []) : '<p class="mini">沒有測驗紀錄。</p>') + '</div>' +
-        '<div class="detail-section">' + sectionTitle('作答詳情', '') + renderAnswerRows(answers) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('報告結果', '') + renderHistoryList(latest ? latest.matchedContent || [] : [], '沒有報告區間內容。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.dimensionName || item.dimensionKey || '') + '｜' + escapeHtml(item.label || '') + '</strong><p>' + escapeHtml(item.title || '') + '</p><p>' + escapeHtml(item.body || '') + '</p></div>'; }) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('預約紀錄', '') + renderHistoryList(res.appointmentHistory || [], '沒有預約紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(compactDate(item.startAt)) + '</strong><p>' + escapeHtml(item.status || '') + '｜' + escapeHtml(item.consultantName || '') + '</p>' + (item.meetLink ? '<p><a target="_blank" href="' + escapeHtml(item.meetLink) + '">會議連結</a></p>' : '') + '</div>'; }) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('Email 發送歷程', '') + renderHistoryList(res.emailHistory || [], '沒有 Email 紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.subject || '') + '</strong><p>' + escapeHtml(item.status || '') + '｜' + escapeHtml(item.triggerName || '') + '｜' + escapeHtml(compactDate(item.sentAt || item.scheduledAt || item.createdAt)) + '</p></div>'; }) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('點擊歷程', '') + renderHistoryList(res.clickEvents || [], '沒有點擊紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('客戶歷程', '') + renderHistoryList(res.normalizedTimeline || [], '沒有歷程紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.title || item.type || '') + '</strong><p>' + escapeHtml(item.body || '') + '</p><p class="mini">' + escapeHtml(item.category || '') + '｜' + escapeHtml(compactDate(item.occurredAt)) + '</p></div>'; }) + '</div>';
+        '<div class="detail-section">' + sectionTitle('預約作答', '') + renderBookingAnswers(res.appointmentHistory || []) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('測驗作答', '') + renderQuizAnswers(res.quizHistory || [], res.answersByResponse || {}, contact.id) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('紀錄歷程', '最新在上') + renderChronologicalHistory(res) + '</div>';
     }
     function deleteCrmContact(contactId) {
       if (!contactId) return;
