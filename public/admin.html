@@ -235,12 +235,25 @@
     .crm-answer-line { color:var(--muted); line-height:1.5; }
     .crm-answer-line strong { color:var(--ink); }
     .detail-section { border-top:1px solid var(--line); padding-top:14px; margin-top:14px; }
+    .detail-management > summary { cursor:pointer; font-weight:700; }
     .detail-answer { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; }
     .detail-record summary { cursor:pointer; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
     .detail-record[open] summary { margin-bottom:12px; }
     .detail-hero { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:start; }
     .detail-identity { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .detail-contact-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .detail-contact-grid .crm-meta-item strong { overflow-wrap:anywhere; white-space:normal; text-overflow:clip; }
+    .consultation-pdf { position:fixed; left:-10000px; top:0; width:820px; padding:0; background:#fff; color:#202124; font:15px/1.65 Arial,"Noto Sans TC",sans-serif; }
+    .consultation-pdf-section { width:820px; padding:22px 28px; background:#fff; color:#202124; border:1px solid #d7dce2; }
+    .consultation-pdf-section h1 { color:#1a73e8; font-size:25px; margin:0 0 6px; }
+    .consultation-pdf-section h2 { color:#202124; font-size:19px; margin:0 0 12px; }
+    .consultation-pdf-section h3 { color:#202124; font-size:16px; margin:16px 0 6px; }
+    .consultation-pdf-section p { color:#3c4043; margin:0 0 10px; overflow-wrap:anywhere; }
+    .consultation-pdf-meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 20px; margin-top:14px; }
+    .consultation-pdf-meta div { border-bottom:1px solid #e5e9ee; padding:5px 0; overflow-wrap:anywhere; }
+    .consultation-pdf-meta strong { display:inline-block; min-width:64px; }
+    .consultation-pdf-answer { padding:10px 12px; border:1px solid #e5e9ee; margin:8px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .consultation-pdf-score { display:flex; justify-content:space-between; gap:14px; padding:6px 0; border-bottom:1px solid #e5e9ee; }
     .detail-pill-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
     .section-title-row { display:flex; justify-content:space-between; gap:12px; align-items:center; }
     .section-title-row h3 { margin:0; }
@@ -542,6 +555,7 @@
       .crm-batch-toolbar { grid-template-columns:1fr; }
       .project-checks, .question-row .option-editor { grid-template-columns: 1fr; }
       .card-top { flex-direction: column; }
+      .detail-hero { grid-template-columns:1fr; }
       table { display: block; overflow-x: auto; }
       details.item > summary { grid-template-columns: 1fr; gap: 6px; }
     }
@@ -594,6 +608,8 @@
     <section class="workspace" id="view"></section>
   </main>
 
+  <script src="./vendor/html2canvas.min.js"></script>
+  <script src="./vendor/jspdf.umd.min.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const isLocalPreview = location.protocol === 'file:' ||
@@ -605,6 +621,7 @@
     function tokenKey() { return 'dm_saas_' + tenant + '_token'; }
     let token = localStorage.getItem(tokenKey()) || '';
     let currentUser = null;
+    let clientDetailForPdf = null;
     let currentView = 'crm';
     let crmMode = 'upcoming';
     let crmProject = 'ALL';
@@ -1903,6 +1920,7 @@
           const clickedBackdrop = event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
           if (clickedBackdrop) dialog.close();
         });
+        dialog.addEventListener('close', function () { clientDetailForPdf = null; });
       }
       return dialog;
     }
@@ -1946,19 +1964,134 @@
       });
     }
 
-    function renderQuizAnswers(items, answersByResponse, contactId) {
+    function clientProfile(res) {
+      const history = res.quizHistory || [];
+      const values = function (key, fallback) {
+        return history.map(function (item) { return String(item[key] || item.scoreSummary?.demographics?.[fallback] || '').trim(); }).find(Boolean) || '';
+      };
+      return { age: values('profileAge', 'age'), occupation: values('profileOccupation', 'identity') };
+    }
+
+    function renderQuizAnswers(items, answersByResponse) {
       return renderHistoryList(items, '沒有測驗作答紀錄。', function (item, index) {
+        return '<details class="item detail-record"' + (index === 0 ? ' open' : '') + '><summary><strong>' + escapeHtml(item.versionCode || '測驗') + '</strong><span>' + escapeHtml(compactDate(item.submittedAt)) + '</span></summary>' +
+          renderAnswerRows((answersByResponse || {})[String(item.id)] || []) + '</details>';
+      });
+    }
+
+    function renderQuizResults(items, contactId) {
+      return renderHistoryList(items, '沒有測驗結果。', function (item, index) {
         const resultId = escapeHtml(item.resultId || '');
         const actions = resultId ? '<div class="actions"><button class="secondary" type="button" onclick="openQuizReportFromAdmin(&quot;' + resultId + '&quot;)">開啟報告</button>' +
-          '<button class="secondary" type="button" onclick="downloadQuizReportPdf(&quot;' + resultId + '&quot;)">下載 PDF</button>' +
+          '<button class="secondary" type="button" onclick="downloadQuizReportPdf(&quot;' + resultId + '&quot;)">下載測驗報告 PDF</button>' +
           '<button class="secondary" type="button" onclick="resendQuizReportEmail(&quot;' + resultId + '&quot;,' + Number(contactId || 0) + ')">重發測驗報告</button></div>' : '';
         const matched = renderHistoryList(item.matchedContent || [], '沒有報告區間內容。', function (content) {
           return '<div class="item"><strong>' + escapeHtml(content.dimensionName || content.dimensionKey || '') + '｜' + escapeHtml(content.label || '') + '</strong><p>' + escapeHtml(content.title || '') + '</p><p>' + escapeHtml(content.body || '') + '</p></div>';
         });
         return '<details class="item detail-record"' + (index === 0 ? ' open' : '') + '><summary><strong>' + escapeHtml(item.versionCode || '測驗') + '</strong><span>' + escapeHtml(compactDate(item.submittedAt)) + '</span></summary>' +
-          actions + renderScoreItems(item.scoreItems || []) + '<h4>題目與答案</h4>' + renderAnswerRows((answersByResponse || {})[String(item.id)] || []) +
-          '<h4>報告結果</h4>' + matched + '</details>';
+          actions + renderScoreItems(item.scoreItems || []) + '<h4>報告結果</h4>' + matched + '</details>';
       });
+    }
+
+    function consultationPdfSections(res) {
+      const contact = res.contact || {};
+      const profile = clientProfile(res);
+      const appointment = (res.appointmentHistory || [])[0];
+      const quiz = (res.quizHistory || []).find(function (item) { return String(item.versionCode || '').toUpperCase() === 'FULL'; }) || (res.quizHistory || [])[0];
+      const answers = quiz ? (res.answersByResponse || {})[String(quiz.id)] || [] : [];
+      const name = escapeHtml(contact.name || '未命名客戶');
+      const sections = [
+        '<h1>客戶諮詢資料</h1><p>僅供內部諮詢使用</p><div class="consultation-pdf-meta">' +
+          '<div><strong>姓名</strong>' + name + '</div><div><strong>年齡</strong>' + escapeHtml(profile.age || '未提供') + '</div>' +
+          '<div><strong>職業</strong>' + escapeHtml(profile.occupation || '未提供') + '</div><div><strong>電話</strong>' + escapeHtml(contact.phone || '未提供') + '</div>' +
+          '<div><strong>Email</strong>' + escapeHtml(contact.email || '未提供') + '</div><div><strong>匯出日期</strong>' + escapeHtml(new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })) + '</div></div>',
+        '<h2>諮詢作答</h2><p>預約時間：' + escapeHtml(appointment ? compactDate(appointment.startAt) : '未預約') + '</p>' +
+          '<div class="consultation-pdf-answer">' + escapeHtml(appointment?.answers || '沒有填寫預約表單內容。') + '</div>',
+        '<h2>測驗作答</h2><p>版本：' + escapeHtml(quiz?.versionCode || '無') + '｜作答時間：' + escapeHtml(quiz ? compactDate(quiz.submittedAt) : '未作答') + '</p>' +
+          (answers.length ? '' : '<p>沒有測驗作答明細。</p>')
+      ];
+      answers.forEach(function (answer) {
+        sections.push('<h3>' + escapeHtml(answer.questionTitle || '題目 ' + answer.questionNo) + '</h3><div class="consultation-pdf-answer">' + escapeHtml(answer.answerText || '未填寫') + '</div>');
+      });
+      sections.push('<h2>測驗結果</h2>' + (quiz ? '<p>版本：' + escapeHtml(quiz.versionCode || '') + '｜作答時間：' + escapeHtml(compactDate(quiz.submittedAt)) + '</p>' : '<p>沒有測驗結果。</p>') +
+        (quiz?.scoreItems || []).map(function (score) {
+          return '<div class="consultation-pdf-score"><strong>' + escapeHtml(score.name || score.key) + '</strong><strong>' + escapeHtml(score.displayScore) + (score.displayMax ? '/' + escapeHtml(score.displayMax) : '') + '</strong></div>';
+        }).join(''));
+      (quiz?.matchedContent || []).forEach(function (content) {
+        sections.push('<h3>' + escapeHtml(content.dimensionName || content.dimensionKey || '結果') + '｜' + escapeHtml(content.title || content.label || '') + '</h3>' +
+          (content.subtitle ? '<p><strong>' + escapeHtml(content.subtitle) + '</strong></p>' : '') +
+          '<div class="consultation-pdf-answer">' + escapeHtml(content.body || '沒有補充說明。') + '</div>');
+      });
+      return sections;
+    }
+
+    function consultationPdfSliceHeight(canvas, startY, maximum) {
+      const end = Math.min(canvas.height, startY + maximum);
+      if (end >= canvas.height) return canvas.height - startY;
+      const from = Math.max(startY + 1, end - 60);
+      const rows = end - from;
+      const pixels = canvas.getContext('2d').getImageData(0, from, canvas.width, rows).data;
+      for (let row = rows - 1; row >= 0; row -= 1) {
+        let colored = 0;
+        for (let x = 0; x < canvas.width; x += 4) {
+          const index = (row * canvas.width + x) * 4;
+          if (pixels[index] < 245 || pixels[index + 1] < 245 || pixels[index + 2] < 245) colored += 1;
+        }
+        if (colored < canvas.width / 80) return from + row - startY;
+      }
+      return end - startY;
+    }
+
+    function appendConsultationPdfCanvas(pdf, canvas, position) {
+      const margin = 12;
+      const width = pdf.internal.pageSize.getWidth() - margin * 2;
+      const bottom = pdf.internal.pageSize.getHeight() - margin;
+      const fullHeight = canvas.height * width / canvas.width;
+      if (fullHeight <= bottom - margin && fullHeight > bottom - position.y) { pdf.addPage(); position.y = margin; }
+      let offset = 0;
+      while (offset < canvas.height) {
+        if (bottom - position.y < 18) { pdf.addPage(); position.y = margin; }
+        const maximum = Math.floor((bottom - position.y) * canvas.width / width);
+        const height = Math.max(1, consultationPdfSliceHeight(canvas, offset, maximum));
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = height;
+        slice.getContext('2d').drawImage(canvas, 0, offset, canvas.width, height, 0, 0, canvas.width, height);
+        const heightMm = height * width / canvas.width;
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, position.y, width, heightMm, undefined, 'FAST');
+        position.y += heightMm;
+        offset += height;
+      }
+      position.y += 4;
+    }
+
+    async function downloadClientConsultationPdf(button) {
+      const res = clientDetailForPdf;
+      if (!res || button.disabled) return;
+      button.disabled = true;
+      button.textContent = '正在製作 PDF...';
+      let root;
+      try {
+        if (typeof html2canvas !== 'function' || !window.jspdf?.jsPDF) throw new Error('PDF 元件未載入，請重新整理後再試。');
+        root = document.createElement('div');
+        root.className = 'consultation-pdf';
+        document.body.appendChild(root);
+        const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+        const position = { y: 12 };
+        for (const html of consultationPdfSections(res)) {
+          root.innerHTML = '<section class="consultation-pdf-section">' + html + '</section>';
+          const canvas = await html2canvas(root.firstElementChild, { scale: 1.5, backgroundColor: '#ffffff', windowWidth: 1000 });
+          appendConsultationPdfCanvas(pdf, canvas, position);
+        }
+        const name = String(res.contact?.name || '客戶').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 24);
+        await Promise.resolve(pdf.save('客戶諮詢資料_' + name + '_' + new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) + '.pdf'));
+      } catch (error) {
+        alert('PDF 下載失敗：' + (error.message || error));
+      } finally {
+        root?.remove();
+        button.disabled = false;
+        button.textContent = '下載諮詢資料 PDF';
+      }
     }
 
     function renderChronologicalHistory(res) {
@@ -2053,7 +2186,9 @@
 
     function renderClientDetail(res) {
       const dialog = detailDialog();
+      clientDetailForPdf = res;
       const contact = res.contact || {};
+      const profile = clientProfile(res);
       const knownTags = cache.crm?.crmTags || [];
       const contactTags = Array.isArray(contact.tags) ? contact.tags : [];
       const tagChecks = knownTags.length ? '<div class="tag-pick-grid">' + knownTags.map(function (tag) { return '<label class="checkline"><input class="crm-detail-tag-check" type="checkbox" value="' + escapeHtml(tag) + '"' + (contactTags.includes(tag) ? ' checked' : '') + '> ' + escapeHtml(tag) + '</label>'; }).join('') + '</div>' : '<p class="mini">目前尚未建立標籤。</p>';
@@ -2066,19 +2201,19 @@
         '<div class="detail-hero">' +
           '<div>' +
             '<div class="detail-identity"><h2>' + escapeHtml(contact.name || '客戶資料卡') + '</h2><span class="badge">' + escapeHtml(lifecycleLabel) + '</span><span class="badge">' + escapeHtml(projectLabel) + '</span></div>' +
-            '<div class="detail-contact-grid">' + crmDetailMeta('電話', contact.phone || '') + crmDetailMeta('Email', contact.email || '') + crmDetailMeta('名單狀態', lifecycleLabel) + '</div>' +
+            '<div class="detail-contact-grid">' + crmDetailMeta('電話', contact.phone || '') + crmDetailMeta('Email', contact.email || '') + crmDetailMeta('年齡', profile.age || '未提供') + crmDetailMeta('職業', profile.occupation || '未提供') + crmDetailMeta('名單狀態', lifecycleLabel) + '</div>' +
             tagPills +
           '</div>' +
-          '<div class="actions"><button class="danger" onclick="deleteCrmContact(' + Number(contact.id || 0) + ')">刪除名單</button><button class="secondary" onclick="detailDialog().close()">關閉</button></div>' +
+          '<div class="actions"><button type="button" onclick="downloadClientConsultationPdf(this)">下載諮詢資料 PDF</button><button class="danger" onclick="deleteCrmContact(' + Number(contact.id || 0) + ')">刪除名單</button><button class="secondary" onclick="detailDialog().close()">關閉</button></div>' +
         '</div>' +
-        '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('付款紀錄', summary.paymentCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + statBox('Email 紀錄', summary.emailCount || 0) + statBox('點擊紀錄', summary.clickCount || 0) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('基本資料', '最近互動') + '<div class="crm-card-meta">' + crmDetailMeta('專案', projectLabel) + crmDetailMeta('最新測驗', compactDate(summary.latestQuizAt)) + crmDetailMeta('最近付款', compactDate(summary.latestPaymentAt)) + crmDetailMeta('最新預約', compactDate(summary.latestAppointmentAt)) + crmDetailMeta('名單狀態', lifecycleLabel) + '</div></div>' +
+        '<div class="detail-section">' + sectionTitle('諮詢作答', '') + renderBookingAnswers(res.appointmentHistory || []) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('測驗作答', '') + renderQuizAnswers(res.quizHistory || [], res.answersByResponse || {}) + '</div>' +
+        '<div class="detail-section">' + sectionTitle('測驗結果', '') + renderQuizResults(res.quizHistory || [], contact.id) + '</div>' +
+        '<details class="detail-section detail-management"><summary>其他管理資料</summary>' +
+        '<div class="stat-grid">' + statBox('測驗次數', summary.quizCount || 0) + statBox('付款紀錄', summary.paymentCount || 0) + statBox('預約紀錄', summary.appointmentCount || 0) + '</div>' +
         '<div class="detail-section">' + sectionTitle('名單分類與購買紀錄', '可指派顧問、套用標籤、更新流程與購買紀錄，匯出時會一併帶出') + '<div class="row"><div class="col-4"><label>指派顧問</label><select id="crmDetailConsultant">' + consultantSelect + '</select></div><div class="col-4"><label>流程狀態</label><select id="crmDetailStage">' + crmPipelineOptions(summary.lifecycleStage || contact.lifecycle_stage || 'lead', false).replace('<option value="">不變更狀態</option>', '') + '</select></div><div class="col-4"><label>新增標籤</label><input id="crmDetailNewTags" list="crmKnownTags" placeholder="輸入新標籤，可用逗號分隔"><datalist id="crmKnownTags">' + crmTagOptionsHtml(knownTags) + '</datalist></div><div class="col-12"><label>既有標籤</label>' + tagChecks + '</div><div class="col-4"><label>購買方案</label><input id="crmDetailPurchasePlan" value="' + escapeHtml(contact.purchase_plan || '') + '" placeholder="例如：完整版檢測、諮詢"></div><div class="col-3"><label>購買日期</label><input id="crmDetailPurchaseDate" type="date" value="' + escapeHtml(normalizeDateInput(contact.purchase_date)) + '"></div><div class="col-12"><label>內部備註</label><textarea id="crmDetailNotes">' + escapeHtml(contact.notes || '') + '</textarea></div><div class="col-12"><div class="actions"><button type="button" onclick="saveClientLabels(' + Number(contact.id || 0) + ')">儲存名單資料</button></div></div></div></div>' +
         '<div class="detail-section">' + sectionTitle('付款／對帳紀錄', '僅顯示付款成功交易') + renderHistoryList(res.paymentHistory || [], '沒有付款成功紀錄。', function (item) { return '<div class="item"><strong>' + escapeHtml(item.productName || item.productCode || '付款商品') + '｜NT$' + escapeHtml(String(item.amount || 0)) + '</strong><p>藍新交易序號：' + escapeHtml(item.tradeNo || '無資料') + '</p><p>商店訂單編號：' + escapeHtml(item.merchantOrderNo || '') + '</p><p>' + escapeHtml(item.paymentType || '付款方式未提供') + '｜' + escapeHtml(compactDate(item.paidAt || item.createdAt)) + '</p></div>'; }) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('完整版授權', '付款開通與後台邀請都會顯示在這裡') + renderFullQuizEntitlements(res.fullEntitlements || [], contact) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('預約作答', '') + renderBookingAnswers(res.appointmentHistory || []) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('測驗作答', '') + renderQuizAnswers(res.quizHistory || [], res.answersByResponse || {}, contact.id) + '</div>' +
-        '<div class="detail-section">' + sectionTitle('紀錄歷程', '最新在上') + renderChronologicalHistory(res) + '</div>';
+        '<div class="detail-section">' + sectionTitle('完整版授權', '付款開通與後台邀請都會顯示在這裡') + renderFullQuizEntitlements(res.fullEntitlements || [], contact) + '</div></details>';
     }
     function deleteCrmContact(contactId) {
       if (!contactId) return;
