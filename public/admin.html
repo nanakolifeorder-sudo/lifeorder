@@ -1535,8 +1535,9 @@
       if (!can('CRM_ALL')) return '';
       const projects = res.allProjects || [];
       const consultants = (res.allConsultants || []).filter(function (row) { return String(row.meet_tool || '').toLowerCase() === 'zoom'; });
+      const defaultProject = crmProject !== 'ALL' ? crmProject : (projects.some(function (row) { return row.code === 'LOP'; }) ? 'LOP' : projects[0]?.code);
       const projectChoices = projects.map(function (row) {
-        return '<option value="' + escapeHtml(row.code) + '"' + (crmProject === row.code ? ' selected' : '') + '>' + escapeHtml(row.name) + '</option>';
+        return '<option value="' + escapeHtml(row.code) + '"' + (defaultProject === row.code ? ' selected' : '') + '>' + escapeHtml(row.name) + '</option>';
       }).join('');
       const consultantChoices = consultants.map(function (row) {
         return '<option value="' + escapeHtml(row.id) + '">' + escapeHtml(row.name || row.login_email || row.id) + '</option>';
