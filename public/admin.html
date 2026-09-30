@@ -1530,6 +1530,58 @@
       loadCrm();
     }
 
+    let adminBookingResult = null;
+    function adminZoomBookingPanel(res) {
+      if (!can('CRM_ALL')) return '';
+      const projects = res.allProjects || [];
+      const consultants = (res.allConsultants || []).filter(function (row) { return String(row.meet_tool || '').toLowerCase() === 'zoom'; });
+      const projectChoices = projects.map(function (row) {
+        return '<option value="' + escapeHtml(row.code) + '"' + (crmProject === row.code ? ' selected' : '') + '>' + escapeHtml(row.name) + '</option>';
+      }).join('');
+      const consultantChoices = consultants.map(function (row) {
+        return '<option value="' + escapeHtml(row.id) + '">' + escapeHtml(row.name || row.login_email || row.id) + '</option>';
+      }).join('');
+      const result = adminBookingResult ? '<div class="row" style="margin-top:14px">' +
+        '<div class="col-6"><label>客戶專屬諮詢前表單</label><div class="copy-field"><input readonly value="' + escapeHtml(adminBookingResult.intakeUrl) + '"><button class="secondary" type="button" onclick="copyBookingUrl(this)">複製連結</button></div></div>' +
+        '<div class="col-6"><label>Zoom 會議連結</label><div class="copy-field"><input readonly value="' + escapeHtml(adminBookingResult.meetLink) + '"><button class="secondary" type="button" onclick="copyBookingUrl(this)">複製連結</button></div></div>' +
+        (adminBookingResult.crmWarning ? '<p class="bad">' + escapeHtml(adminBookingResult.crmWarning) + '</p>' : '') + '</div>' : '';
+      return '<div class="panel"><h2>先建立 Zoom 預約</h2><div class="row">' +
+        '<div class="col-4"><label>專案</label><select id="adminBookingProject">' + projectChoices + '</select></div>' +
+        '<div class="col-4"><label>Zoom 顧問</label><select id="adminBookingConsultant">' + consultantChoices + '</select></div>' +
+        '<div class="col-4"><label>時間（台北時間）</label><input id="adminBookingTime" type="datetime-local"></div>' +
+        '<div class="col-4"><label>客戶姓名</label><input id="adminBookingName" autocomplete="name"></div>' +
+        '<div class="col-4"><label>客戶 Email</label><input id="adminBookingEmail" type="email" autocomplete="email"></div>' +
+        '<div class="col-4"><label>客戶電話（選填）</label><input id="adminBookingPhone" type="tel" autocomplete="tel"></div>' +
+        '</div><div class="actions"><button type="button" id="adminBookingCreate" onclick="createAdminZoomBooking()"' + (!consultants.length ? ' disabled' : '') + '>建立會議與專屬表單</button></div>' +
+        result + '</div>';
+    }
+
+    function createAdminZoomBooking() {
+      const button = document.getElementById('adminBookingCreate');
+      const payload = {
+        projectCode: document.getElementById('adminBookingProject').value,
+        consultantId: Number(document.getElementById('adminBookingConsultant').value),
+        dateTime: document.getElementById('adminBookingTime').value,
+        name: document.getElementById('adminBookingName').value.trim(),
+        email: document.getElementById('adminBookingEmail').value.trim(),
+        phone: document.getElementById('adminBookingPhone').value.trim()
+      };
+      if (!payload.projectCode || !payload.consultantId || !payload.dateTime || !payload.name || !payload.email) {
+        alert('請填寫專案、顧問、時間、客戶姓名及 Email。');
+        return;
+      }
+      if (!confirm('確定為 ' + payload.name + ' 建立 Zoom 會議與專屬諮詢表單？')) return;
+      button.disabled = true;
+      api('createAdminZoomBooking', payload).then(function (result) {
+        adminBookingResult = result;
+        delete cache.crm;
+        loadCrm();
+      }).catch(function (error) {
+        alert(error.message || '建立失敗。');
+        button.disabled = false;
+      });
+    }
+
     function renderCrm(res) {
       window.crmCardItems = {};
       const all = [].concat(res.data || [], res.leads || [], res.contacts || [], res.rejected || [], res.waitlist || []);
@@ -1555,7 +1607,7 @@
       const accessCodeOptions = ['<option value="ALL">所有重測碼</option>', '<option value="NONE"' + (crmAccessCodeFilter === 'NONE' ? ' selected' : '') + '>未使用</option>'].concat(accessCodes.map(function (code) {
         return '<option value="' + escapeHtml(code) + '"' + (crmAccessCodeFilter === code ? ' selected' : '') + '>' + escapeHtml(code) + '</option>';
       })).join('');
-      document.getElementById('view').innerHTML =
+      document.getElementById('view').innerHTML = adminZoomBookingPanel(res) +
         '<div class="panel">' +
           '<div class="row">' +
             '<div class="col-2"><h2>客戶 CRM</h2></div>' +
@@ -1903,6 +1955,8 @@
           '<button class="secondary" type="button" onclick="downloadQuizReportPdf(&quot;' + escapeHtml(item.quizResultId) + '&quot;)">下載 PDF</button>'
         : '';
       const kindBadge = '';
+      const intakeBadge = item.intakeStatus ? '<span class="badge">諮詢表單：' + escapeHtml(item.intakeStatus) + '</span>' : '';
+      const intakeButton = item.intakeUrl ? '<div class="copy-field" style="max-width:520px;margin:10px 0"><input readonly value="' + escapeHtml(item.intakeUrl) + '"><button class="secondary" type="button" onclick="copyBookingUrl(this)">複製專屬表單連結</button></div>' : '';
       const actionButtons = item.kind === 'appointment' && isUpcoming
         ? '<button class="danger" onclick="cancelAppointment(' + item.rowId + ')">取消會議</button>' +
           '<button class="yellow" onclick="openAdminReschedule(' + item.rowId + ',&quot;' + escapeHtml(item.projectCode || '') + '&quot;)">改期</button>' +
@@ -1917,7 +1971,7 @@
       return '<div class="' + cls + '">' +
         '<div class="card-top">' +
           '<div>' +
-            '<div class="crm-card-title">' + crmSelectionCheckbox(item) + '<button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> ' + stageBadge + ' ' + rescheduleBadge + '</div>' +
+            '<div class="crm-card-title">' + crmSelectionCheckbox(item) + '<button class="name-link" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">' + escapeHtml(item.clientName || '未命名客戶') + '</button> ' + stageBadge + ' ' + rescheduleBadge + ' ' + intakeBadge + '</div>' +
             '<p class="mini">' + escapeHtml(item.clientPhone || '無電話') + (item.clientEmail ? ' ｜ ' + escapeHtml(item.clientEmail) : '') + '</p>' +
           '</div>' +
           '<span class="badge">' + escapeHtml(projectLabel) + '</span>' +
@@ -1930,6 +1984,7 @@
         '</div>' +
         renderTagPills(item.tags || []) +
         '<div class="answer-box"><div class="mini">表單/測驗摘要</div><div class="crm-answer-list">' + crmAnswerPreview(item) + '</div></div>' +
+        intakeButton +
         (item.meetLink ? '<p><a href="' + escapeHtml(item.meetLink) + '" target="_blank">開啟會議連結</a></p>' : '') +
         (item.kind === 'appointment' && crmMode === 'past' ? crmEditor(item) : '') +
         '<div class="actions"><button class="secondary" onclick="openClientDetail(&quot;' + escapeHtml(key) + '&quot;)">打開資料卡</button>' + reportButtons + actionButtons + '</div>' +
@@ -1988,7 +2043,7 @@
     function renderBookingAnswers(items) {
       return renderHistoryList(items, '沒有預約作答紀錄。', function (item) {
         return '<div class="item"><strong>' + escapeHtml(compactDate(item.startAt || item.createdAt)) + '</strong>' +
-          '<p class="mini">' + escapeHtml(item.status || '') + (item.consultantName ? '｜' + escapeHtml(item.consultantName) : '') + '</p>' +
+          '<p class="mini">' + escapeHtml(item.status || '') + (item.consultantName ? '｜' + escapeHtml(item.consultantName) : '') + (item.intakeStatus ? '｜諮詢表單：' + escapeHtml(item.intakeStatus) : '') + '</p>' +
           '<div class="detail-answer">' + escapeHtml(item.answers || '沒有填寫預約表單內容。') + '</div>' +
           (item.meetLink ? '<p><a target="_blank" rel="noopener" href="' + escapeHtml(item.meetLink) + '">會議連結</a></p>' : '') + '</div>';
       });

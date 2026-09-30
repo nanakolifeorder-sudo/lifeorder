@@ -18,6 +18,10 @@
       "destination": "/booking.html"
     },
     {
+      "source": "/consultation-intake",
+      "destination": "/consultation-intake.html"
+    },
+    {
       "source": "/checkout",
       "destination": "/checkout.html"
     },
